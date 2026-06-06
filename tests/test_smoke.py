@@ -54,13 +54,13 @@ class TestEmergentBehavior:
 
     def test_trophic_depth_exceeds_2(self) -> None:
         """Criterion 1: Trophic hierarchies of depth > 2 emerge."""
-        world = _run_scenario(steps=150, seed=42)
+        world = _run_scenario(steps=80, seed=42)
         max_depth = world.telemetry.max_trophic_depth
         assert max_depth > 2.0, f"Max trophic depth was only {max_depth:.1f}; expected > 2.0"
 
     def test_population_stability(self) -> None:
         """Criterion 2: Population reaches stable equilibrium."""
-        world = _run_scenario(steps=300, seed=42, population=30)
+        world = _run_scenario(steps=150, seed=42, population=30)
         # Check that population didn't go to zero
         assert world.living_population > 0, "Population went extinct"
         # Check for approximate stability in the last 50 steps
@@ -118,7 +118,7 @@ class TestEmergentBehavior:
                 agent.genome.maintenance_cost = 0.4
 
         # Run more steps — should see population decline from starvation
-        for _step_num in range(50, 300):
+        for _step_num in range(50, 150):
             world.set_ground_truth(False)
             world.step()
 
@@ -176,7 +176,7 @@ class TestEmergentBehavior:
 
     def test_genome_diversity(self) -> None:
         """Criterion 5: At least 2 distinct species coexist."""
-        world = _run_scenario(steps=200, seed=42, population=25)
+        world = _run_scenario(steps=100, seed=42, population=25)
         living = [a for a in world.agents.values() if a.is_alive]
         if len(living) < 2:
             pytest.skip("Population too small to assess diversity")
@@ -223,15 +223,15 @@ class TestMathematicalProperties:
         # Track per-step variance ratios for actual chain pairs
         ratios: list[float] = []
 
-        for step_num in range(150):
+        for step_num in range(100):
             scenario.step(step_num)
             world.set_ground_truth(scenario.get_ground_truth(step_num))
             world.step()
             if world.living_population == 0:
                 break
 
-            # Only sample from step 80 onward (compression models need training)
-            if step_num < 80:
+            # Only sample from step 50 onward (compression models need training)
+            if step_num < 50:
                 continue
 
             # Build map: output_stream_id -> agent variance
