@@ -277,6 +277,7 @@ class World:
                 input_data.append(stream.current_data)
 
         if not input_data:
+            agent.state.last_step_yield = 0.0
             return
 
         combined = np.concatenate(input_data)
@@ -289,6 +290,7 @@ class World:
 
         # Update agent state
         agent.state.signal_vector = model.get_signal_vector()
+        agent.state.last_step_yield = info_yield
         agent.state.cumulative_yield += info_yield
 
         # Update residual stream (capped to max_dim)
@@ -355,8 +357,8 @@ class World:
         # Information energy: yield - compute_cost + subsidy
         info_delta = -agent.genome.compute_cost
         if model is not None:
-            # Crude yield estimate from last compression
-            info_delta += agent.state.cumulative_yield * 0.01  # normalized
+            # Use this step's compression yield
+            info_delta += agent.state.last_step_yield * agent.genome.metabolic_efficiency
         # Subsidy from downstream agents consuming this agent's residual
         if agent.state.output_stream_id:
             downstream_count = sum(

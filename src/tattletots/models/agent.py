@@ -40,6 +40,7 @@ class AgentState(BaseModel):
         description="Internal state of the compression model (model-specific)",
     )
     cumulative_yield: float = Field(default=0.0, description="Lifetime information yield")
+    last_step_yield: float = Field(default=0.0, description="Info yield from most recent step")
     cumulative_attention: float = Field(default=0.0, description="Lifetime attention income")
     reports_issued: int = Field(default=0, ge=0)
     correct_reports: int = Field(default=0, ge=0)
