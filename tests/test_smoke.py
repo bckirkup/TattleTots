@@ -124,9 +124,9 @@ class TestEmergentBehavior:
 
         pop_after = world.living_population
         # Population should have decreased significantly
-        assert (
-            pop_after < pop_before
-        ), f"Expected extinction cascade: pop went from {pop_before} to {pop_after}"
+        assert pop_after < pop_before, (
+            f"Expected extinction cascade: pop went from {pop_before} to {pop_after}"
+        )
 
     def test_false_alarm_agents_die(self) -> None:
         """Criterion 4: False-alarm agents lose trust and die."""
@@ -170,9 +170,9 @@ class TestEmergentBehavior:
 
         # The wolf should be dead or severely weakened
         wolf_final = world.agents[wolf.id]
-        assert (
-            not wolf_final.is_alive or wolf_final.state.energy.attention < 0.5
-        ), "False-alarm agent should have died or lost most attention energy"
+        assert not wolf_final.is_alive or wolf_final.state.energy.attention < 0.5, (
+            "False-alarm agent should have died or lost most attention energy"
+        )
 
     def test_genome_diversity(self) -> None:
         """Criterion 5: At least 2 distinct species coexist."""
@@ -188,9 +188,9 @@ class TestEmergentBehavior:
         threshold_std = np.std(thresholds)
 
         # Either multiple model types OR significant parameter diversity
-        assert (
-            len(types) >= 2 or threshold_std > 0.1
-        ), f"Insufficient diversity: types={types}, threshold_std={threshold_std:.3f}"
+        assert len(types) >= 2 or threshold_std > 0.1, (
+            f"Insufficient diversity: types={types}, threshold_std={threshold_std:.3f}"
+        )
 
 
 @pytest.mark.smoke

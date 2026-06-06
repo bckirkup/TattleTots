@@ -150,9 +150,9 @@ class TestBranchingStability:
 
         level_c_linear = compute_trophic_level("C", linear_inputs_after, linear_sources)
         # C has no inputs → falls back to base level 1
-        assert level_c_linear == pytest.approx(
-            1.0
-        ), "C should lose its trophic position when bridge node B is removed"
+        assert level_c_linear == pytest.approx(1.0), (
+            "C should lose its trophic position when bridge node B is removed"
+        )
 
         # Branching C retains higher level than linear C after disruption
         assert level_c_after > level_c_linear
@@ -283,9 +283,9 @@ class TestDomesticationOverlap:
         assert upstream.state.input_preference_override.size > 0
         # Preferences should have shifted toward the shaping signal
         override = upstream.state.input_preference_override
-        assert (
-            override[0] > 0.5
-        ), f"First preference {override[0]:.3f} should have increased toward downstream signal"
+        assert override[0] > 0.5, (
+            f"First preference {override[0]:.3f} should have increased toward downstream signal"
+        )
 
     def test_domestication_without_overlap(self) -> None:
         """Shaping should have no effect when dimensions don't match."""
