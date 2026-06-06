@@ -13,6 +13,7 @@ from tattletots.engine.compression import (
     create_compression_model,
 )
 from tattletots.engine.config import SimulationConfig
+from tattletots.engine.domestication import apply_shaping, compute_shaping_signal
 from tattletots.engine.reproduction import attempt_reproduction
 from tattletots.engine.trophic import compute_trophic_level
 from tattletots.engine.trust import verify_reports
@@ -252,3 +253,89 @@ class TestReproduction:
         ]
         offspring = attempt_reproduction(agents, config, rng)
         assert len(offspring) == 0  # Already at cap
+
+
+class TestDomestication:
+    """Domestication unit tests (moved from test_math_properties.py)."""
+
+    def test_domestication_with_overlapping_signals(self) -> None:
+        genome = Genome(
+            input_preference=np.array([0.5, 0.3, 0.2]),
+            domestication_sensitivity=0.5,
+        )
+        upstream = Agent(
+            genome=genome,
+            state=AgentState(lifecycle=LifecycleStage.ADULT),
+        )
+        downstream = Agent(
+            state=AgentState(
+                lifecycle=LifecycleStage.ADULT,
+                signal_vector=np.array([0.8, 0.1, 0.1]),
+            ),
+        )
+        signal = compute_shaping_signal(downstream, upstream)
+        apply_shaping(upstream, [signal])
+        assert upstream.state.input_preference_override.size > 0
+        override = upstream.state.input_preference_override
+        assert override[0] > 0.5
+
+    def test_domestication_without_overlap(self) -> None:
+        genome = Genome(
+            input_preference=np.array([0.5, 0.3, 0.2]),
+            domestication_sensitivity=0.5,
+        )
+        upstream = Agent(
+            genome=genome,
+            state=AgentState(lifecycle=LifecycleStage.ADULT),
+        )
+        downstream = Agent(
+            state=AgentState(
+                lifecycle=LifecycleStage.ADULT,
+                signal_vector=np.array([0.8, 0.2]),
+            ),
+        )
+        signal = compute_shaping_signal(downstream, upstream)
+        apply_shaping(upstream, [signal])
+        assert upstream.state.input_preference_override.size == 0
+
+    def test_domestication_zero_sensitivity(self) -> None:
+        genome = Genome(
+            input_preference=np.array([0.5, 0.3, 0.2]),
+            domestication_sensitivity=0.0,
+        )
+        upstream = Agent(
+            genome=genome,
+            state=AgentState(lifecycle=LifecycleStage.ADULT),
+        )
+        downstream = Agent(
+            state=AgentState(
+                lifecycle=LifecycleStage.ADULT,
+                signal_vector=np.array([0.8, 0.1, 0.1]),
+            ),
+        )
+        signal = compute_shaping_signal(downstream, upstream)
+        apply_shaping(upstream, [signal])
+        assert upstream.state.input_preference_override.size == 0
+
+    def test_domestication_does_not_mutate_genome(self) -> None:
+        original_pref = np.array([0.5, 0.3, 0.2])
+        genome = Genome(
+            input_preference=original_pref.copy(),
+            domestication_sensitivity=0.5,
+        )
+        upstream = Agent(
+            genome=genome,
+            state=AgentState(lifecycle=LifecycleStage.ADULT),
+        )
+        downstream = Agent(
+            state=AgentState(
+                lifecycle=LifecycleStage.ADULT,
+                signal_vector=np.array([0.8, 0.1, 0.1]),
+            ),
+        )
+        signal = compute_shaping_signal(downstream, upstream)
+        apply_shaping(upstream, [signal])
+        np.testing.assert_array_almost_equal(
+            upstream.genome.input_preference,
+            original_pref,
+        )
