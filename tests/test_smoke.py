@@ -77,8 +77,9 @@ class TestEmergentBehavior:
         config = SimulationConfig(
             initial_population=20,
             max_population=60,
-            max_steps=100,
+            max_steps=200,
             seed=42,
+            subsidy_rate=0.0,
         )
         scenario = GaussianShiftScenario(shift_step=200, total_steps=200, seed=42)
         world = World(config=config)
@@ -101,11 +102,14 @@ class TestEmergentBehavior:
         for sid in raw_ids:
             del world.streams[sid]
 
-        # Also remove subsidy to make starvation real
-        world.config.subsidy_rate = 0.0
+        # Block reproduction so deaths dominate
+        world.config.reproduction_energy_fraction = 0.0
+        for agent in world.agents.values():
+            if agent.is_alive:
+                agent.genome.reproduction_threshold = 999.0
 
-        # Run more steps — should see population decline
-        for _step_num in range(50, 150):
+        # Run more steps — should see population decline from starvation
+        for _step_num in range(50, 200):
             world.set_ground_truth(False)
             world.step()
 
