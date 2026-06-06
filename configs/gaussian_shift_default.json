@@ -1,0 +1,34 @@
+{
+  "simulation": {
+    "max_population": 100,
+    "initial_population": 20,
+    "mutation_rate": 0.1,
+    "reproduction_energy_fraction": 0.5,
+    "subsidy_rate": 0.1,
+    "initial_info_energy": 1.0,
+    "initial_attn_energy": 1.0,
+    "trust_delta_pos": 0.05,
+    "trust_delta_neg": 0.2,
+    "trust_delta_miss": 0.1,
+    "false_alarm_penalty": 0.3,
+    "recombination_probability": 0.3,
+    "seed": 42,
+    "max_steps": 400
+  },
+  "scenario": {
+    "scenario": "gaussian_shift",
+    "n_components": 10,
+    "dimensionality": 20,
+    "noise_std": 0.5,
+    "shift_step": 200,
+    "total_steps": 400
+  },
+  "gene_pool": {
+    "available_compression_types": ["pca", "ar1", "threshold"],
+    "n_components_range": [1, 5],
+    "escalation_threshold_range": [0.3, 0.9],
+    "metabolic_efficiency_range": [0.5, 2.0],
+    "development_duration_range": [3, 10],
+    "notes": "Gene pool defines the initial distribution of heritable traits. Evolution selects which combinations survive the dual-currency pressure."
+  }
+}
