@@ -21,6 +21,16 @@ class StepRecord:
     max_trophic_level: float
     n_streams: int
     ground_truth_active: bool
+    # Energy flow tracking
+    total_info_yield: float = 0.0
+    total_attn_income: float = 0.0
+    total_compute_cost: float = 0.0
+    total_maintenance_cost: float = 0.0
+    # Demographic tracking
+    n_juveniles: int = 0
+    n_adults: int = 0
+    mean_generation: float = 0.0
+    n_compression_types: int = 0
 
 
 @dataclass
@@ -98,6 +108,24 @@ class TelemetryRecorder:
             if before > 0 and after / before < 0.5:
                 return True
         return False
+
+    def energy_flow_history(self) -> dict[str, list[float]]:
+        """Energy flow metrics over time."""
+        return {
+            "info_yield": [r.total_info_yield for r in self.history],
+            "attn_income": [r.total_attn_income for r in self.history],
+            "compute_cost": [r.total_compute_cost for r in self.history],
+            "maintenance_cost": [r.total_maintenance_cost for r in self.history],
+        }
+
+    def demographic_history(self) -> dict[str, list[float]]:
+        """Demographic metrics over time."""
+        return {
+            "juveniles": [float(r.n_juveniles) for r in self.history],
+            "adults": [float(r.n_adults) for r in self.history],
+            "mean_generation": [r.mean_generation for r in self.history],
+            "compression_types": [float(r.n_compression_types) for r in self.history],
+        }
 
     def summary(self) -> dict[str, object]:
         """Summary statistics for the entire run."""

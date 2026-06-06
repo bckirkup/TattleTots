@@ -416,6 +416,8 @@ class World:
     ) -> StepRecord:
         """Build telemetry record for this step."""
         living = [a for a in self.agents.values() if a.is_alive]
+        juveniles = [a for a in living if a.state.lifecycle == LifecycleStage.JUVENILE]
+        adults = [a for a in living if a.state.lifecycle == LifecycleStage.ADULT]
         return StepRecord(
             time_step=self.time_step,
             population=len(living),
@@ -433,4 +435,14 @@ class World:
             max_trophic_level=max(self.trophic_levels.values(), default=1.0),
             n_streams=len(self.streams),
             ground_truth_active=self._ground_truth_active,
+            total_info_yield=sum(a.state.last_step_yield for a in living),
+            total_attn_income=sum(a.state.energy.attention for a in living),
+            total_compute_cost=sum(a.genome.compute_cost for a in living),
+            total_maintenance_cost=sum(a.genome.maintenance_cost for a in living),
+            n_juveniles=len(juveniles),
+            n_adults=len(adults),
+            mean_generation=(
+                float(np.mean([a.state.generation for a in living])) if living else 0.0
+            ),
+            n_compression_types=len({a.genome.compression_type for a in living}),
         )
