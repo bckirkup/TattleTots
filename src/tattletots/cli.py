@@ -10,6 +10,7 @@ from pathlib import Path
 from tattletots.engine.config import SimulationConfig
 from tattletots.engine.world import World
 from tattletots.scenarios.gaussian_shift import GaussianShiftScenario
+from tattletots.telemetry.cost_accounting import CostAccumulator
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -90,6 +91,8 @@ def main(argv: list[str] | None = None) -> int:
     world.seed_population()
 
     # Run simulation
+    cost_accumulator = CostAccumulator()
+
     print(f"TattleTots v0.1.0 — {args.scenario}")
     print(f"  Population: {sim_config.initial_population}, Steps: {args.steps}, Seed: {args.seed}")
     print()
@@ -110,12 +113,22 @@ def main(argv: list[str] | None = None) -> int:
                 f"trophic_depth={record.max_trophic_level:.1f}"
             )
 
+        # Cost accounting
+        cost_dict = scenario.compute_costs(
+            n_escalations=record.reports_issued,
+            n_correct=record.correct_reports,
+            n_false_alarms=record.false_alarms,
+            n_missed=0,  # not tracked at record level
+        )
+        cost_accumulator.record_from_dict(step_num, cost_dict)
+
         if record.population == 0:
             print("  ** Total extinction **")
             break
 
     # Summary
     summary = world.telemetry.summary()
+    cost_summary = cost_accumulator.summary()
     print()
     print("=== Simulation Complete ===")
     print(f"  Final population: {summary['final_population']}")
@@ -126,6 +139,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  Precision:        {summary['precision']:.2%}")
     print(f"  Max trophic depth:{summary['max_trophic_depth']:.1f}")
     print(f"  Equilibrium:      {summary['reached_equilibrium']}")
+    print(f"  Total cost:       {cost_summary['total_cost']:.2f}")
 
     # Write output
     if args.output:
@@ -133,6 +147,7 @@ def main(argv: list[str] | None = None) -> int:
             "config": sim_config.model_dump(),
             "scenario": scenario.to_config(),
             "summary": summary,
+            "cost_summary": cost_summary,
             "population_history": world.telemetry.population_history(),
         }
         with open(args.output, "w") as f:

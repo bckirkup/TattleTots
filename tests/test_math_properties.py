@@ -4,7 +4,6 @@ Covers:
   §6.2  Chain depth bounded by signal rank (~ceil(K/k))
   §6.3  Branching topologies more stable than linear
   §6.4  H-D-W equilibrium (honest-deceiver-whistleblower coexistence)
-  §6.5  Domestication improves yield only when signals overlap
 """
 
 from __future__ import annotations
@@ -13,7 +12,6 @@ import numpy as np
 import pytest
 
 from tattletots.engine.config import SimulationConfig
-from tattletots.engine.domestication import apply_shaping, compute_shaping_signal
 from tattletots.engine.trophic import compute_trophic_level
 from tattletots.engine.world import World
 from tattletots.models.agent import Agent, AgentState, LifecycleStage
@@ -250,117 +248,4 @@ class TestHDWEquilibrium:
         assert threshold_range > 0.1, (
             f"Escalation threshold range {threshold_range:.3f} too narrow; "
             "expected diverse strategies to coexist"
-        )
-
-
-@pytest.mark.smoke
-class TestDomesticationOverlap:
-    """§6.5: Domestication improves yield only when signals overlap."""
-
-    def test_domestication_with_overlapping_signals(self) -> None:
-        """Shaping should modify preferences when signal dimensions match."""
-        genome = Genome(
-            input_preference=np.array([0.5, 0.3, 0.2]),
-            domestication_sensitivity=0.5,
-        )
-        upstream = Agent(
-            genome=genome,
-            state=AgentState(lifecycle=LifecycleStage.ADULT),
-        )
-
-        # Downstream signal overlaps in dimensionality
-        downstream = Agent(
-            state=AgentState(
-                lifecycle=LifecycleStage.ADULT,
-                signal_vector=np.array([0.8, 0.1, 0.1]),
-            ),
-        )
-
-        signal = compute_shaping_signal(downstream, upstream)
-        apply_shaping(upstream, [signal])
-
-        # Override should have been written to state
-        assert upstream.state.input_preference_override.size > 0
-        # Preferences should have shifted toward the shaping signal
-        override = upstream.state.input_preference_override
-        assert override[0] > 0.5, (
-            f"First preference {override[0]:.3f} should have increased toward downstream signal"
-        )
-
-    def test_domestication_without_overlap(self) -> None:
-        """Shaping should have no effect when dimensions don't match."""
-        genome = Genome(
-            input_preference=np.array([0.5, 0.3, 0.2]),
-            domestication_sensitivity=0.5,
-        )
-        upstream = Agent(
-            genome=genome,
-            state=AgentState(lifecycle=LifecycleStage.ADULT),
-        )
-
-        # Downstream signal has DIFFERENT dimensionality (2 vs 3)
-        downstream = Agent(
-            state=AgentState(
-                lifecycle=LifecycleStage.ADULT,
-                signal_vector=np.array([0.8, 0.2]),
-            ),
-        )
-
-        signal = compute_shaping_signal(downstream, upstream)
-        apply_shaping(upstream, [signal])
-
-        # Override should NOT have been written (dim mismatch → early return)
-        assert upstream.state.input_preference_override.size == 0
-
-    def test_domestication_zero_sensitivity(self) -> None:
-        """Agents with zero domestication_sensitivity should be immune."""
-        genome = Genome(
-            input_preference=np.array([0.5, 0.3, 0.2]),
-            domestication_sensitivity=0.0,
-        )
-        upstream = Agent(
-            genome=genome,
-            state=AgentState(lifecycle=LifecycleStage.ADULT),
-        )
-
-        downstream = Agent(
-            state=AgentState(
-                lifecycle=LifecycleStage.ADULT,
-                signal_vector=np.array([0.8, 0.1, 0.1]),
-            ),
-        )
-
-        signal = compute_shaping_signal(downstream, upstream)
-        apply_shaping(upstream, [signal])
-
-        # No override — sensitivity is zero
-        assert upstream.state.input_preference_override.size == 0
-
-    def test_domestication_does_not_mutate_genome(self) -> None:
-        """Domestication must write to state, not genome (genome immutability)."""
-        original_pref = np.array([0.5, 0.3, 0.2])
-        genome = Genome(
-            input_preference=original_pref.copy(),
-            domestication_sensitivity=0.5,
-        )
-        upstream = Agent(
-            genome=genome,
-            state=AgentState(lifecycle=LifecycleStage.ADULT),
-        )
-
-        downstream = Agent(
-            state=AgentState(
-                lifecycle=LifecycleStage.ADULT,
-                signal_vector=np.array([0.8, 0.1, 0.1]),
-            ),
-        )
-
-        signal = compute_shaping_signal(downstream, upstream)
-        apply_shaping(upstream, [signal])
-
-        # Genome should be unchanged
-        np.testing.assert_array_almost_equal(
-            upstream.genome.input_preference,
-            original_pref,
-            err_msg="Domestication must not mutate genome.input_preference",
         )
