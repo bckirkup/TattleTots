@@ -65,8 +65,10 @@ class GaussianShiftScenario(DomainAdapter):
 
     def _setup_streams(self) -> None:
         """Create raw data streams — one per structured component group."""
-        # Split into 3 streams of different dimensionalities
-        dims = [7, 7, 6]  # Sum = 20
+        # Split dimensionality into 3 streams as evenly as possible
+        n_streams = 3
+        base, remainder = divmod(self.dimensionality, n_streams)
+        dims = [base + (1 if i < remainder else 0) for i in range(n_streams)]
         for i, d in enumerate(dims):
             stream = Stream(
                 stream_type="raw",  # type: ignore[arg-type]

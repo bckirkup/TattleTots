@@ -31,6 +31,7 @@ class StepRecord:
     n_adults: int = 0
     mean_generation: float = 0.0
     n_compression_types: int = 0
+    missed_events: int = 0
 
 
 @dataclass

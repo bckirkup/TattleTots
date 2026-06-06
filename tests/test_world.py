@@ -383,7 +383,12 @@ class TestBuildStepRecord:
         world.agents[dead.id] = dead
 
         world.time_step = 5
-        record = world._build_step_record(reports=[], births=["b1", "b2"], deaths=["d1"])
+        record = world._build_step_record(
+            reports=[],
+            births=["b1", "b2"],
+            deaths=["d1"],
+            missed=[],
+        )
         assert record.time_step == 5
         assert record.population == 3
         assert record.births == 2
@@ -391,10 +396,20 @@ class TestBuildStepRecord:
 
     def test_record_handles_no_living_agents(self) -> None:
         world = _minimal_world()
-        record = world._build_step_record(reports=[], births=[], deaths=[])
+        record = world._build_step_record(reports=[], births=[], deaths=[], missed=[])
         assert record.population == 0
         assert record.mean_info_energy == 0.0
         assert record.mean_attn_energy == 0.0
+
+    def test_missed_events_propagated(self) -> None:
+        world = _minimal_world()
+        record = world._build_step_record(
+            reports=[],
+            births=[],
+            deaths=[],
+            missed=["a1", "a2", "a3"],
+        )
+        assert record.missed_events == 3
 
 
 class TestWorldStep:
