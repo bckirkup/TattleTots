@@ -18,7 +18,11 @@ def compute_stream_attractiveness(agent: Agent, stream: Stream, rng: np.random.G
     base_attractiveness = stream.structured_variance
 
     # If agent has input preferences and they cover this stream's index
-    pref = agent.state.shaped_input_preference if agent.state.shaped_input_preference is not None else agent.genome.input_preference
+    pref = (
+        agent.state.shaped_input_preference
+        if agent.state.shaped_input_preference is not None
+        else agent.genome.input_preference
+    )
     if pref.size > 0:
         # Use a hash of stream id to get a stable index
         idx = hash(stream.id) % len(pref)
