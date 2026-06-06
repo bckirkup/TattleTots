@@ -195,11 +195,36 @@ class TestMaybeEscalate:
         )
         world.agents[agent.id] = agent
         world._init_agent_model(agent)
-        # Train on zero data
+        # Train on zero data — build baseline history
         for _ in range(5):
             world._compress(agent)
+            world._maybe_escalate(agent)  # accumulate anomaly history
         report = world._maybe_escalate(agent)
         assert report is None
+
+    def test_no_escalation_with_insufficient_history(self) -> None:
+        """With < 3 anomaly samples, normalized score is 0.0 → no escalation."""
+        world = _minimal_world()
+        s = _add_raw_stream(world, dim=5, data=np.ones(5) * 100)
+        user = User(name="u1")
+        world.add_user(user)
+        agent = Agent(
+            genome=Genome(
+                compression_type=CompressionType.THRESHOLD,
+                escalation_threshold=0.01,
+            ),
+            state=AgentState(
+                lifecycle=LifecycleStage.ADULT,
+                input_stream_ids=[s.id],
+            ),
+        )
+        world.agents[agent.id] = agent
+        world._init_agent_model(agent)
+        world._compress(agent)
+        # First call → only 1 sample in history → anomaly = 0.0
+        report = world._maybe_escalate(agent)
+        assert report is None
+        assert len(agent.state.anomaly_history) == 1
 
     def test_escalation_on_anomaly(self) -> None:
         world = _minimal_world()
@@ -218,9 +243,11 @@ class TestMaybeEscalate:
         )
         world.agents[agent.id] = agent
         world._init_agent_model(agent)
-        # Train on zero data, then inject anomaly
+        # Build baseline on zero data
         for _ in range(10):
             world._compress(agent)
+            world._maybe_escalate(agent)  # accumulate anomaly history
+        # Inject a large anomaly — z-score will be very high
         s.current_data = np.ones(5) * 100.0
         world._compress(agent)
         report = world._maybe_escalate(agent)
@@ -229,11 +256,11 @@ class TestMaybeEscalate:
 
     def test_no_report_without_users(self) -> None:
         world = _minimal_world()
-        s = _add_raw_stream(world, dim=5, data=np.ones(5) * 100)
+        s = _add_raw_stream(world, dim=5, data=np.zeros(5))
         agent = Agent(
             genome=Genome(
                 compression_type=CompressionType.THRESHOLD,
-                escalation_threshold=0.001,
+                escalation_threshold=0.01,
             ),
             state=AgentState(
                 lifecycle=LifecycleStage.ADULT,
@@ -242,11 +269,39 @@ class TestMaybeEscalate:
         )
         world.agents[agent.id] = agent
         world._init_agent_model(agent)
+        # Build baseline on zero data (no users registered)
         for _ in range(5):
             world._compress(agent)
+            world._maybe_escalate(agent)
+        # Inject anomaly
+        s.current_data = np.ones(5) * 100.0
+        world._compress(agent)
         report = world._maybe_escalate(agent)
-        # No users to report to → None
+        # No users to report to → None even though anomaly is high
         assert report is None
+
+    def test_anomaly_history_window_capped(self) -> None:
+        """Anomaly history should not grow beyond the window size."""
+        world = _minimal_world()
+        s = _add_raw_stream(world, dim=5, data=np.ones(5))
+        user = User(name="u1")
+        world.add_user(user)
+        agent = Agent(
+            genome=Genome(
+                compression_type=CompressionType.THRESHOLD,
+                escalation_threshold=0.99,
+            ),
+            state=AgentState(
+                lifecycle=LifecycleStage.ADULT,
+                input_stream_ids=[s.id],
+            ),
+        )
+        world.agents[agent.id] = agent
+        world._init_agent_model(agent)
+        for _ in range(80):
+            world._compress(agent)
+            world._maybe_escalate(agent)
+        assert len(agent.state.anomaly_history) <= world._ANOMALY_WINDOW
 
 
 class TestApplyEnergy:

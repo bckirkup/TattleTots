@@ -57,6 +57,10 @@ class AgentState(BaseModel):
         default_factory=lambda: np.array([], dtype=np.float64),
         description="Runtime override of genome input_preference (set by domestication)",
     )
+    anomaly_history: list[float] = Field(
+        default_factory=list,
+        description="Rolling window of raw anomaly scores for baseline normalization",
+    )
 
 
 class Agent(BaseModel):

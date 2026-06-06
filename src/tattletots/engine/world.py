@@ -310,8 +310,15 @@ class World:
                     out_stream.dimensionality = capped_residual.size
                 out_stream.update(capped_residual)
 
+    _ANOMALY_WINDOW: int = 50
+
     def _maybe_escalate(self, agent: Agent) -> Report | None:
-        """Agent decides whether to escalate based on anomaly score vs threshold."""
+        """Agent decides whether to escalate based on anomaly score vs threshold.
+
+        Raw anomaly scores are normalized against the agent's running baseline
+        so that escalation fires only on genuinely unusual signals (z-score
+        mapped through a sigmoid).
+        """
         model = self.compression_models.get(agent.id)
         if model is None:
             return None
@@ -330,7 +337,23 @@ class World:
         max_dim = 30
         if combined.size > max_dim:
             combined = combined[:max_dim]
-        anomaly = model.anomaly_score(combined)
+        raw_anomaly = model.anomaly_score(combined)
+
+        # Maintain rolling window of raw scores
+        agent.state.anomaly_history.append(raw_anomaly)
+        if len(agent.state.anomaly_history) > self._ANOMALY_WINDOW:
+            agent.state.anomaly_history = agent.state.anomaly_history[-self._ANOMALY_WINDOW :]
+
+        # Need at least 3 samples to establish a baseline
+        if len(agent.state.anomaly_history) < 3:
+            anomaly = 0.0
+        else:
+            hist = np.array(agent.state.anomaly_history[:-1])
+            mu = float(np.mean(hist))
+            sigma = max(float(np.std(hist)), 1e-10)
+            z = (raw_anomaly - mu) / sigma
+            # Sigmoid mapping: fires when z > ~2 (i.e., 2+ std devs above baseline)
+            anomaly = float(1.0 / (1.0 + np.exp(-0.5 * (z - 2.0))))
 
         if anomaly < agent.genome.escalation_threshold:
             return None

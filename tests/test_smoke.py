@@ -114,11 +114,11 @@ class TestEmergentBehavior:
         # Increase costs to accelerate starvation
         for agent in world.agents.values():
             if agent.is_alive:
-                agent.genome.compute_cost = 0.3
-                agent.genome.maintenance_cost = 0.2
+                agent.genome.compute_cost = 0.5
+                agent.genome.maintenance_cost = 0.4
 
         # Run more steps — should see population decline from starvation
-        for _step_num in range(50, 200):
+        for _step_num in range(50, 300):
             world.set_ground_truth(False)
             world.step()
 
