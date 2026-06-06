@@ -15,6 +15,13 @@ class TestGaussianShiftScenario:
         total_dim = sum(s.dimensionality for s in streams)
         assert total_dim == 20
 
+    @pytest.mark.parametrize("dim", [10, 20, 30, 7, 100])
+    def test_streams_respect_custom_dimensionality(self, dim: int) -> None:
+        scenario = GaussianShiftScenario(dimensionality=dim, seed=42)
+        streams = scenario.get_streams()
+        total_dim = sum(s.dimensionality for s in streams)
+        assert total_dim == dim
+
     def test_streams_are_raw_type(self) -> None:
         scenario = GaussianShiftScenario(seed=42)
         for stream in scenario.get_streams():

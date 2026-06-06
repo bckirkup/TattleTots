@@ -118,9 +118,9 @@ def main(argv: list[str] | None = None) -> int:
             n_escalations=record.reports_issued,
             n_correct=record.correct_reports,
             n_false_alarms=record.false_alarms,
-            n_missed=0,  # not tracked at record level
+            n_missed=record.missed_events,
         )
-        cost_accumulator.record_from_dict(step_num, cost_dict)
+        cost_accumulator.record_from_dict(record.time_step, cost_dict)
 
         if record.population == 0:
             print("  ** Total extinction **")

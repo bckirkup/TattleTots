@@ -123,6 +123,7 @@ class World:
         )
 
         # Penalize agents that missed a true event
+        missed: list[str] = []
         if self._ground_truth_active:
             reporting_ids = {r.agent_id for r in reports}
             missed = [
@@ -178,7 +179,12 @@ class World:
             del self.streams[sid]
 
         # Record telemetry
-        record = self._build_step_record(reports=verified_reports, births=births, deaths=deaths)
+        record = self._build_step_record(
+            reports=verified_reports,
+            births=births,
+            deaths=deaths,
+            missed=missed,
+        )
         self.telemetry.record_step(record)
         return record
 
@@ -413,6 +419,7 @@ class World:
         reports: list[Report],
         births: list[str],
         deaths: list[str],
+        missed: list[str],
     ) -> StepRecord:
         """Build telemetry record for this step."""
         living = [a for a in self.agents.values() if a.is_alive]
@@ -445,4 +452,5 @@ class World:
                 float(np.mean([a.state.generation for a in living])) if living else 0.0
             ),
             n_compression_types=len({a.genome.compression_type for a in living}),
+            missed_events=len(missed),
         )
