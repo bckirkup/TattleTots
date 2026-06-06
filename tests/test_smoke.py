@@ -233,6 +233,9 @@ class TestMathematicalProperties:
             # Use median to reduce outlier sensitivity from recently-attached agents
             median_l1 = float(np.median(l1_vars))
             median_l2 = float(np.median(l2_vars))
+            # Both near-zero → fully compressed, treat as equal
+            if median_l1 < 1e-15 and median_l2 < 1e-15:
+                return
             assert median_l2 <= median_l1 * 2.0, (
                 f"Level 2 median variance ({median_l2:.3f}) should be ≤ "
                 f"2× Level 1 median variance ({median_l1:.3f})"
