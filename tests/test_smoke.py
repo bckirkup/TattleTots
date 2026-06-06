@@ -151,6 +151,7 @@ class TestEmergentBehavior:
             ),
         )
         world.agents[wolf.id] = wolf
+        world._init_agent_model(wolf)
 
         # Run with no actual events (ground truth = False)
         for step_num in range(100):

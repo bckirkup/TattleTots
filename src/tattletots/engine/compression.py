@@ -49,11 +49,15 @@ class PCACompression(CompressionModel):
         centered = data - self._mean
 
         if centered.shape[0] < 2:
-            # Single sample: use magnitude as crude signal
-            magnitude = float(np.linalg.norm(centered))
-            self._signal = centered.flatten()
-            self._explained_var = magnitude * self.efficiency
-            return centered.flatten(), self._explained_var
+            # Single sample: mean == sample, so centered is zero.
+            # Use raw signal magnitude as a proxy for compressibility.
+            raw = data.flatten()
+            magnitude = float(np.linalg.norm(raw))
+            norm_yield = min(1.0, magnitude / max(float(np.sqrt(raw.size)), 1e-10))
+            info_yield = norm_yield * self.efficiency
+            self._signal = raw[: self.n_components]
+            self._explained_var = info_yield
+            return raw, info_yield
 
         # SVD for PCA
         n_comp = min(self.n_components, min(centered.shape))
