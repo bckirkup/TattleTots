@@ -1,0 +1,25 @@
+{
+  "simulation": {
+    "initial_population": 30,
+    "max_population": 60,
+    "initial_info_energy": 1.5,
+    "initial_attn_energy": 1.5,
+    "max_steps": 400,
+    "seed": 42,
+    "false_alarm_penalty": 0.8,
+    "trust_delta_neg": 0.3,
+    "trust_delta_pos": 0.05,
+    "trust_delta_miss": 0.15,
+    "mutation_rate": 0.1,
+    "recombination_probability": 0.3,
+    "subsidy_rate": 0.1
+  },
+  "scenario": {
+    "n_components": 10,
+    "dimensionality": 20,
+    "noise_std": 0.5,
+    "shift_step": 200,
+    "total_steps": 400
+  },
+  "_description": "Conservative: low false alarm rate (~3%), high sensitivity (~100%). Harsh penalties for false alarms (0.8 attn cost). Good for domains where false dispatches are expensive."
+}
