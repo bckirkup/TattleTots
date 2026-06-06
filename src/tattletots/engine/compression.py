@@ -31,43 +31,55 @@ class CompressionModel(ABC):
 
 
 class PCACompression(CompressionModel):
-    """PCA-based compression: extracts top-k principal components."""
+    """PCA-based compression: extracts top-k principal components.
+
+    Maintains a sliding window of recent samples so that PCA can operate
+    even when the engine feeds one sample per step (the common case).
+    """
+
+    _WINDOW_SIZE: int = 20
 
     def __init__(self, n_components: int, efficiency: float = 1.0) -> None:
         self.n_components = n_components
         self.efficiency = efficiency
-        self._mean: NDArray[np.float64] | None = None
+        self._mean: NDArray[np.float64] = np.array([], dtype=np.float64)
         self._components: NDArray[np.float64] | None = None
         self._signal: NDArray[np.float64] = np.array([], dtype=np.float64)
         self._explained_var: float = 0.0
+        self._history: list[NDArray[np.float64]] = []
 
     def fit_transform(self, data: NDArray[np.float64]) -> tuple[NDArray[np.float64], float]:
-        if data.ndim == 1:
-            data = data.reshape(1, -1)
+        flat = data.flatten()
 
-        self._mean = data.mean(axis=0)
-        centered = data - self._mean
+        # Maintain sliding window; reset on dimensionality change
+        if self._history and len(self._history[0]) != len(flat):
+            self._history.clear()
+        self._history.append(flat.copy())
+        if len(self._history) > self._WINDOW_SIZE:
+            self._history = self._history[-self._WINDOW_SIZE :]
+
+        window = np.array(self._history, dtype=np.float64)
+        mean: NDArray[np.float64] = window.mean(axis=0)
+        self._mean = mean
+        centered = window - mean
 
         if centered.shape[0] < 2:
-            # Single sample: mean == sample, so centered is zero.
-            # Use raw signal magnitude as a proxy for compressibility.
-            raw = data.flatten()
-            magnitude = float(np.linalg.norm(raw))
-            norm_yield = min(1.0, magnitude / max(float(np.sqrt(raw.size)), 1e-10))
-            info_yield = norm_yield * self.efficiency
-            self._signal = raw[: self.n_components]
-            self._explained_var = info_yield
-            return raw, info_yield
+            magnitude = float(np.linalg.norm(flat))
+            self._signal = flat[: self.n_components]
+            self._explained_var = magnitude * self.efficiency
+            self._components = None
+            return flat, self._explained_var
 
         # SVD for PCA
         n_comp = min(self.n_components, min(centered.shape))
         u, s, vt = np.linalg.svd(centered, full_matrices=False)
         self._components = vt[:n_comp]
 
-        # Project and reconstruct
-        projected = centered @ self._components.T
+        # Project and reconstruct the *current* sample only
+        current_centered = (flat - mean).reshape(1, -1)
+        projected = current_centered @ self._components.T
         reconstructed = projected @ self._components
-        residual = (centered - reconstructed).flatten()
+        residual = (current_centered - reconstructed).flatten()
 
         total_var = float(np.sum(s**2))
         explained_var = float(np.sum(s[:n_comp] ** 2))
@@ -78,11 +90,12 @@ class PCACompression(CompressionModel):
         return residual, info_yield
 
     def anomaly_score(self, data: NDArray[np.float64]) -> float:
-        if self._mean is None or self._components is None:
+        if self._mean.size == 0 or self._components is None:
             return 0.0
-        if data.ndim == 1:
-            data = data.reshape(1, -1)
-        centered = data - self._mean
+        flat = data.flatten()
+        if flat.shape[0] != self._mean.shape[0]:
+            return 0.0
+        centered = (flat - self._mean).reshape(1, -1)
         projected = centered @ self._components.T
         reconstructed = projected @ self._components
         reconstruction_error = float(np.mean((centered - reconstructed) ** 2))

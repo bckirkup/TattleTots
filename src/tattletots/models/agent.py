@@ -53,9 +53,9 @@ class AgentState(BaseModel):
         default_factory=lambda: np.array([], dtype=np.float64),
         description="Current signal vector (compressed representation of input)",
     )
-    shaped_input_preference: np.ndarray | None = Field(
-        default=None,
-        description="Runtime-shaped input preference from domestication (not heritable)",
+    input_preference_override: np.ndarray = Field(
+        default_factory=lambda: np.array([], dtype=np.float64),
+        description="Runtime override of genome input_preference (set by domestication)",
     )
 
 

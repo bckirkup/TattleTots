@@ -52,9 +52,12 @@ The `DomainAdapter` ABC defines the contract between TattleTots and domain simul
 
 `GaussianShiftScenario` — K=10 structured Gaussian with midpoint regime change. Self-contained smoke test requiring no external domain.
 
-### telemetry/ — Recording
+### telemetry/ — Recording & Cost Accounting
 
-`TelemetryRecorder` accumulates `StepRecord` per time step. Provides analytics: population history, stability detection, extinction cascade detection.
+| Module | Responsibility |
+|--------|---------------|
+| `recorder.py` | `StepRecord` + `TelemetryRecorder` — per-step snapshots, population history, stability detection, extinction cascade detection, energy flow tracking, demographic metrics |
+| `cost_accounting.py` | `StepCosts` + `CostAccumulator` — surveillance, response, and damage cost tracking from domain adapters |
 
 ## Key Design Decisions
 

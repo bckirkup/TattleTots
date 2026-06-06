@@ -58,7 +58,7 @@ def _sexual_reproduction(
     child_genome = Genome.recombine(parent_a.genome, parent_b.genome, rng)
     child_genome = child_genome.mutate(rng, rate=config.mutation_rate)
 
-    # Both parents pay (based on parents' thresholds, not child's mutated one)
+    # Both parents pay
     cost_per_parent = (
         parent_a.genome.reproduction_threshold + parent_b.genome.reproduction_threshold
     ) / 8

@@ -52,17 +52,17 @@ def apply_shaping(
     padded = [np.pad(s, (0, max_len - len(s))) for s in valid_signals]
     mean_signal = np.mean(padded, axis=0)
 
-    # Modify input preference toward what downstream wants (runtime state, not genome)
-    base_pref = upstream_agent.state.shaped_input_preference
-    if base_pref is None:
-        base_pref = upstream_agent.genome.input_preference
-    if base_pref.size == 0 or base_pref.size != len(mean_signal):
+    # Read current effective preference (state override > genome default)
+    pref = upstream_agent.state.input_preference_override
+    if pref.size == 0:
+        pref = upstream_agent.genome.input_preference
+    if pref.size == 0 or pref.size != len(mean_signal):
         return
 
     # Nudge preferences toward the shaping signal direction
-    new_pref = base_pref + sensitivity * mean_signal[: len(base_pref)]
+    new_pref = pref + sensitivity * mean_signal[: len(pref)]
     new_pref = np.clip(new_pref, 0.0, None)
     total = new_pref.sum()
     if total > 0:
         new_pref /= total
-    upstream_agent.state.shaped_input_preference = new_pref
+    upstream_agent.state.input_preference_override = new_pref
