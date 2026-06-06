@@ -52,8 +52,10 @@ def apply_shaping(
     padded = [np.pad(s, (0, max_len - len(s))) for s in valid_signals]
     mean_signal = np.mean(padded, axis=0)
 
-    # Modify input preference toward what downstream wants
-    pref = upstream_agent.genome.input_preference
+    # Read current effective preference (state override > genome default)
+    pref = upstream_agent.state.input_preference_override
+    if pref.size == 0:
+        pref = upstream_agent.genome.input_preference
     if pref.size == 0 or pref.size != len(mean_signal):
         return
 
@@ -63,4 +65,4 @@ def apply_shaping(
     total = new_pref.sum()
     if total > 0:
         new_pref /= total
-    upstream_agent.genome.input_preference = new_pref
+    upstream_agent.state.input_preference_override = new_pref

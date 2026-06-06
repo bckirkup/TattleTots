@@ -59,7 +59,9 @@ def _sexual_reproduction(
     child_genome = child_genome.mutate(rng, rate=config.mutation_rate)
 
     # Both parents pay
-    cost_per_parent = child_genome.reproduction_threshold / 4
+    cost_per_parent = (
+        parent_a.genome.reproduction_threshold + parent_b.genome.reproduction_threshold
+    ) / 8
     parent_a.state.energy.information -= cost_per_parent
     parent_a.state.energy.attention -= cost_per_parent
     parent_b.state.energy.information -= cost_per_parent

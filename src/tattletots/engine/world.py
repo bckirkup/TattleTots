@@ -228,7 +228,9 @@ class World:
         n_users = max(len(self.users), 1)
 
         return Genome(
-            compression_type=list(CompressionType)[int(self.rng.integers(0, len(CompressionType)))],
+            compression_type=CompressionType(
+                list(CompressionType)[int(self.rng.integers(0, len(CompressionType)))]
+            ),
             n_components=int(self.rng.integers(1, 6)),
             input_preference=self.rng.dirichlet(np.ones(n_streams)),
             escalation_threshold=float(self.rng.uniform(0.3, 0.9)),
@@ -319,6 +321,9 @@ class World:
             return None
 
         combined = np.concatenate(input_data)
+        max_dim = 30
+        if combined.size > max_dim:
+            combined = combined[:max_dim]
         anomaly = model.anomaly_score(combined)
 
         if anomaly < agent.genome.escalation_threshold:
@@ -358,7 +363,7 @@ class World:
         info_delta = -agent.genome.compute_cost
         if model is not None:
             # Use this step's compression yield
-            info_delta += agent.state.last_step_yield * agent.genome.metabolic_efficiency
+            info_delta += agent.state.last_step_yield
         # Subsidy from downstream agents consuming this agent's residual
         if agent.state.output_stream_id:
             downstream_count = sum(
