@@ -135,9 +135,9 @@ class TestCompress:
         world._compress(agent)
         assert agent.state.signal_vector.size > 0
 
-    def test_caps_input_at_30_dimensions(self) -> None:
+    def test_caps_input_at_max_stream_dim(self) -> None:
         world = _minimal_world()
-        # Two streams with 20 dims each = 40 total, should be capped to 30
+        # Two streams with 20 dims each = 40 total, should be capped to max_stream_dim (30)
         s1 = _add_raw_stream(world, dim=20, data=np.ones(20))
         s2 = Stream(
             stream_type=StreamType.RAW,
@@ -156,9 +156,25 @@ class TestCompress:
         world.agents[agent.id] = agent
         world._init_agent_model(agent)
         world._compress(agent)
-        # The residual stream should be <= 30 dimensions
+        # The residual stream should be <= max_stream_dim
         out_stream = world.streams[agent.state.output_stream_id]
-        assert out_stream.dimensionality <= 30
+        assert out_stream.dimensionality <= world.config.max_stream_dim
+
+    def test_custom_max_stream_dim(self) -> None:
+        world = _minimal_world(max_stream_dim=15)
+        s1 = _add_raw_stream(world, dim=20, data=np.ones(20))
+        agent = Agent(
+            genome=Genome(compression_type=CompressionType.THRESHOLD, n_components=3),
+            state=AgentState(
+                lifecycle=LifecycleStage.ADULT,
+                input_stream_ids=[s1.id],
+            ),
+        )
+        world.agents[agent.id] = agent
+        world._init_agent_model(agent)
+        world._compress(agent)
+        out_stream = world.streams[agent.state.output_stream_id]
+        assert out_stream.dimensionality <= 15
 
     def test_no_input_yields_zero(self) -> None:
         world = _minimal_world()

@@ -53,6 +53,7 @@ Simulations are parameterized via JSON:
     "initial_population": 20,
     "max_population": 100,
     "mutation_rate": 0.1,
+    "max_stream_dim": 30,
     "seed": 42
   },
   "scenario": {
