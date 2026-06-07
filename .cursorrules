@@ -42,6 +42,7 @@ tattletots --scenario gaussian_shift --verbose  # Run simulation
 - Attention is zero-sum per user (hard constraint)
 - Residual entropy must decrease through trophic chain
 - Population cap is enforced (no reproduction above max_population)
+- Input/residual dimensionality capped at `config.max_stream_dim` (default 30, tunable)
 - Trust updates are asymmetric: Δ⁻ >> Δ⁺ (false alarms cost more than correct alarms earn)
 - Dead agents' streams and compression models are cleaned up immediately
 

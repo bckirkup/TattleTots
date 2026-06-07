@@ -75,6 +75,9 @@ def get_streams(self) -> list[Stream]:
 - Stream data (`current_data`) must be a NumPy array of that exact size.
 - `StreamType.RAW` for basal data sources. Residual and output streams are
   created automatically by the engine.
+- The engine caps combined agent inputs at `config.max_stream_dim` dimensions
+  (default 30). If your streams exceed this, set `max_stream_dim` in the
+  `SimulationConfig` to match your adapter's dimensionality.
 
 ### 2. Define Your Users
 
@@ -166,6 +169,7 @@ config = SimulationConfig(
     initial_population=20,
     max_population=100,
     max_steps=500,
+    max_stream_dim=50,  # raise from default 30 if your streams are high-dimensional
     seed=42,
 )
 

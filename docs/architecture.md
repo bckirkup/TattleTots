@@ -35,7 +35,7 @@ TattleTots is a discrete-time simulation of an information ecology operating und
 | Module | Responsibility |
 |--------|---------------|
 | `world.py` | World state + step() orchestration |
-| `config.py` | `SimulationConfig` parameters |
+| `config.py` | `SimulationConfig` parameters (incl. tunable `max_stream_dim`) |
 | `compression.py` | Pluggable compression models (PCA, AR1, Threshold) |
 | `trophic.py` | Stream selection + trophic level computation |
 | `attention.py` | Softmax allocation + niche overlap |

@@ -24,7 +24,7 @@ pytest
 - **Never modify tests to make them pass** — fix the implementation
 - **Genome fields are heritable** — runtime state is NOT
 - **Compression models must handle variable-dimension input gracefully** (reset on dim change)
-- **Residual streams are capped at 30 dimensions** to prevent exponential blowup
+- **Input/residual streams are capped at `config.max_stream_dim`** (default 30) to prevent exponential blowup
 
 ## Key Files
 | File | Purpose |
@@ -39,7 +39,7 @@ pytest
 - Streams must be cleaned up when agents die (orphan cleanup in step loop)
 - Trophic level computation is O(N) with memoization — called every step
 - Population cap prevents runaway reproduction
-- Dimensionality cap on residuals prevents exponential vector growth
+- Dimensionality cap (`max_stream_dim` in `SimulationConfig`) on inputs/residuals prevents exponential vector growth; tunable per scenario
 
 ## PR Requirements
 - All ruff checks pass

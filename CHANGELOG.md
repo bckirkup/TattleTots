@@ -4,6 +4,11 @@ All notable changes to TattleTots are documented here.
 
 ## [Unreleased]
 
+### Changed
+- **`max_stream_dim` is now tunable** — the hardcoded 30-dimension cap on agent
+  inputs and residual streams is now `SimulationConfig.max_stream_dim` (default
+  30). Domain adapters with high-dimensional streams can increase this via config.
+
 ### Added
 - **Phase 7 — Mathematical invariant tests** (`tests/test_math_properties.py`)
   - Chain depth bounded by signal rank (§6.2)
