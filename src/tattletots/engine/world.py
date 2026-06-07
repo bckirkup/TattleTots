@@ -290,7 +290,7 @@ class World:
 
         combined = np.concatenate(input_data)
         # Cap input dimensionality to prevent exponential growth through trophic chain
-        max_dim = 30
+        max_dim = self.config.max_stream_dim
         if combined.size > max_dim:
             combined = combined[:max_dim]
 
@@ -301,7 +301,7 @@ class World:
         agent.state.last_step_yield = info_yield
         agent.state.cumulative_yield += info_yield
 
-        # Update residual stream (capped to max_dim)
+        # Update residual stream (capped to max_stream_dim)
         if agent.state.output_stream_id:
             out_stream = self.streams.get(agent.state.output_stream_id)
             if out_stream is not None:
@@ -334,7 +334,7 @@ class World:
             return None
 
         combined = np.concatenate(input_data)
-        max_dim = 30
+        max_dim = self.config.max_stream_dim
         if combined.size > max_dim:
             combined = combined[:max_dim]
         raw_anomaly = model.anomaly_score(combined)

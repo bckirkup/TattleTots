@@ -38,6 +38,14 @@ class SimulationConfig(BaseModel):
     )
     seed: int | None = Field(default=None, description="Random seed for reproducibility")
     max_steps: int = Field(default=1000, ge=1, description="Maximum simulation steps")
+    max_stream_dim: int = Field(
+        default=30,
+        ge=1,
+        description=(
+            "Maximum dimensionality for combined inputs and residual streams. "
+            "Prevents exponential vector growth through the trophic chain."
+        ),
+    )
     extinction_check_window: int = Field(
         default=50, ge=1, description="Steps between stability checks"
     )
