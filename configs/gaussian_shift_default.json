@@ -13,7 +13,8 @@
     "false_alarm_penalty": 0.3,
     "recombination_probability": 0.3,
     "seed": 42,
-    "max_steps": 400
+    "max_steps": 400,
+    "max_input_dim": 30
   },
   "scenario": {
     "scenario": "gaussian_shift",

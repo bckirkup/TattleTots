@@ -290,7 +290,7 @@ class World:
 
         combined = np.concatenate(input_data)
         # Cap input dimensionality to prevent exponential growth through trophic chain
-        max_dim = 30
+        max_dim = self.config.max_input_dim
         if combined.size > max_dim:
             combined = combined[:max_dim]
 
@@ -334,7 +334,7 @@ class World:
             return None
 
         combined = np.concatenate(input_data)
-        max_dim = 30
+        max_dim = self.config.max_input_dim
         if combined.size > max_dim:
             combined = combined[:max_dim]
         raw_anomaly = model.anomaly_score(combined)

@@ -41,3 +41,12 @@ class SimulationConfig(BaseModel):
     extinction_check_window: int = Field(
         default=50, ge=1, description="Steps between stability checks"
     )
+    max_input_dim: int = Field(
+        default=30,
+        ge=1,
+        description=(
+            "Maximum dimensionality for agent input vectors and residual streams. "
+            "Caps exponential growth through the trophic chain. Increase for "
+            "high-dimensional domain adapters."
+        ),
+    )
