@@ -96,6 +96,16 @@ class FireEcologyAdapter(DomainAdapter):
     def compute_costs(self, ...) -> dict[str, float]: ...
 ```
 
+### Available Domain Adapters
+
+| Repository | Domain | Package |
+|------------|--------|---------|
+| [Coral_Key_in_Three_Hour_Epochs](https://github.com/bckirkup/Coral_Key_in_Three_Hour_Epochs) | Fishery monitoring & IUU detection | `coral-key` |
+| [Xylella_SPQR](https://github.com/bckirkup/Xylella_SPQR) | Precision agriculture & pest management | `grain-guard` |
+| [Scrapiron_and_the_Bear](https://github.com/bckirkup/Scrapiron_and_the_Bear) | Wildfire detection & suppression | `fire-ecology` |
+
+Each domain repo includes a `scripts/run_with_tattletots.py` runner that plugs its adapter into the full TattleTots engine, producing unified JSON output for cross-domain comparison. See [docs/COORDINATION.md](docs/COORDINATION.md) for details on installation, configuration, and output schema.
+
 ## Testing
 
 ```bash
