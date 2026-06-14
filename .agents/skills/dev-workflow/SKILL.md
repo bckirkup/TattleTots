@@ -46,6 +46,7 @@ pytest --cov=tattletots  # with coverage
 | `false_alarm_penalty` | 0.3 | Attention energy cost for false alarms |
 | `trust_delta_pos` / `trust_delta_neg` | 0.05 / 0.2 | Asymmetric trust update magnitudes |
 | `seed` | None | Random seed for reproducibility |
+| `use_gpu` | False | Offload array math to GPU via CuPy. Requires `pip install -e ".[gpu]"` |
 
 ## Simulation Step Order (10 phases)
 
@@ -68,11 +69,51 @@ pytest --cov=tattletots  # with coverage
 - **Input/residual cap**: combined inputs and residuals are truncated to `config.max_stream_dim` dimensions.
 - **Dead agents**: streams and compression models cleaned up immediately.
 
+## GPU Acceleration
+
+```bash
+pip install -e ".[gpu]"  # installs cupy-cuda12x
+```
+
+Set `"use_gpu": true` in config JSON. All array math (SVD in PCA compression, attention
+softmax, niche overlap cosine) dispatches to CuPy. Falls back silently to NumPy if no GPU.
+
+Key files:
+- `src/tattletots/engine/gpu_utils.py` — `get_array_module()`, `to_numpy()`, `gpu_available()`
+- Compression, attention, and niche overlap use `xp = get_array_module(use_gpu)` pattern
+
 ## Adding Domain Adapters
 
 Implement `DomainAdapter` ABC from `tattletots.interface`. Set `max_stream_dim` in `SimulationConfig` to match your adapter's stream dimensionality if it exceeds 30.
 
 See `docs/domain_integration.md` for the full guide and `scenarios/gaussian_shift.py` for a reference implementation.
+
+### Available Domain Repos
+
+| Repo | Domain | Runner |
+|------|--------|--------|
+| `Coral_Key_in_Three_Hour_Epochs` | Fishery/IUU | `scripts/run_with_tattletots.py` |
+| `Xylella_SPQR` | Precision agriculture | `scripts/run_with_tattletots.py` |
+| `Scrapiron_and_the_Bear` | Wildfire | `scripts/run_with_tattletots.py` |
+
+All runners output unified JSON (`tattletots.output_schema.SimulationOutput`).
+See `docs/COORDINATION.md` for the full cross-repo guide.
+
+## Parameter Scans
+
+For large sweeps, generate config variants and run in parallel:
+
+```bash
+# Each run produces a SimulationOutput JSON file
+python scripts/run_with_tattletots.py --config <cfg>.json --output <out>.json
+
+# Load results programmatically
+from tattletots.output_schema import SimulationOutput
+result = SimulationOutput.model_validate_json(path.read_text())
+```
+
+Key parameters to sweep: `mutation_rate`, `initial_population`, `max_population`,
+`false_alarm_penalty`, `trust_delta_neg`, `seed` (replicate).
 
 ## Pre-existing Configs
 

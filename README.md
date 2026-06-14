@@ -106,6 +106,60 @@ class FireEcologyAdapter(DomainAdapter):
 
 Each domain repo includes a `scripts/run_with_tattletots.py` runner that plugs its adapter into the full TattleTots engine, producing unified JSON output for cross-domain comparison. See [docs/COORDINATION.md](docs/COORDINATION.md) for details on installation, configuration, and output schema.
 
+## GPU Acceleration
+
+TattleTots supports optional GPU offloading via [CuPy](https://cupy.dev/) for large-population runs and parameter scans:
+
+```bash
+# Install with GPU support
+pip install -e ".[gpu]"
+
+# Enable in config JSON
+{"simulation": {"use_gpu": true, ...}}
+
+# Or pass directly via the engine
+tattletots --config configs/gpu_scan.json --verbose
+```
+
+When `use_gpu: true`, all array math (compression SVD, attention softmax, niche overlap) dispatches to CuPy. Falls back to NumPy silently if CuPy is unavailable or no CUDA device is found.
+
+### Parameter Scans
+
+For large sweeps across parameter space, use the runner script with shell parallelism:
+
+```bash
+# Single run with JSON output
+python scripts/run_with_tattletots.py --config configs/tattletots_integration.json --output results.json
+
+# Parallel parameter scan (example: vary mutation_rate and seed)
+for rate in 0.01 0.05 0.1 0.2 0.5; do
+  for seed in $(seq 1 10); do
+    python -c "
+import json, sys
+cfg = json.load(open('configs/gaussian_shift_default.json'))
+cfg['simulation']['mutation_rate'] = $rate
+cfg['simulation']['seed'] = $seed
+json.dump(cfg, open(f'configs/scan/mr{rate}_s{seed}.json', 'w'))
+" && python scripts/run_with_tattletots.py \
+      --config "configs/scan/mr${rate}_s${seed}.json" \
+      --output "results/mr${rate}_s${seed}.json" &
+  done
+done
+wait
+```
+
+All output files conform to `tattletots.output_schema.SimulationOutput`, so results can be loaded and compared programmatically:
+
+```python
+import json, pathlib
+from tattletots.output_schema import SimulationOutput
+
+results = [
+    SimulationOutput.model_validate_json(p.read_text())
+    for p in pathlib.Path("results").glob("*.json")
+]
+```
+
 ## Testing
 
 ```bash

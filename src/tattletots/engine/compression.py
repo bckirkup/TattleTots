@@ -81,12 +81,13 @@ class PCACompression(CompressionModel):
         # SVD for PCA
         n_comp = min(self.n_components, min(centered.shape))
         _u, s, vt = xp.linalg.svd(centered, full_matrices=False)
-        self._components = vt[:n_comp]
+        components = vt[:n_comp]
+        self._components = components
 
         # Project and reconstruct the *current* sample only
         current_centered = (flat - mean).reshape(1, -1)
-        projected = current_centered @ self._components.T
-        reconstructed = projected @ self._components
+        projected = current_centered @ components.T
+        reconstructed = projected @ components
         residual = (current_centered - reconstructed).flatten()
 
         total_var = float(xp.sum(s**2))

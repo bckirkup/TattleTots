@@ -21,7 +21,7 @@ def _try_import_cupy() -> ModuleType | None:
         return _cupy
     _cupy_import_attempted = True
     try:
-        import cupy as cp  # type: ignore[import-untyped]
+        import cupy as cp  # type: ignore[import-not-found]
 
         _cupy = cp
     except Exception:
@@ -42,7 +42,7 @@ def to_numpy(arr: object) -> np.ndarray:
     """Convert a cupy or numpy array to a plain numpy array."""
     cp = _try_import_cupy()
     if cp is not None and isinstance(arr, cp.ndarray):
-        return cp.asnumpy(arr)  # type: ignore[return-value]
+        return cp.asnumpy(arr)  # type: ignore[no-any-return]
     return np.asarray(arr)
 
 
@@ -52,6 +52,6 @@ def gpu_available() -> bool:
     if cp is None:
         return False
     try:
-        return cp.cuda.runtime.getDeviceCount() > 0
+        return bool(cp.cuda.runtime.getDeviceCount() > 0)
     except Exception:
         return False

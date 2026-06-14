@@ -2,16 +2,12 @@
 
 from __future__ import annotations
 
-import numpy as np
-
 from tattletots.engine.gpu_utils import get_array_module
 from tattletots.models.agent import Agent
 from tattletots.models.user import User
 
 
-def allocate_attention(
-    user: User, agents: list[Agent], use_gpu: bool = False
-) -> dict[str, float]:
+def allocate_attention(user: User, agents: list[Agent], use_gpu: bool = False) -> dict[str, float]:
     """Softmax attention allocation from a user across agents.
 
     α_{k,i}(t) = A_k(t) * (τ_{k,i} * r_{k,i}) / Σ_j(τ_{k,j} * r_{k,j})
@@ -35,10 +31,7 @@ def allocate_attention(
         return {agent.id: equal_share for agent in agents}
 
     weights = scores / total_score
-    return {
-        agent.id: user.attention_budget * float(weights[i])
-        for i, agent in enumerate(agents)
-    }
+    return {agent.id: user.attention_budget * float(weights[i]) for i, agent in enumerate(agents)}
 
 
 def compute_attention_income(
@@ -59,9 +52,7 @@ def compute_attention_income(
     return income
 
 
-def compute_niche_overlap(
-    agent_a: Agent, agent_b: Agent, use_gpu: bool = False
-) -> float:
+def compute_niche_overlap(agent_a: Agent, agent_b: Agent, use_gpu: bool = False) -> float:
     """Cosine similarity between two agents' signal vectors.
 
     High overlap → direct competition for the same attention niche.
