@@ -49,3 +49,11 @@ class SimulationConfig(BaseModel):
     extinction_check_window: int = Field(
         default=50, ge=1, description="Steps between stability checks"
     )
+    use_gpu: bool = Field(
+        default=False,
+        description=(
+            "Offload array math to the GPU via CuPy. Requires the [gpu] optional "
+            "dependency (cupy-cuda12x). Falls back to NumPy silently if CuPy is "
+            "not installed or no CUDA device is found."
+        ),
+    )

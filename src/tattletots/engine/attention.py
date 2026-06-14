@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import numpy as np
 
+from tattletots.engine.gpu_utils import get_array_module
 from tattletots.models.agent import Agent
 from tattletots.models.user import User
 
 
-def allocate_attention(user: User, agents: list[Agent]) -> dict[str, float]:
+def allocate_attention(
+    user: User, agents: list[Agent], use_gpu: bool = False
+) -> dict[str, float]:
     """Softmax attention allocation from a user across agents.
 
     α_{k,i}(t) = A_k(t) * (τ_{k,i} * r_{k,i}) / Σ_j(τ_{k,j} * r_{k,j})
@@ -18,23 +21,24 @@ def allocate_attention(user: User, agents: list[Agent]) -> dict[str, float]:
     if not agents:
         return {}
 
-    scores: list[float] = []
-    for agent in agents:
-        trust = user.get_trust(agent.id)
-        relevance = user.compute_relevance(agent.state.signal_vector)
-        scores.append(trust * max(relevance, 0.0))
+    xp = get_array_module(use_gpu)
+    trust_arr = xp.array([user.get_trust(a.id) for a in agents], dtype=xp.float64)
+    relevance_arr = xp.array(
+        [max(user.compute_relevance(a.state.signal_vector), 0.0) for a in agents],
+        dtype=xp.float64,
+    )
+    scores = trust_arr * relevance_arr
+    total_score = float(xp.sum(scores))
 
-    total_score = sum(scores)
     if total_score <= 0:
-        # Equal split if no differentiation
         equal_share = user.attention_budget / len(agents)
         return {agent.id: equal_share for agent in agents}
 
-    allocations: dict[str, float] = {}
-    for agent, score in zip(agents, scores, strict=True):
-        allocations[agent.id] = user.attention_budget * (score / total_score)
-
-    return allocations
+    weights = scores / total_score
+    return {
+        agent.id: user.attention_budget * float(weights[i])
+        for i, agent in enumerate(agents)
+    }
 
 
 def compute_attention_income(
@@ -55,7 +59,9 @@ def compute_attention_income(
     return income
 
 
-def compute_niche_overlap(agent_a: Agent, agent_b: Agent) -> float:
+def compute_niche_overlap(
+    agent_a: Agent, agent_b: Agent, use_gpu: bool = False
+) -> float:
     """Cosine similarity between two agents' signal vectors.
 
     High overlap → direct competition for the same attention niche.
@@ -66,14 +72,15 @@ def compute_niche_overlap(agent_a: Agent, agent_b: Agent) -> float:
     if sig_a.size == 0 or sig_b.size == 0:
         return 0.0
 
+    xp = get_array_module(use_gpu)
     min_dim = min(len(sig_a), len(sig_b))
-    a = sig_a[:min_dim]
-    b = sig_b[:min_dim]
+    a = xp.asarray(sig_a[:min_dim], dtype=xp.float64)
+    b = xp.asarray(sig_b[:min_dim], dtype=xp.float64)
 
-    norm_a = float(np.linalg.norm(a))
-    norm_b = float(np.linalg.norm(b))
+    norm_a = float(xp.linalg.norm(a))
+    norm_b = float(xp.linalg.norm(b))
 
     if norm_a < 1e-10 or norm_b < 1e-10:
         return 0.0
 
-    return float(np.dot(a, b) / (norm_a * norm_b))
+    return float(xp.dot(a, b) / (norm_a * norm_b))

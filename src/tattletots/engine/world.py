@@ -136,7 +136,9 @@ class World:
         # 5. Attention allocation
         all_allocations: dict[str, dict[str, float]] = {}
         for user in self.users.values():
-            all_allocations[user.id] = allocate_attention(user, living_agents)
+            all_allocations[user.id] = allocate_attention(
+                user, living_agents, use_gpu=self.config.use_gpu
+            )
 
         # 6. Energy accounting
         for agent in living_agents:
@@ -254,6 +256,7 @@ class World:
             agent.genome.compression_type,
             agent.genome.n_components,
             agent.genome.metabolic_efficiency,
+            use_gpu=self.config.use_gpu,
         )
         self.compression_models[agent.id] = model
 
