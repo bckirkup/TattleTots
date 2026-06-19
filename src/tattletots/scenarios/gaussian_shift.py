@@ -155,7 +155,9 @@ class GaussianShiftScenario(DomainAdapter):
 
     def dim_index_to_location(self, dim_index: int) -> EventLocation:
         """Map dimension index to component block."""
-        component = min(dim_index // max(1, self.dimensionality // self.n_components), self.n_components - 1)
+        component = min(
+            dim_index // max(1, self.dimensionality // self.n_components), self.n_components - 1
+        )
         return (component, 0)
 
     def compute_costs(

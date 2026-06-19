@@ -45,7 +45,8 @@ def apply_temporal_fusion(
             return current
         window = np.stack(buffer, axis=0)
         # Lightweight projection: mean across time preserves dim, reduces noise
-        return window.mean(axis=0)
+        result: NDArray[np.float64] = window.mean(axis=0)
+        return result
 
     if mode == TemporalFusionMode.AR_LAG:
         if len(buffer) < 2:

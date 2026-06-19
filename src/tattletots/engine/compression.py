@@ -243,7 +243,9 @@ class WaveletCompression(CompressionModel):
         self._signal: NDArray[np.float64] = np.array([], dtype=np.float64)
         self._approx: NDArray[np.float64] | None = None
 
-    def _haar_decompose(self, flat: NDArray[np.float64]) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    def _haar_decompose(
+        self, flat: NDArray[np.float64]
+    ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
         xp = self._xp
         n = flat.size
         if n < 2:

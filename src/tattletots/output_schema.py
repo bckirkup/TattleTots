@@ -69,11 +69,9 @@ class TimeSeries(BaseModel):
     max_trophic_level: list[float] = Field(default_factory=list)
 
     @classmethod
-    def from_telemetry(
-        cls, telemetry: TelemetryRecorder, cost_per_step: list[float]
-    ) -> TimeSeries:
+    def from_telemetry(cls, telemetry: TelemetryRecorder, cost_per_step: list[float]) -> TimeSeries:
         """Build a TimeSeries from a TelemetryRecorder and per-step costs."""
-        ecology = telemetry.ecology_time_series()
+        ecology: dict[str, Any] = telemetry.ecology_time_series()
         return cls(cost_per_step=cost_per_step, **ecology)
 
 

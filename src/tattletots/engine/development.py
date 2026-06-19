@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import numpy as np
-
 from tattletots.engine.config import SimulationConfig
 from tattletots.models.agent import Agent, LifecycleStage
 from tattletots.models.genome import MimesisMode, ParentalStrategy

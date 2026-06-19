@@ -12,7 +12,6 @@ from tattletots.engine.development import (
 )
 from tattletots.models.agent import Agent, AgentState, LifecycleStage
 from tattletots.models.genome import Genome, MimesisMode, ParentalStrategy
-from tattletots.models.user import User
 
 
 class TestDevelopment:
@@ -26,7 +25,9 @@ class TestDevelopment:
             genome=Genome(maintenance_cost=0.1),
             state=AgentState(lifecycle=LifecycleStage.ADULT),
         )
-        assert juvenile_maintenance_cost(juvenile, config) < juvenile_maintenance_cost(adult, config)
+        assert juvenile_maintenance_cost(juvenile, config) < juvenile_maintenance_cost(
+            adult, config
+        )
 
     def test_mimesis_nudges_preferences(self) -> None:
         config = SimulationConfig(mimesis_learning_rate=0.5)

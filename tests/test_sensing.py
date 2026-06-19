@@ -11,9 +11,15 @@ from tattletots.models.genome import Genome, SensingStrategy
 from tattletots.models.stream import Stream, StreamType
 
 
-def _agent_with_streams(strategy: SensingStrategy, working_dim: int = 16) -> tuple[Agent, dict[str, Stream]]:
-    s1 = Stream(stream_type=StreamType.RAW, dimensionality=10, label="s1", current_data=np.arange(10.0))
-    s2 = Stream(stream_type=StreamType.RAW, dimensionality=10, label="s2", current_data=np.arange(10.0) * 2)
+def _agent_with_streams(
+    strategy: SensingStrategy, working_dim: int = 16
+) -> tuple[Agent, dict[str, Stream]]:
+    s1 = Stream(
+        stream_type=StreamType.RAW, dimensionality=10, label="s1", current_data=np.arange(10.0)
+    )
+    s2 = Stream(
+        stream_type=StreamType.RAW, dimensionality=10, label="s2", current_data=np.arange(10.0) * 2
+    )
     streams = {s1.id: s1, s2.id: s2}
     agent = Agent(
         genome=Genome(
@@ -53,6 +59,8 @@ class TestSensing:
 
     def test_projection_does_not_increase_variance_unbounded(self) -> None:
         agent, streams = _agent_with_streams(SensingStrategy.CONCAT, working_dim=8)
-        combined = np.concatenate([streams[sid].current_data for sid in agent.state.input_stream_ids])
+        combined = np.concatenate(
+            [streams[sid].current_data for sid in agent.state.input_stream_ids]
+        )
         out, _ = prepare_agent_input(agent, streams, SimulationConfig())
         assert float(np.var(out)) <= float(np.var(combined)) + 1e-6
