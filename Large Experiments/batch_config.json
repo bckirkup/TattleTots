@@ -1,0 +1,47 @@
+{
+  "output_directory": "batch_results",
+  "runs": [
+    {
+      "name": "coral_key_run",
+      "domain": "coral_key",
+      "config_overrides": {
+        "simulation": {
+          "max_steps": 100,
+          "seed": 42
+        },
+        "domain": {
+          "total_epochs": 100,
+          "seed": 42
+        }
+      }
+    },
+    {
+      "name": "fire_ecology_run",
+      "domain": "fire_ecology",
+      "config_overrides": {
+        "simulation": {
+          "max_steps": 100,
+          "seed": 42
+        },
+        "domain": {
+          "steps": 100,
+          "seed": 42
+        }
+      }
+    },
+    {
+      "name": "grain_guard_run",
+      "domain": "grain_guard",
+      "config_overrides": {
+        "simulation": {
+          "max_steps": 100,
+          "seed": 42
+        },
+        "domain": {
+          "steps": 100,
+          "seed": 42
+        }
+      }
+    }
+  ]
+}
