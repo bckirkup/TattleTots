@@ -29,9 +29,18 @@ pytest
 ## Key Files
 | File | Purpose |
 |------|---------|
-| `src/tattletots/engine/world.py` | Main simulation loop (10-phase step) |
+| `src/tattletots/engine/world.py` | Main simulation loop (12-phase step) |
 | `src/tattletots/models/genome.py` | Heritable traits + mutation/recombination |
+| `src/tattletots/models/location.py` | `EventLocation` type alias for spatial coordinates |
 | `src/tattletots/engine/compression.py` | Pluggable compression models |
+| `src/tattletots/engine/spatial.py` | Spatial region specialization (mask + infer location) |
+| `src/tattletots/engine/temporal.py` | Temporal memory fusion (EMA, window stack, AR lag) |
+| `src/tattletots/engine/development.py` | Juvenile mimesis + parental investment |
+| `src/tattletots/engine/escalation.py` | Adaptive threshold calibration |
+| `src/tattletots/engine/sensing.py` | Multi-stream fusion strategies |
+| `src/tattletots/engine/residual.py` | Residual output policies |
+| `src/tattletots/engine/whistleblowing.py` | Dishonesty detection |
+| `src/tattletots/interface/domain_adapter.py` | DomainAdapter ABC (8 abstract methods) |
 | `src/tattletots/scenarios/gaussian_shift.py` | Built-in smoke test scenario |
 | `tests/test_smoke.py` | Success criteria validation |
 
