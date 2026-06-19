@@ -1,3 +1,9 @@
 __pycache__/
 *.pyc
 *.zip
+
+# Generated experiment outputs
+Large Experiments/batch_results/
+Large Experiments/smoke_test_results/
+Large Experiments/quick_validation*/
+Large Experiments/designed_experiments_results/
