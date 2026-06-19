@@ -35,10 +35,12 @@ An agent dies if *either* reserve hits zero. This creates the fundamental tensio
 
 ```
 src/tattletots/
-├── models/          # Domain types: Agent, Stream, User, Genome, Energy
-├── engine/          # Simulation core: World, compression, trophic, trust
+├── models/          # Domain types: Agent, Stream, User, Genome, Energy, Location
+├── engine/          # Simulation core: World, compression, sensing, spatial,
+│                    #   temporal, development, escalation, trophic, trust,
+│                    #   reproduction, residual, whistleblowing, domestication
 ├── interface/       # DomainAdapter ABC for plugging in domain repos
-├── scenarios/       # Built-in test scenarios (Gaussian shift)
+├── scenarios/       # Built-in test scenarios (Gaussian shift, High-dim shift)
 ├── telemetry/       # History recording and analytics
 └── cli.py           # Command-line entry point
 ```
@@ -86,15 +88,20 @@ Domain repositories implement `DomainAdapter`:
 
 ```python
 from tattletots.interface import DomainAdapter
+from tattletots.models.location import EventLocation
 
 class FireEcologyAdapter(DomainAdapter):
     def get_streams(self) -> list[Stream]: ...
     def get_users(self) -> list[User]: ...
     def step(self, time_step: int) -> None: ...
     def get_ground_truth(self, time_step: int) -> bool: ...
+    def get_active_locations(self, time_step: int) -> list[EventLocation]: ...
+    def infer_report_location(self, stream_data, stream_labels) -> EventLocation: ...
     def score_relevance(self, signal, user) -> float: ...
     def compute_costs(self, ...) -> dict[str, float]: ...
 ```
+
+The engine uses `get_active_locations()` for spatial report verification — each agent report includes a location, and correctness is evaluated per-location (not just globally). The `infer_report_location()` callback maps agent input streams to a spatial coordinate.
 
 ### Available Domain Adapters
 
