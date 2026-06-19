@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from tattletots.output_schema import TimeSeries
 from tattletots.telemetry.cost_accounting import CostAccumulator, StepCosts
 from tattletots.telemetry.recorder import StepRecord, TelemetryRecorder
-from tattletots.output_schema import TimeSeries
 
 
 def _make_record(

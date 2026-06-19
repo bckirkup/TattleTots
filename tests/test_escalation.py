@@ -5,7 +5,11 @@ from __future__ import annotations
 import numpy as np
 
 from tattletots.engine.compression import ThresholdCompression
-from tattletots.engine.escalation import compute_effective_threshold, normalize_anomaly, should_escalate
+from tattletots.engine.escalation import (
+    compute_effective_threshold,
+    normalize_anomaly,
+    should_escalate,
+)
 from tattletots.models.agent import Agent
 from tattletots.models.genome import EscalationMode, Genome
 

@@ -101,4 +101,6 @@ class SimulationConfig(BaseModel):
         description="Max |parent_sig - child_sig| for lineage subsidy",
     )
     mimesis_learning_rate: float = Field(default=0.05, ge=0.0, le=1.0)
-    n_spatial_blocks: int = Field(default=10, ge=1, description="Uniform blocks for high-dim streams")
+    n_spatial_blocks: int = Field(
+        default=10, ge=1, description="Uniform blocks for high-dim streams"
+    )

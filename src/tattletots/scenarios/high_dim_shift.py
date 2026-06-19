@@ -58,7 +58,8 @@ class HighDimShiftScenario(DomainAdapter):
     def _setup_users(self) -> None:
         priority = np.zeros(self.n_blocks)
         priority[self.shift_block] = 1.0
-        priority /= max(np.linalg.norm(priority), 1e-10)
+        norm = float(np.linalg.norm(priority))
+        priority /= max(norm, 1e-10)
         self._users = [
             User(
                 name="Block Monitor",

@@ -9,8 +9,7 @@ import numpy as np
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
-    from tattletots.engine.config import SimulationConfig
-    from tattletots.models.agent import AgentState
+    from tattletots.engine.config import GenePoolConfig, SimulationConfig
 
 
 class CompressionType(enum.StrEnum):
@@ -257,11 +256,7 @@ class Genome(BaseModel):
         if self.spatial_strategy != SpatialStrategy.GLOBAL:
             cost += config.spatial_cost_rate
         if self.residual_policy == ResidualPolicy.STORE and residual_buffer_len > 0:
-            cost += (
-                config.storage_cost_rate
-                * residual_buffer_dim
-                * residual_buffer_len
-            )
+            cost += config.storage_cost_rate * residual_buffer_dim * residual_buffer_len
         if self.residual_policy == ResidualPolicy.REFINE:
             cost += self.compute_cost * config.refine_cost_multiplier
         if self.escalation_mode != EscalationMode.FIXED:
@@ -359,7 +354,9 @@ class Genome(BaseModel):
             )
 
         if rng.random() < rate:
-            data["spatial_radius"] = int(np.clip(data["spatial_radius"] + rng.integers(-1, 2), 0, 20))
+            data["spatial_radius"] = int(
+                np.clip(data["spatial_radius"] + rng.integers(-1, 2), 0, 20)
+            )
 
         if rng.random() < rate:
             policies = list(ResidualPolicy)
@@ -385,7 +382,12 @@ class Genome(BaseModel):
             )
 
         # Mutate array preferences
-        for key in ("input_preference", "target_user_affinity", "fusion_weights", "region_affinity"):
+        for key in (
+            "input_preference",
+            "target_user_affinity",
+            "fusion_weights",
+            "region_affinity",
+        ):
             arr = np.array(data[key], dtype=np.float64)
             if len(arr) > 0:
                 mask = rng.random(len(arr)) < rate
@@ -405,7 +407,12 @@ class Genome(BaseModel):
         data_b = parent_b.model_dump()
         child_data: dict[str, object] = {}
 
-        array_keys = ("input_preference", "target_user_affinity", "fusion_weights", "region_affinity")
+        array_keys = (
+            "input_preference",
+            "target_user_affinity",
+            "fusion_weights",
+            "region_affinity",
+        )
         for key in data_a:
             if key in array_keys:
                 arr_a = np.array(data_a[key], dtype=np.float64)
@@ -429,12 +436,12 @@ class Genome(BaseModel):
         *,
         n_streams: int = 1,
         n_users: int = 1,
-        gene_pool: object | None = None,
+        gene_pool: GenePoolConfig | None = None,
     ) -> Genome:
         """Generate a random genome, optionally constrained by gene pool config."""
         from tattletots.engine.config import GenePoolConfig as PoolConfig
 
-        pool = gene_pool or PoolConfig()
+        pool: GenePoolConfig = gene_pool if gene_pool is not None else PoolConfig()
         comp_types = pool.available_compression_types or list(CompressionType)
         comp_type = CompressionType(comp_types[int(rng.integers(0, len(comp_types)))])
         lo, hi = pool.n_components_range
@@ -485,4 +492,3 @@ class Genome(BaseModel):
                 escalation_types[int(rng.integers(0, len(escalation_types)))]
             ),
         )
-

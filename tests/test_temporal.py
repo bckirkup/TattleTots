@@ -11,7 +11,9 @@ from tattletots.models.genome import Genome, TemporalFusionMode
 
 class TestTemporal:
     def test_none_mode_passthrough(self) -> None:
-        agent = Agent(genome=Genome(temporal_memory_depth=0, temporal_fusion_mode=TemporalFusionMode.NONE))
+        agent = Agent(
+            genome=Genome(temporal_memory_depth=0, temporal_fusion_mode=TemporalFusionMode.NONE)
+        )
         data = np.ones(5)
         out = apply_temporal_fusion(agent, data)
         np.testing.assert_array_equal(out, data)
@@ -27,7 +29,9 @@ class TestTemporal:
 
     def test_window_stack_averages(self) -> None:
         agent = Agent(
-            genome=Genome(temporal_memory_depth=3, temporal_fusion_mode=TemporalFusionMode.WINDOW_STACK)
+            genome=Genome(
+                temporal_memory_depth=3, temporal_fusion_mode=TemporalFusionMode.WINDOW_STACK
+            )
         )
         apply_temporal_fusion(agent, np.zeros(3))
         apply_temporal_fusion(agent, np.ones(3) * 2)

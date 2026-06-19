@@ -164,9 +164,7 @@ class World:
         self._process_whistleblowing(living_agents)
 
         # 6. Trust verification
-        verified_reports = verify_reports(
-            reports, self._active_locations, self.users, self.config
-        )
+        verified_reports = verify_reports(reports, self._active_locations, self.users, self.config)
         self.last_reports = verified_reports
 
         missed: list[str] = []
@@ -289,7 +287,11 @@ class World:
         )
 
     def _init_agent_model(self, agent: Agent) -> None:
-        window = max(20, agent.genome.temporal_memory_depth) if agent.genome.temporal_memory_depth > 0 else 20
+        window = (
+            max(20, agent.genome.temporal_memory_depth)
+            if agent.genome.temporal_memory_depth > 0
+            else 20
+        )
         model = create_compression_model(
             agent.genome.compression_type,
             agent.genome.n_components,
@@ -410,7 +412,10 @@ class World:
             n_blocks=self.config.n_spatial_blocks,
             dim_to_location=self._dim_to_location,
         )
-        if agent.genome.spatial_strategy == SpatialStrategy.GLOBAL and self._location_inference is not None:
+        if (
+            agent.genome.spatial_strategy == SpatialStrategy.GLOBAL
+            and self._location_inference is not None
+        ):
             raw_data, raw_labels = gather_raw_stream_data(agent, self.streams)
             if raw_data:
                 location = self._location_inference(raw_data, raw_labels)
@@ -575,9 +580,7 @@ class World:
             total_info_yield=sum(a.state.last_step_yield for a in living),
             total_attn_income=sum(a.state.energy.attention for a in living),
             total_compute_cost=sum(a.state.last_compute_cost_paid for a in living),
-            total_maintenance_cost=sum(
-                juvenile_maintenance_cost(a, self.config) for a in living
-            ),
+            total_maintenance_cost=sum(juvenile_maintenance_cost(a, self.config) for a in living),
             n_juveniles=len(juveniles),
             n_adults=len(adults),
             mean_generation=(

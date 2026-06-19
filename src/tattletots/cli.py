@@ -14,7 +14,9 @@ from tattletots.scenarios.high_dim_shift import HighDimShiftScenario
 from tattletots.telemetry.cost_accounting import CostAccumulator
 
 
-def _load_scenario(name: str, scenario_config: dict[str, int | float | str]):
+def _load_scenario(
+    name: str, scenario_config: dict[str, int | float | str]
+) -> GaussianShiftScenario | HighDimShiftScenario:
     if name == "gaussian_shift":
         return GaussianShiftScenario.from_config(scenario_config)
     if name == "high_dim_shift":

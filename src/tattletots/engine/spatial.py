@@ -11,7 +11,6 @@ from tattletots.models.agent import Agent
 from tattletots.models.genome import SpatialStrategy
 from tattletots.models.location import EventLocation
 
-
 DimToLocationFn = Callable[[int], EventLocation]
 
 
