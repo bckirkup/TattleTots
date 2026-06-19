@@ -17,9 +17,13 @@ import os
 import subprocess
 import sys
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Dict, List
+
+from baseline_parallel import resolve_worker_count, resolve_workspace_root, run_process_pool
+
+_SCRIPT_DIR = Path(__file__).resolve().parent
+_WORKSPACE_ROOT = resolve_workspace_root(_SCRIPT_DIR)
 
 # Define paths to the domain repositories relative to the workspace root
 REPOS = {
@@ -71,7 +75,7 @@ def run_single_simulation(
     print(f"[*] Starting run '{run_name}' ({repo_info['name']})...")
 
     # 1. Load default config
-    workspace_root = Path(__file__).parent.resolve()
+    workspace_root = _WORKSPACE_ROOT
     default_config_path = workspace_root / repo_info["default_config"]
     if not default_config_path.exists():
         error_msg = f"Default config not found at {default_config_path}"
@@ -196,8 +200,8 @@ def main() -> int:
     parser.add_argument(
         "--config",
         type=Path,
-        default=Path("batch_config.json"),
-        help="Path to batch config JSON file (default: batch_config.json)",
+        default=_SCRIPT_DIR / "batch_config.json",
+        help="Path to batch config JSON file (default: batch_config.json in this directory)",
     )
     parser.add_argument(
         "--output-dir",
@@ -208,6 +212,12 @@ def main() -> int:
         "--parallel",
         action="store_true",
         help="Run simulations in parallel (default: sequential)",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        help="Number of parallel worker processes (default: min(CPU count, job count))",
     )
     parser.add_argument(
         "--verbose",
@@ -239,8 +249,18 @@ def main() -> int:
         print("[-] Error: No runs specified in batch config.")
         return 1
 
-    print(f"[*] Found {len(runs)} simulation runs to execute.")
-    print(f"[*] Execution mode: {'PARALLEL' if args.parallel else 'SEQUENTIAL'}")
+    n_jobs = len(runs)
+    worker_count = resolve_worker_count(args.workers, n_jobs)
+
+    print(f"[*] Found {n_jobs} simulation runs to execute.")
+    if args.parallel:
+        print(
+            f"[*] Execution mode: PARALLEL (ProcessPoolExecutor, "
+            f"{worker_count} worker process{'es' if worker_count != 1 else ''}, "
+            f"PID {os.getpid()} parent)"
+        )
+    else:
+        print(f"[*] Execution mode: SEQUENTIAL (single process, PID {os.getpid()})")
     print("=" * 60)
 
     results_key = {
@@ -253,33 +273,35 @@ def main() -> int:
     start_time = time.time()
 
     # 3. Execute runs
-    if args.parallel:
-        # Run in parallel using ThreadPoolExecutor
-        # (Since we invoke python as a subprocess, this is true process-level parallelism)
-        with ThreadPoolExecutor() as executor:
-            futures = {
-                executor.submit(
-                    run_single_simulation,
-                    run["name"],
-                    run["domain"],
-                    run.get("config_overrides", {}),
-                    output_dir,
-                    args.verbose,
-                ): run["name"]
-                for run in runs
-            }
+    submit_kwargs = [
+        (
+            run["name"],
+            run["domain"],
+            run.get("config_overrides", {}),
+            output_dir,
+            args.verbose,
+        )
+        for run in runs
+    ]
 
-            for future in as_completed(futures):
-                name = futures[future]
-                try:
-                    res = future.result()
-                    results_key["runs"][name] = res
-                except Exception as e:
-                    print(f"[-] Run '{name}' raised an unhandled exception: {e}")
-                    results_key["runs"][name] = {
-                        "status": "failed",
-                        "error": f"Unhandled exception: {e}",
-                    }
+    def _store_success(run: Dict[str, Any], res: Dict[str, Any]) -> None:
+        results_key["runs"][run["name"]] = res
+
+    def _store_failure(run: Dict[str, Any], exc: Exception) -> None:
+        results_key["runs"][run["name"]] = {
+            "status": "failed",
+            "error": f"Unhandled exception: {exc}",
+        }
+
+    if args.parallel:
+        run_process_pool(
+            run_single_simulation,
+            submit_kwargs,
+            runs,
+            max_workers=worker_count,
+            on_success=_store_success,
+            on_failure=_store_failure,
+        )
     else:
         # Run sequentially
         for run in runs:

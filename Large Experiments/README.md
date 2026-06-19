@@ -20,7 +20,8 @@ The batch execution system allows running arbitrary, custom-defined configuratio
 ### Commands
 To run the batch simulations in parallel (recommended):
 ```bash
-python run_batch.py --config batch_config.json --parallel
+cd TattleTots/Large\ Experiments
+python run_batch.py --config batch_config.json --parallel --workers 8
 ```
 
 To run sequentially:
@@ -47,7 +48,8 @@ All outputs are saved to the configured directory (e.g., `batch_results/`):
 The designed experiments system implements the full combinatorial sweeps described in `Designed Experiments.txt` and `Design of Experiment.md`. It sweeps across 5 levels of TattleTots shared parameters (Conservative to Exploratory) and domain-specific factors.
 
 ### Files
-* **`run_experiments.py`**: A parallelized script that generates the full combinatorial space of runs, executes them using process-isolated threads, captures execution logs, and indexes the results.
+* **`run_experiments.py`**: A parallelized script that generates the full combinatorial space of runs, executes them using ProcessPoolExecutor, captures execution logs, and indexes the results.
+* **`baseline_parallel.py`**: Shared ProcessPoolExecutor helpers used by batch, DOE, and domain baseline runners.
 * **`designed_experiments_config.json`**: The generated configuration file defining the parameter sweeps, step counts (800 steps/epochs), triplicate seeds (42, 43, 44), and factor levels.
 
 ### Swept Factors & Mappings
@@ -89,11 +91,13 @@ d:\TotsFiles\
 ├── Coral_Key_in_Three_Hour_Epochs/  # ReefWatch domain repository
 ├── Scrapiron_and_the_Bear/          # FireEcology domain repository
 ├── TattleTots/                      # Shared BMA engine repository
+│   └── Large Experiments/           # DOE, batch, baseline_parallel.py
 ├── Xylella_SPQR/                    # GrainGuard domain repository
-├── batch_config.json                # Batch execution configuration
-├── run_batch.py                     # Batch execution runner script
-├── designed_experiments_config.json # Designed experiments configuration
-├── run_experiments.py               # Designed experiments runner script
 ├── batch_results/                   # Output directory for batch runs (generated)
 └── smoke_test_results/              # Output directory for DOE smoke tests (generated)
 ```
+
+## Baseline Parameter Scans
+
+Non-Tots baseline scans live in each domain repo under `baselines/`. See the workspace root `README.md` at the parent of all repos for run commands.
+
