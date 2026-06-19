@@ -1,0 +1,99 @@
+{
+  "purpose": "Quick validation: can new-brain TattleTots compete with the strongest baseline in each domain?",
+  "total_runs": "18 BMA runs (6 per domain × 3 seeds) + baselines already collected",
+  "estimated_runtime": "At tt_level=1 (~7 min/run): ~2 hours total",
+  "tattletots_config": {
+    "initial_population": 50,
+    "max_population": 100,
+    "max_stream_dim": 551,
+    "initial_info_energy": 1.5,
+    "initial_attn_energy": 1.5,
+    "false_alarm_penalty": 0.8,
+    "trust_delta_neg": 0.3,
+    "trust_delta_pos": 0.05,
+    "trust_delta_miss": 0.15,
+    "mutation_rate": 0.1,
+    "recombination_probability": 0.3,
+    "seed": [42, 43, 44],
+    "max_steps": 800
+  },
+  "coral_key": {
+    "description": "Target: beat A2 (AIS+SAR+Catch) at 62.7% detection (high adversary) and A3 at 37.6% (medium)",
+    "runs": [
+      {
+        "label": "medium_adversary_3iuu",
+        "iuu_vessels": 3,
+        "adversary_level": "medium",
+        "sar_revisit_interval": 8,
+        "baseline_target": {"A2": 0.35, "A3": 0.376}
+      },
+      {
+        "label": "high_adversary_3iuu",
+        "iuu_vessels": 3,
+        "adversary_level": "high",
+        "sar_revisit_interval": 8,
+        "baseline_target": {"A2": 0.627, "A3": 0.47}
+      }
+    ]
+  },
+  "fire_ecology": {
+    "description": "Target: beat A2 Centralized at 247 burned (10 drones) and A1 Camera ML at 323 burned",
+    "runs": [
+      {
+        "label": "medium_fire_10drones",
+        "n_drones": 10,
+        "n_cameras": 3,
+        "base_ignition_rate": 0.0001,
+        "weather_volatility": 1.0,
+        "grid_rows": 20,
+        "grid_cols": 20,
+        "baseline_target": {"A2": 247, "A1": 323}
+      },
+      {
+        "label": "high_fire_15drones",
+        "n_drones": 15,
+        "n_cameras": 3,
+        "base_ignition_rate": 0.0004,
+        "weather_volatility": 1.0,
+        "grid_rows": 20,
+        "grid_cols": 20,
+        "baseline_target": {"A2": 140, "A1": 364}
+      }
+    ]
+  },
+  "grain_guard": {
+    "description": "Target: beat A0 Human IPM at 3.6% yield (orchard) and A3 Centralized at 4.9% yield (monoculture)",
+    "runs": [
+      {
+        "label": "monoculture_baseline",
+        "landscape": "monoculture",
+        "grid_rows": 20,
+        "grid_cols": 20,
+        "pest_intro_probability": 0.01,
+        "resistance_initial_frequency": 0.01,
+        "baseline_target": {"A3": 0.049, "A0": 0.026}
+      },
+      {
+        "label": "orchard_complexity",
+        "landscape": "orchard",
+        "grid_rows": 20,
+        "grid_cols": 20,
+        "pest_intro_probability": 0.01,
+        "resistance_initial_frequency": 0.01,
+        "baseline_target": {"A0": 0.036, "A3": 0.032}
+      }
+    ]
+  },
+  "success_criteria": {
+    "coral_key": "BMA detection rate > A3 Full Centralized detection rate at same adversary level",
+    "fire": "BMA burned cells < A2 Centralized burned cells at same drone count",
+    "grain": "BMA final yield > best baseline yield at same landscape type"
+  },
+  "failure_interpretation": {
+    "all_fail": "New brains don't help — genome expressiveness isn't the bottleneck",
+    "coral_key_wins_others_lose": "BMA advantage is domain-specific to adversarial residual detection",
+    "fire_wins_others_lose": "BMA advantage is in physical coordination, not information processing",
+    "grain_wins_others_lose": "BMA advantage is in heterogeneous landscapes, not time-series detection",
+    "all_win": "Architecture is broadly competitive — proceed to full DOE with new brains"
+  }
+}
