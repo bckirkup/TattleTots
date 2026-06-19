@@ -43,11 +43,15 @@ class PCACompression(CompressionModel):
     even when the engine feeds one sample per step (the common case).
     """
 
-    _WINDOW_SIZE: int = 20
-
-    def __init__(self, n_components: int, efficiency: float = 1.0) -> None:
+    def __init__(
+        self,
+        n_components: int,
+        efficiency: float = 1.0,
+        window_size: int = 20,
+    ) -> None:
         self.n_components = n_components
         self.efficiency = efficiency
+        self._window_size = window_size
         self._xp: ModuleType = np
         self._mean: NDArray[np.float64] = np.array([], dtype=np.float64)
         self._components: NDArray[np.float64] | None = None
@@ -63,8 +67,8 @@ class PCACompression(CompressionModel):
         if self._history and len(self._history[0]) != len(flat):
             self._history.clear()
         self._history.append(flat.copy())
-        if len(self._history) > self._WINDOW_SIZE:
-            self._history = self._history[-self._WINDOW_SIZE :]
+        if len(self._history) > self._window_size:
+            self._history = self._history[-self._window_size :]
 
         window = xp.array(self._history, dtype=xp.float64)
         mean = window.mean(axis=0)
@@ -229,23 +233,71 @@ class ThresholdCompression(CompressionModel):
         return self._signal
 
 
+class WaveletCompression(CompressionModel):
+    """Haar wavelet compression using detail coefficients as residual."""
+
+    def __init__(self, n_components: int, efficiency: float = 1.0) -> None:
+        self.n_components = n_components
+        self.efficiency = efficiency
+        self._xp: ModuleType = np
+        self._signal: NDArray[np.float64] = np.array([], dtype=np.float64)
+        self._approx: NDArray[np.float64] | None = None
+
+    def _haar_decompose(self, flat: NDArray[np.float64]) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+        xp = self._xp
+        n = flat.size
+        if n < 2:
+            return flat, xp.zeros_like(flat)
+        # Pad to even length
+        if n % 2 == 1:
+            flat = xp.concatenate([flat, flat[-1:]])
+        approx = (flat[0::2] + flat[1::2]) / xp.sqrt(xp.array(2.0))
+        detail = (flat[0::2] - flat[1::2]) / xp.sqrt(xp.array(2.0))
+        # Upsample approx back to original size for residual computation
+        recon = xp.zeros(flat.size, dtype=xp.float64)
+        recon[0::2] = (approx + detail) / xp.sqrt(xp.array(2.0))
+        recon[1::2] = (approx - detail) / xp.sqrt(xp.array(2.0))
+        residual = flat - recon
+        return approx, residual
+
+    def fit_transform(self, data: NDArray[np.float64]) -> tuple[NDArray[np.float64], float]:
+        xp = self._xp
+        flat = xp.asarray(data.flatten(), dtype=xp.float64)
+        approx, residual = self._haar_decompose(flat)
+        self._approx = approx
+        self._signal = to_numpy(approx[: self.n_components])
+        input_var = float(xp.var(flat))
+        residual_var = float(xp.var(residual))
+        info_yield = max(0.0, 1.0 - residual_var / max(input_var, 1e-10)) * self.efficiency
+        return to_numpy(residual[: flat.size]), info_yield
+
+    def anomaly_score(self, data: NDArray[np.float64]) -> float:
+        xp = self._xp
+        flat = xp.asarray(data.flatten(), dtype=xp.float64)
+        _, residual = self._haar_decompose(flat)
+        return float(xp.mean(residual**2))
+
+    def get_signal_vector(self) -> NDArray[np.float64]:
+        return self._signal
+
+
 def create_compression_model(
     compression_type: CompressionType,
     n_components: int,
     efficiency: float = 1.0,
     use_gpu: bool = False,
+    window_size: int = 20,
 ) -> CompressionModel:
     """Factory for compression models based on genome specification."""
     xp = get_array_module(use_gpu)
     match compression_type:
         case CompressionType.PCA:
-            model: CompressionModel = PCACompression(n_components, efficiency)
+            model: CompressionModel = PCACompression(n_components, efficiency, window_size)
         case CompressionType.AR1:
             model = AR1Compression(n_components, efficiency)
         case CompressionType.THRESHOLD:
             model = ThresholdCompression(n_components, efficiency)
         case CompressionType.WAVELET:
-            # Fallback to PCA for now; wavelet is a future extension
-            model = PCACompression(n_components, efficiency)
+            model = WaveletCompression(n_components, efficiency)
     model.set_array_module(xp)
     return model

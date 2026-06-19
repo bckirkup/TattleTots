@@ -162,7 +162,31 @@ The engine supports pluggable compression models:
 | PCA | SVD on sliding window, top-k components | Best for linearly structured signals |
 | AR(1) | First-order autoregressive prediction | Best for temporally correlated data |
 | Threshold | Simple anomaly detection via deviation | Robust to high-dimensional noise |
-| Wavelet | Multi-scale decomposition (future) | Best for mixed-frequency signals |
+| Wavelet | Haar wavelet decomposition | Best for mixed-frequency signals |
+
+## Compute Complexity Traits
+
+Agents evolve independent compute traits, each with per-step information-energy cost:
+
+```
+total_compute_cost = compute_cost
+  + temporal_memory_depth * temporal_cost_rate
+  + working_dim * projection_cost_rate
+  + spatial_cost_rate          (if spatial_strategy != GLOBAL)
+  + storage_cost_rate * dim * buffer_len   (STORE policy)
+  + compute_cost * refine_cost_multiplier  (REFINE policy)
+  + escalation_memory_depth * escalation_cost_rate  (adaptive escalation)
+```
+
+| Trait | Options | Effect |
+|-------|---------|--------|
+| Sensing | CONCAT, WEIGHTED_FUSE, SUBSPACE_SAMPLE, BLOCK_SPECIALIZE | How multi-stream input is fused to `working_dim` |
+| Temporal | NONE, EMA, WINDOW_STACK, AR_LAG | History fusion before compression |
+| Spatial | GLOBAL, PEAK, WEIGHTED_ROI, FIXED_REGION | Region specialization for input and reporting |
+| Residual | EXCRETE, STORE, REFINE, COMPRESS_OUT | Post-compression residual handling |
+| Escalation | FIXED, ADAPTIVE_QUANTILE, ADAPTIVE_VOLATILITY | Threshold calibration |
+
+Richer agents only survive when the environment rewards the extra yield, attention, or detection precision.
 
 Each model implements `fit_transform(data) -> (residual, yield)` and
 `anomaly_score(data) -> float`. The PCA model maintains a sliding window

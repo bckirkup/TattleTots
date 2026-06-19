@@ -35,6 +35,18 @@ class MyDomainAdapter(DomainAdapter):
 
     def get_ground_truth(self, time_step: int) -> bool:
         """Is a real event (fire, intrusion, etc.) active right now?"""
+        return len(self.get_active_locations(time_step)) > 0
+
+    def get_active_locations(self, time_step: int) -> list[tuple[int, int]]:
+        """Return grid cells or zones where a true event is active."""
+        ...
+
+    def infer_report_location(
+        self,
+        stream_data: list,
+        stream_labels: list[str],
+    ) -> tuple[int, int]:
+        """Infer the location an agent reports from its input stream data."""
         ...
 
     def score_relevance(self, signal_vector, user) -> float:
@@ -119,15 +131,24 @@ def step(self, time_step: int) -> None:
 The engine calls `step()` once per simulation step, before agents consume
 the streams.
 
-### 4. Provide Ground Truth
+### 4. Provide Ground Truth and Active Locations
 
-The engine uses ground truth to verify escalation reports. A `True` return
-means a real event is occurring — agents that escalate correctly earn trust;
-agents that stay silent lose trust.
+The engine verifies escalation reports against **active event locations**.
+Each report includes a `location` tuple `(row, col)` or `(zone_x, zone_y)`.
+A report is correct iff its location is in the active set for that step.
+Wrong-location reports are false alarms; agents that stay silent or report
+the wrong location during an active event receive missed-event penalties.
 
 ```python
 def get_ground_truth(self, time_step: int) -> bool:
-    return self._events[time_step]  # Your domain-specific event schedule
+    return len(self.get_active_locations(time_step)) > 0
+
+def get_active_locations(self, time_step: int) -> list[tuple[int, int]]:
+    return self._active_event_cells  # domain-specific
+
+def infer_report_location(self, stream_data, stream_labels) -> tuple[int, int]:
+    # Map agent input streams to the reported location
+    ...
 ```
 
 ### 5. Score Relevance
@@ -181,10 +202,11 @@ for stream in adapter.get_streams():
 for user in adapter.get_users():
     world.add_user(user)
 world.seed_population()
+world.set_location_inference(adapter.infer_report_location)
 
 for step_num in range(config.max_steps):
     adapter.step(step_num)
-    world.set_ground_truth(adapter.get_ground_truth(step_num))
+    world.set_event_state(adapter.get_active_locations(step_num))
     world.step()
     if world.living_population == 0:
         break
@@ -204,7 +226,7 @@ costs = CostAccumulator()
 
 for step_num in range(config.max_steps):
     adapter.step(step_num)
-    world.set_ground_truth(adapter.get_ground_truth(step_num))
+    world.set_event_state(adapter.get_active_locations(step_num))
     world.step()
 
     # Get last step's telemetry

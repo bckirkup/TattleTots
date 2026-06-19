@@ -21,6 +21,7 @@ class StepRecord:
     max_trophic_level: float
     n_streams: int
     ground_truth_active: bool
+    active_location_count: int = 0
     # Energy flow tracking
     total_info_yield: float = 0.0
     total_attn_income: float = 0.0
@@ -32,6 +33,10 @@ class StepRecord:
     mean_generation: float = 0.0
     n_compression_types: int = 0
     missed_events: int = 0
+    mean_working_dim: float = 0.0
+    mean_memory_depth: float = 0.0
+    n_sensing_strategies: int = 0
+    n_residual_policies: int = 0
 
 
 @dataclass
@@ -83,6 +88,22 @@ class TelemetryRecorder:
     def population_history(self) -> list[int]:
         """Population count over time."""
         return [r.population for r in self.history]
+
+    def ecology_time_series(self) -> dict[str, list[int] | list[float]]:
+        """Ecology metrics over time for unified output schema."""
+        return {
+            "population": [r.population for r in self.history],
+            "reports_issued": [r.reports_issued for r in self.history],
+            "correct_reports": [r.correct_reports for r in self.history],
+            "false_alarms": [r.false_alarms for r in self.history],
+            "missed_events": [r.missed_events for r in self.history],
+            "mean_info_energy": [r.mean_info_energy for r in self.history],
+            "mean_attn_energy": [r.mean_attn_energy for r in self.history],
+            "births": [r.births for r in self.history],
+            "deaths": [r.deaths for r in self.history],
+            "n_compression_types": [r.n_compression_types for r in self.history],
+            "max_trophic_level": [r.max_trophic_level for r in self.history],
+        }
 
     def is_stable(self, window: int = 50, tolerance: float = 0.2) -> bool:
         """Check if population has reached approximate equilibrium.

@@ -11,6 +11,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 from numpy.typing import NDArray
 
+from tattletots.models.location import EventLocation
 from tattletots.models.stream import Stream
 from tattletots.models.user import User
 
@@ -46,6 +47,18 @@ class DomainAdapter(ABC):
         """Return whether a true event is active at this time step."""
 
     @abstractmethod
+    def get_active_locations(self, time_step: int) -> list[EventLocation]:
+        """Return locations where a true event is occurring at this time step."""
+
+    @abstractmethod
+    def infer_report_location(
+        self,
+        stream_data: list[NDArray[np.float64]],
+        stream_labels: list[str],
+    ) -> EventLocation:
+        """Infer the location an agent is reporting from its input streams."""
+
+    @abstractmethod
     def score_relevance(self, signal_vector: NDArray[np.float64], user: User) -> float:
         """Score how relevant a signal is to a specific user (domain-specific)."""
 
@@ -61,3 +74,11 @@ class DomainAdapter(ABC):
 
         Returns dict with keys: surveillance_cost, response_cost, damage_cost.
         """
+
+    def get_spatial_dim_map(self) -> dict[str, slice]:
+        """Optional mapping from stream labels to dimension slices for spatial specialization."""
+        return {}
+
+    def dim_index_to_location(self, dim_index: int) -> EventLocation:
+        """Map a dimension index to a spatial location (default: block index)."""
+        return (dim_index % 10, 0)

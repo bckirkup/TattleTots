@@ -36,10 +36,11 @@ def _run_scenario(steps: int = 200, seed: int = 42, population: int = 25) -> Wor
     for user in scenario.get_users():
         world.add_user(user)
     world.seed_population()
+    world.set_location_inference(scenario.infer_report_location)
 
     for step_num in range(steps):
         scenario.step(step_num)
-        world.set_ground_truth(scenario.get_ground_truth(step_num))
+        world.set_event_state(scenario.get_active_locations(step_num))
         world.step()
         if world.living_population == 0:
             break
@@ -189,6 +190,7 @@ class TestHDWEquilibrium:
             world.add_user(user)
 
         world.seed_population()
+        world.set_location_inference(scenario.infer_report_location)
 
         rng = np.random.default_rng(42)
         # Add 20 agents with diverse escalation thresholds
@@ -232,7 +234,7 @@ class TestHDWEquilibrium:
 
         for step_num in range(200):
             scenario.step(step_num)
-            world.set_ground_truth(scenario.get_ground_truth(step_num))
+            world.set_event_state(scenario.get_active_locations(step_num))
             world.step()
             if world.living_population == 0:
                 break

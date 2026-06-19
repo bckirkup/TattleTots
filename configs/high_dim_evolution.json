@@ -1,0 +1,52 @@
+{
+  "simulation": {
+    "max_population": 150,
+    "initial_population": 30,
+    "mutation_rate": 0.12,
+    "reproduction_energy_fraction": 0.5,
+    "subsidy_rate": 0.1,
+    "initial_info_energy": 2.0,
+    "initial_attn_energy": 2.0,
+    "trust_delta_pos": 0.05,
+    "trust_delta_neg": 0.2,
+    "trust_delta_miss": 0.1,
+    "false_alarm_penalty": 0.3,
+    "recombination_probability": 0.3,
+    "seed": 42,
+    "max_steps": 400,
+    "max_stream_dim": 256,
+    "default_working_dim": 64,
+    "max_working_dim": 256,
+    "n_spatial_blocks": 10,
+    "temporal_cost_rate": 0.001,
+    "projection_cost_rate": 0.0005,
+    "spatial_cost_rate": 0.02,
+    "storage_cost_rate": 0.0001,
+    "refine_cost_multiplier": 1.0,
+    "escalation_cost_rate": 0.0002
+  },
+  "scenario": {
+    "scenario": "high_dim_shift",
+    "dimensionality": 1000,
+    "n_blocks": 10,
+    "shift_block": 3,
+    "noise_std": 0.5,
+    "shift_step": 200,
+    "total_steps": 400
+  },
+  "gene_pool": {
+    "available_compression_types": ["pca", "ar1", "threshold", "wavelet"],
+    "n_components_range": [1, 8],
+    "escalation_threshold_range": [0.3, 0.9],
+    "metabolic_efficiency_range": [0.5, 2.0],
+    "development_duration_range": [3, 10],
+    "working_dim_range": [16, 128],
+    "max_temporal_depth": 30,
+    "n_blocks": 10,
+    "available_sensing_strategies": ["concat", "weighted_fuse", "subspace_sample", "block_specialize"],
+    "available_temporal_modes": ["none", "ema", "window_stack", "ar_lag"],
+    "available_spatial_strategies": ["global", "peak", "weighted_roi", "fixed_region"],
+    "available_residual_policies": ["excrete", "store", "refine", "compress_out"],
+    "available_escalation_modes": ["fixed", "adaptive_quantile", "adaptive_volatility"]
+  }
+}

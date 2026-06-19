@@ -37,10 +37,11 @@ def _run_scenario(steps: int = 200, seed: int = 42, population: int = 25) -> Wor
     for user in scenario.get_users():
         world.add_user(user)
     world.seed_population()
+    world.set_location_inference(scenario.infer_report_location)
 
     for step_num in range(steps):
         scenario.step(step_num)
-        world.set_ground_truth(scenario.get_ground_truth(step_num))
+        world.set_event_state(scenario.get_active_locations(step_num))
         world.step()
         if world.living_population == 0:
             break
@@ -88,11 +89,12 @@ class TestEmergentBehavior:
         for user in scenario.get_users():
             world.add_user(user)
         world.seed_population()
+        world.set_location_inference(scenario.infer_report_location)
 
         # Run for 50 steps to establish ecology
         for step_num in range(50):
             scenario.step(step_num)
-            world.set_ground_truth(False)
+            world.set_event_state([])
             world.step()
 
         pop_before = world.living_population
@@ -119,7 +121,7 @@ class TestEmergentBehavior:
 
         # Run more steps — should see population decline from starvation
         for _step_num in range(50, 150):
-            world.set_ground_truth(False)
+            world.set_event_state([])
             world.step()
 
         pop_after = world.living_population
@@ -161,11 +163,12 @@ class TestEmergentBehavior:
         )
         world.agents[wolf.id] = wolf
         world._init_agent_model(wolf)
+        world.set_location_inference(scenario.infer_report_location)
 
-        # Run with no actual events (ground truth = False)
+        # Run with no actual events (empty active locations)
         for step_num in range(100):
             scenario.step(step_num)
-            world.set_ground_truth(False)
+            world.set_event_state([])
             world.step()
 
         # The wolf should be dead or severely weakened
@@ -219,13 +222,14 @@ class TestMathematicalProperties:
         for user in scenario.get_users():
             world.add_user(user)
         world.seed_population()
+        world.set_location_inference(scenario.infer_report_location)
 
         # Track per-step variance ratios for actual chain pairs
         ratios: list[float] = []
 
         for step_num in range(100):
             scenario.step(step_num)
-            world.set_ground_truth(scenario.get_ground_truth(step_num))
+            world.set_event_state(scenario.get_active_locations(step_num))
             world.step()
             if world.living_population == 0:
                 break

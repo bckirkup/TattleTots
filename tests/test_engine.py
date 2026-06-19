@@ -170,8 +170,9 @@ class TestTrust:
             signal_vector=np.array([1.0]),
             confidence=0.9,
             anomaly_score=2.0,
+            location=(2, 3),
         )
-        verified = verify_reports([report], True, {user.id: user}, config)
+        verified = verify_reports([report], frozenset({(2, 3)}), {user.id: user}, config)
         assert verified[0].correct is True
         assert user.get_trust("a1") > 0.5
 
@@ -185,14 +186,31 @@ class TestTrust:
             signal_vector=np.array([1.0]),
             confidence=0.9,
             anomaly_score=2.0,
+            location=(0, 0),
         )
-        verify_reports([report], False, {user.id: user}, config)
+        verify_reports([report], frozenset(), {user.id: user}, config)
         assert user.get_trust("a1") < 0.5
+
+    def test_wrong_location_is_false_even_when_event_active(self) -> None:
+        config = SimulationConfig()
+        user = User(name="u1")
+        report = Report(
+            agent_id="a1",
+            target_user_id=user.id,
+            time_step=1,
+            signal_vector=np.array([1.0]),
+            confidence=0.9,
+            anomaly_score=2.0,
+            location=(1, 1),
+        )
+        verified = verify_reports([report], frozenset({(5, 5)}), {user.id: user}, config)
+        assert verified[0].correct is False
 
     def test_trust_asymmetry(self) -> None:
         """Trust is hard to build, easy to destroy."""
         config = SimulationConfig(trust_delta_pos=0.05, trust_delta_neg=0.2)
         user = User(name="u1")
+        active = frozenset({(0, 0)})
         # 4 correct alarms
         for _ in range(4):
             r = Report(
@@ -202,8 +220,9 @@ class TestTrust:
                 signal_vector=np.array([1.0]),
                 confidence=0.9,
                 anomaly_score=2.0,
+                location=(0, 0),
             )
-            verify_reports([r], True, {user.id: user}, config)
+            verify_reports([r], active, {user.id: user}, config)
         trust_after_4_correct = user.get_trust("a1")
         # 1 false alarm
         r = Report(
@@ -213,8 +232,9 @@ class TestTrust:
             signal_vector=np.array([1.0]),
             confidence=0.9,
             anomaly_score=2.0,
+            location=(9, 9),
         )
-        verify_reports([r], False, {user.id: user}, config)
+        verify_reports([r], active, {user.id: user}, config)
         trust_after_false = user.get_trust("a1")
         # One false alarm wipes out multiple correct ones
         assert trust_after_false < trust_after_4_correct - 0.1

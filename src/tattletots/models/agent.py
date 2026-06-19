@@ -61,6 +61,39 @@ class AgentState(BaseModel):
         default_factory=list,
         description="Rolling window of raw anomaly scores for baseline normalization",
     )
+    temporal_buffer: list[np.ndarray] = Field(
+        default_factory=list,
+        description="Ring buffer of post-sensing vectors for temporal fusion",
+    )
+    residual_buffer: list[np.ndarray] = Field(
+        default_factory=list,
+        description="Stored residuals awaiting emission (STORE policy)",
+    )
+    fusion_weights_override: np.ndarray = Field(
+        default_factory=lambda: np.array([], dtype=np.float64),
+        description="Runtime override of fusion_weights (mimesis/domestication)",
+    )
+    effective_escalation_threshold: float = Field(
+        default=0.7,
+        description="Computed threshold after adaptive calibration",
+    )
+    last_compute_cost_paid: float = Field(default=0.0)
+    output_claim_stream_id: str | None = Field(
+        default=None,
+        description="OUTPUT stream published on escalation (whistleblowing)",
+    )
+    curated_stream_id: str | None = Field(
+        default=None,
+        description="Marsupial parent-curated stream for juvenile training",
+    )
+    last_spatial_mask: np.ndarray = Field(
+        default_factory=lambda: np.array([], dtype=np.float64),
+        description="Last spatial weight mask applied to input",
+    )
+    projected_input: np.ndarray = Field(
+        default_factory=lambda: np.array([], dtype=np.float64),
+        description="Last sensing+temporal+spatial processed input",
+    )
 
 
 class Agent(BaseModel):

@@ -7,10 +7,19 @@ import json
 import sys
 from pathlib import Path
 
-from tattletots.engine.config import SimulationConfig
+from tattletots.engine.config import GenePoolConfig, SimulationConfig
 from tattletots.engine.world import World
 from tattletots.scenarios.gaussian_shift import GaussianShiftScenario
+from tattletots.scenarios.high_dim_shift import HighDimShiftScenario
 from tattletots.telemetry.cost_accounting import CostAccumulator
+
+
+def _load_scenario(name: str, scenario_config: dict[str, int | float | str]):
+    if name == "gaussian_shift":
+        return GaussianShiftScenario.from_config(scenario_config)
+    if name == "high_dim_shift":
+        return HighDimShiftScenario.from_config(scenario_config)
+    raise ValueError(f"Unknown scenario: {name}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -26,7 +35,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--scenario",
-        choices=["gaussian_shift"],
+        choices=["gaussian_shift", "high_dim_shift"],
         default="gaussian_shift",
         help="Built-in scenario to run (default: gaussian_shift)",
     )
@@ -61,12 +70,15 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
 
-    # Load or build configuration
+    gene_pool: GenePoolConfig | None = None
     if args.config:
         with open(args.config) as f:
             raw_config = json.load(f)
         sim_config = SimulationConfig(**raw_config.get("simulation", {}))
         scenario_config = raw_config.get("scenario", {})
+        if "gene_pool" in raw_config:
+            gene_pool = GenePoolConfig(**raw_config["gene_pool"])
+        scenario_name = scenario_config.get("scenario", args.scenario)
     else:
         sim_config = SimulationConfig(
             initial_population=args.population,
@@ -74,35 +86,33 @@ def main(argv: list[str] | None = None) -> int:
             seed=args.seed,
         )
         scenario_config = {}
+        scenario_name = args.scenario
 
-    # Build scenario
-    if args.scenario == "gaussian_shift":
-        scenario = GaussianShiftScenario.from_config(scenario_config)
-    else:
-        print(f"Unknown scenario: {args.scenario}", file=sys.stderr)
-        return 1
+    scenario = _load_scenario(str(scenario_name), scenario_config)
 
-    # Initialize world
-    world = World(config=sim_config)
+    world = World(config=sim_config, gene_pool=gene_pool)
     for stream in scenario.get_streams():
         world.add_stream(stream)
     for user in scenario.get_users():
         world.add_user(user)
     world.seed_population()
+    world.set_location_inference(scenario.infer_report_location)
+    world.set_dim_to_location(scenario.dim_index_to_location)
+    if hasattr(scenario, "get_ground_truth_vector"):
+        world.set_ground_truth_vector(scenario.get_ground_truth_vector(0))
 
-    # Run simulation
     cost_accumulator = CostAccumulator()
 
-    print(f"TattleTots v0.1.0 — {args.scenario}")
+    print(f"TattleTots v0.1.0 — {scenario_name}")
     print(f"  Population: {sim_config.initial_population}, Steps: {args.steps}, Seed: {args.seed}")
     print()
 
     for step_num in range(args.steps):
-        # Advance domain
         scenario.step(step_num)
-        world.set_ground_truth(scenario.get_ground_truth(step_num))
+        world.set_event_state(scenario.get_active_locations(step_num))
+        if hasattr(scenario, "get_ground_truth_vector"):
+            world.set_ground_truth_vector(scenario.get_ground_truth_vector(step_num))
 
-        # Advance ecology
         record = world.step()
 
         if args.verbose and step_num % 50 == 0:
@@ -110,10 +120,10 @@ def main(argv: list[str] | None = None) -> int:
                 f"  Step {step_num:4d}: pop={record.population:3d} "
                 f"births={record.births} deaths={record.deaths} "
                 f"reports={record.reports_issued} "
-                f"trophic_depth={record.max_trophic_level:.1f}"
+                f"trophic_depth={record.max_trophic_level:.1f} "
+                f"working_dim={record.mean_working_dim:.0f}"
             )
 
-        # Cost accounting
         cost_dict = scenario.compute_costs(
             n_escalations=record.reports_issued,
             n_correct=record.correct_reports,
@@ -126,7 +136,6 @@ def main(argv: list[str] | None = None) -> int:
             print("  ** Total extinction **")
             break
 
-    # Summary
     summary = world.telemetry.summary()
     cost_summary = cost_accumulator.summary()
     print()
@@ -141,7 +150,6 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  Equilibrium:      {summary['reached_equilibrium']}")
     print(f"  Total cost:       {cost_summary['total_cost']:.2f}")
 
-    # Write output
     if args.output:
         output_data = {
             "config": sim_config.model_dump(),

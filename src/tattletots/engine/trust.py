@@ -3,25 +3,27 @@
 from __future__ import annotations
 
 from tattletots.engine.config import SimulationConfig
+from tattletots.models.location import EventLocation
 from tattletots.models.report import Report
 from tattletots.models.user import User
 
 
 def verify_reports(
     reports: list[Report],
-    ground_truth_active: bool,
+    active_locations: frozenset[EventLocation],
     users: dict[str, User],
     config: SimulationConfig,
 ) -> list[Report]:
-    """Verify pending reports against ground truth and update user trust.
+    """Verify pending reports against active event locations and update user trust.
 
+    A report is correct iff its reported location is in the active location set.
     Trust is asymmetric: Δ⁻ ≫ Δ⁺ (hard to build, easy to destroy).
     """
     verified: list[Report] = []
 
     for report in reports:
         report.verified = True
-        report.correct = ground_truth_active
+        report.correct = report.location in active_locations
 
         user = users.get(report.target_user_id)
         if user is None:

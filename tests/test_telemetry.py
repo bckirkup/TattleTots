@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from tattletots.telemetry.cost_accounting import CostAccumulator, StepCosts
 from tattletots.telemetry.recorder import StepRecord, TelemetryRecorder
+from tattletots.output_schema import TimeSeries
 
 
 def _make_record(
@@ -169,6 +170,66 @@ class TestTelemetryRecorder:
         assert d["adults"] == [7.0]
         assert d["mean_generation"] == [2.5]
         assert d["compression_types"] == [3.0]
+
+    def test_ecology_time_series(self) -> None:
+        rec = TelemetryRecorder()
+        rec.record_step(
+            _make_record(
+                time_step=1,
+                population=10,
+                births=2,
+                deaths=1,
+                reports_issued=5,
+                correct_reports=4,
+                false_alarms=1,
+                missed_events=2,
+                mean_info_energy=1.5,
+                mean_attn_energy=0.8,
+                max_trophic_level=2.0,
+                n_compression_types=3,
+            )
+        )
+        rec.record_step(
+            _make_record(
+                time_step=2,
+                population=11,
+                births=1,
+                deaths=0,
+                reports_issued=2,
+                correct_reports=2,
+                false_alarms=0,
+                missed_events=0,
+                mean_info_energy=1.6,
+                mean_attn_energy=0.9,
+                max_trophic_level=2.5,
+                n_compression_types=4,
+            )
+        )
+        ts = rec.ecology_time_series()
+        assert ts["population"] == [10, 11]
+        assert ts["births"] == [2, 1]
+        assert ts["deaths"] == [1, 0]
+        assert ts["reports_issued"] == [5, 2]
+        assert ts["correct_reports"] == [4, 2]
+        assert ts["false_alarms"] == [1, 0]
+        assert ts["missed_events"] == [2, 0]
+        assert ts["mean_info_energy"] == [1.5, 1.6]
+        assert ts["mean_attn_energy"] == [0.8, 0.9]
+        assert ts["n_compression_types"] == [3, 4]
+        assert ts["max_trophic_level"] == [2.0, 2.5]
+
+    def test_time_series_from_telemetry(self) -> None:
+        rec = TelemetryRecorder()
+        rec.record_step(_make_record(time_step=1, population=10, reports_issued=3))
+        rec.record_step(_make_record(time_step=2, population=9, reports_issued=1))
+        acc = CostAccumulator()
+        acc.record(StepCosts(time_step=1, surveillance_cost=1, response_cost=2, damage_cost=3))
+        acc.record(StepCosts(time_step=2, surveillance_cost=4, response_cost=5, damage_cost=6))
+
+        ts = TimeSeries.from_telemetry(rec, acc.cost_history())
+        assert ts.population == [10, 9]
+        assert ts.reports_issued == [3, 1]
+        assert ts.cost_per_step == [6.0, 15.0]
 
 
 class TestCostAccumulator:

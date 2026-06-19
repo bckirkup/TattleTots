@@ -17,6 +17,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from tattletots.interface.domain_adapter import DomainAdapter
+from tattletots.models.location import EventLocation
 from tattletots.models.stream import Stream
 from tattletots.models.user import User
 
@@ -125,9 +126,37 @@ class GaussianShiftScenario(DomainAdapter):
         """The shift itself is the 'event' — active for a window around shift_step."""
         return abs(time_step - self.shift_step) <= 5
 
+    def get_active_locations(self, time_step: int) -> list[EventLocation]:
+        """During the shift window, the primary changed component is the event location."""
+        if not self.get_ground_truth(time_step):
+            return []
+        primary = int(np.argmax(np.abs(self._amplitudes_post - self._amplitudes_pre)))
+        return [(primary, 0)]
+
+    def infer_report_location(
+        self,
+        stream_data: list[NDArray[np.float64]],
+        stream_labels: list[str],
+    ) -> EventLocation:
+        """Infer location from the stream chunk with highest signal energy."""
+        if not stream_data:
+            return (0, 0)
+        energies = [float(np.sum(np.abs(data))) for data in stream_data]
+        stream_idx = int(np.argmax(energies))
+        # Map stream index to component group (3 streams split n_components)
+        n_streams = len(self._streams)
+        components_per_stream = max(1, self.n_components // n_streams)
+        component = min(stream_idx * components_per_stream, self.n_components - 1)
+        return (component, 0)
+
     def score_relevance(self, signal_vector: NDArray[np.float64], user: User) -> float:
         """Domain-specific relevance scoring."""
         return user.compute_relevance(signal_vector)
+
+    def dim_index_to_location(self, dim_index: int) -> EventLocation:
+        """Map dimension index to component block."""
+        component = min(dim_index // max(1, self.dimensionality // self.n_components), self.n_components - 1)
+        return (component, 0)
 
     def compute_costs(
         self,

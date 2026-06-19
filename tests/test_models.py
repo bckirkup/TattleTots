@@ -194,6 +194,7 @@ class TestReport:
             signal_vector=np.array([1.0, 2.0]),
             confidence=0.8,
             anomaly_score=1.5,
+            location=(1, 2),
         )
         assert not r.verified
         assert r.correct is None

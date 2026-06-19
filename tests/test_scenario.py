@@ -79,6 +79,27 @@ class TestGaussianShiftScenario:
         assert not scenario.get_ground_truth(94)
         assert not scenario.get_ground_truth(106)
 
+    def test_active_locations_empty_outside_shift_window(self) -> None:
+        scenario = GaussianShiftScenario(shift_step=100)
+        assert scenario.get_active_locations(0) == []
+        assert scenario.get_active_locations(94) == []
+
+    def test_active_locations_during_shift(self) -> None:
+        scenario = GaussianShiftScenario(shift_step=100)
+        locs = scenario.get_active_locations(100)
+        assert len(locs) == 1
+        assert locs[0][1] == 0
+
+    def test_infer_report_location_from_stream_energy(self) -> None:
+        scenario = GaussianShiftScenario(seed=42)
+        scenario.step(0)
+        streams = scenario.get_streams()
+        data = [s.current_data for s in streams]
+        labels = [s.label for s in streams]
+        loc = scenario.infer_report_location(data, labels)
+        assert isinstance(loc, tuple)
+        assert len(loc) == 2
+
     def test_compute_costs_returns_expected_keys(self) -> None:
         scenario = GaussianShiftScenario(seed=42)
         costs = scenario.compute_costs(n_escalations=10, n_correct=7, n_false_alarms=3, n_missed=2)

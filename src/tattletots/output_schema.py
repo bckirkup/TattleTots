@@ -9,9 +9,12 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
+
+if TYPE_CHECKING:
+    from tattletots.telemetry.recorder import TelemetryRecorder
 
 SCHEMA_VERSION = "1.0"
 
@@ -54,6 +57,24 @@ class TimeSeries(BaseModel):
 
     population: list[int] = Field(default_factory=list)
     cost_per_step: list[float] = Field(default_factory=list)
+    reports_issued: list[int] = Field(default_factory=list)
+    correct_reports: list[int] = Field(default_factory=list)
+    false_alarms: list[int] = Field(default_factory=list)
+    missed_events: list[int] = Field(default_factory=list)
+    mean_info_energy: list[float] = Field(default_factory=list)
+    mean_attn_energy: list[float] = Field(default_factory=list)
+    births: list[int] = Field(default_factory=list)
+    deaths: list[int] = Field(default_factory=list)
+    n_compression_types: list[int] = Field(default_factory=list)
+    max_trophic_level: list[float] = Field(default_factory=list)
+
+    @classmethod
+    def from_telemetry(
+        cls, telemetry: TelemetryRecorder, cost_per_step: list[float]
+    ) -> TimeSeries:
+        """Build a TimeSeries from a TelemetryRecorder and per-step costs."""
+        ecology = telemetry.ecology_time_series()
+        return cls(cost_per_step=cost_per_step, **ecology)
 
 
 class SimulationOutput(BaseModel):

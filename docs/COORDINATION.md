@@ -154,7 +154,17 @@ All integrated runs produce JSON conforming to `tattletots.output_schema.Simulat
   "domain_metrics": { "...domain-specific..." },
   "time_series": {
     "population": [20, 19, 21, "..."],
-    "cost_per_step": [12.5, 15.0, "..."]
+    "cost_per_step": [12.5, 15.0, "..."],
+    "reports_issued": [3, 1, "..."],
+    "correct_reports": [2, 1, "..."],
+    "false_alarms": [1, 0, "..."],
+    "missed_events": [0, 1, "..."],
+    "mean_info_energy": [1.2, 1.1, "..."],
+    "mean_attn_energy": [0.8, 0.9, "..."],
+    "births": [1, 0, "..."],
+    "deaths": [0, 1, "..."],
+    "n_compression_types": [4, 4, "..."],
+    "max_trophic_level": [2.0, 2.5, "..."]
   }
 }
 ```

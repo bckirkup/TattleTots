@@ -5,6 +5,8 @@ from __future__ import annotations
 import numpy as np
 from pydantic import BaseModel, Field
 
+from tattletots.models.location import EventLocation
+
 
 class Report(BaseModel):
     """An escalation event: an agent reporting a detected anomaly to a user.
@@ -21,6 +23,9 @@ class Report(BaseModel):
     signal_vector: np.ndarray = Field(description="The compressed signal being escalated")
     confidence: float = Field(ge=0.0, le=1.0, description="Agent's confidence in this anomaly")
     anomaly_score: float = Field(ge=0.0, description="Raw anomaly score that triggered escalation")
+    location: EventLocation = Field(
+        description="Reported location of the detected event (domain-specific coordinates)"
+    )
     verified: bool = Field(default=False, description="Whether this report has been verified")
     correct: bool | None = Field(
         default=None, description="Whether the report was correct (None if unverified)"

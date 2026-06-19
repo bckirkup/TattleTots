@@ -317,7 +317,7 @@ class TestMaybeEscalate:
         for _ in range(80):
             world._compress(agent)
             world._maybe_escalate(agent)
-        assert len(agent.state.anomaly_history) <= world._ANOMALY_WINDOW
+        assert len(agent.state.anomaly_history) <= agent.genome.escalation_memory_depth
 
 
 class TestApplyEnergy:
@@ -329,6 +329,7 @@ class TestApplyEnergy:
                 lifecycle=LifecycleStage.ADULT,
                 energy=EnergyReserves(information=1.0, attention=1.0),
                 last_step_yield=0.0,
+                last_compute_cost_paid=0.1,
             ),
         )
         world._apply_energy(agent, {}, [])
@@ -342,6 +343,7 @@ class TestApplyEnergy:
                 lifecycle=LifecycleStage.ADULT,
                 energy=EnergyReserves(information=1.0, attention=1.0),
                 last_step_yield=0.2,
+                last_compute_cost_paid=0.1,
             ),
         )
         world.compression_models[agent.id] = PCACompression(n_components=2)
@@ -365,6 +367,7 @@ class TestApplyEnergy:
             signal_vector=np.array([1.0]),
             confidence=0.9,
             anomaly_score=2.0,
+            location=(0, 0),
             verified=True,
             correct=False,
         )
@@ -401,8 +404,9 @@ class TestApplyEnergy:
             world.agents[downstream.id] = downstream
 
         world._apply_energy(upstream, {}, [])
-        # subsidy = 2 * 0.1 = 0.2; info_delta = -0.01 + 0.2 = 0.19
-        assert upstream.state.energy.information == pytest.approx(1.19)
+        # subsidy = 2 * 0.1 = 0.2; info_delta = -compute_cost + 0.2
+        expected = 1.0 - upstream.genome.total_compute_cost(world.config) + 0.2
+        assert upstream.state.energy.information == pytest.approx(expected)
 
 
 class TestApplyDomestication:
@@ -534,7 +538,7 @@ class TestRandomGenome:
         for _ in range(20):
             g = world._random_genome()
             assert isinstance(g.compression_type, CompressionType)
-            assert 1 <= g.n_components <= 5
+            assert 1 <= g.n_components <= 50
             assert 0.3 <= g.escalation_threshold <= 0.9
             assert 0.5 <= g.metabolic_efficiency <= 2.0
             assert 0.05 <= g.compute_cost <= 0.2
@@ -543,3 +547,38 @@ class TestRandomGenome:
             assert 0.0 <= g.domestication_sensitivity <= 0.3
             assert g.input_preference.sum() == pytest.approx(1.0, abs=1e-10)
             assert g.target_user_affinity.sum() == pytest.approx(1.0, abs=1e-10)
+
+
+class TestEventState:
+    def test_wrong_location_counts_as_missed(self) -> None:
+        """Agents reporting wrong location during active event get missed penalty."""
+        world = _minimal_world(trust_delta_miss=0.15)
+        _add_raw_stream(world, dim=5)
+        user = User(name="test_user", attention_budget=1.0)
+        world.add_user(user)
+
+        agent = Agent(
+            genome=Genome(escalation_threshold=0.01),
+            state=AgentState(
+                lifecycle=LifecycleStage.ADULT,
+                energy=EnergyReserves(information=2.0, attention=2.0),
+            ),
+        )
+        world.agents[agent.id] = agent
+        world._init_agent_model(agent)
+        agent.state.input_stream_ids = [list(world.streams.keys())[0]]
+
+        world.set_location_inference(lambda _data, _labels: (9, 9))
+        world.set_event_state([(1, 1)])
+
+        trust_before = user.get_trust(agent.id)
+        world.step()
+        trust_after = user.get_trust(agent.id)
+        assert trust_after < trust_before
+
+    def test_set_event_state_derives_ground_truth_active(self) -> None:
+        world = _minimal_world()
+        world.set_event_state([(2, 3)])
+        assert world._ground_truth_active is True
+        world.set_event_state([])
+        assert world._ground_truth_active is False

@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import enum
-from typing import Self
+from typing import TYPE_CHECKING, Self
 
 import numpy as np
 from pydantic import BaseModel, Field
+
+if TYPE_CHECKING:
+    from tattletots.engine.config import SimulationConfig
+    from tattletots.models.agent import AgentState
 
 
 class CompressionType(enum.StrEnum):
@@ -16,6 +20,50 @@ class CompressionType(enum.StrEnum):
     AR1 = "ar1"
     THRESHOLD = "threshold"
     WAVELET = "wavelet"
+
+
+class SensingStrategy(enum.StrEnum):
+    """How an agent fuses multiple input streams into a working vector."""
+
+    CONCAT = "concat"
+    WEIGHTED_FUSE = "weighted_fuse"
+    SUBSPACE_SAMPLE = "subspace_sample"
+    BLOCK_SPECIALIZE = "block_specialize"
+
+
+class TemporalFusionMode(enum.StrEnum):
+    """How temporal history is fused before compression."""
+
+    NONE = "none"
+    EMA = "ema"
+    WINDOW_STACK = "window_stack"
+    AR_LAG = "ar_lag"
+
+
+class SpatialStrategy(enum.StrEnum):
+    """How an agent specializes spatially over input dimensions."""
+
+    GLOBAL = "global"
+    PEAK = "peak"
+    WEIGHTED_ROI = "weighted_roi"
+    FIXED_REGION = "fixed_region"
+
+
+class ResidualPolicy(enum.StrEnum):
+    """What an agent does with compression residuals."""
+
+    EXCRETE = "excrete"
+    STORE = "store"
+    REFINE = "refine"
+    COMPRESS_OUT = "compress_out"
+
+
+class EscalationMode(enum.StrEnum):
+    """How escalation threshold is determined."""
+
+    FIXED = "fixed"
+    ADAPTIVE_QUANTILE = "adaptive_quantile"
+    ADAPTIVE_VOLATILITY = "adaptive_volatility"
 
 
 class ParentalStrategy(enum.StrEnum):
@@ -116,6 +164,109 @@ class Genome(BaseModel):
         default=0.0,
         description="Heritable signature for parent-offspring recognition (subsidy validation)",
     )
+    # --- Compute complexity traits ---
+    sensing_strategy: SensingStrategy = Field(
+        default=SensingStrategy.CONCAT,
+        description="How multiple input streams are fused before compression",
+    )
+    working_dim: int = Field(
+        default=30,
+        ge=8,
+        le=256,
+        description="Target dimensionality after sensing projection",
+    )
+    fusion_weights: np.ndarray = Field(
+        default_factory=lambda: np.array([], dtype=np.float64),
+        description="Per-stream fusion weights (normalized)",
+    )
+    dim_offset: int = Field(
+        default=0,
+        ge=0,
+        description="Seed offset for subspace sampling (lineage diversity)",
+    )
+    block_index: int = Field(
+        default=0,
+        ge=0,
+        description="Which spatial block to specialize on (block_specialize)",
+    )
+    temporal_memory_depth: int = Field(
+        default=0,
+        ge=0,
+        le=100,
+        description="Depth of temporal history buffer",
+    )
+    temporal_fusion_mode: TemporalFusionMode = Field(
+        default=TemporalFusionMode.NONE,
+        description="How temporal history is fused",
+    )
+    spatial_strategy: SpatialStrategy = Field(
+        default=SpatialStrategy.GLOBAL,
+        description="Spatial specialization strategy",
+    )
+    spatial_region: tuple[int, int] = Field(
+        default=(0, 0),
+        description="Center of fixed spatial region (row, col)",
+    )
+    spatial_radius: int = Field(
+        default=1,
+        ge=0,
+        description="Radius for fixed spatial region",
+    )
+    region_affinity: np.ndarray = Field(
+        default_factory=lambda: np.array([], dtype=np.float64),
+        description="Soft weights over domain regions",
+    )
+    residual_policy: ResidualPolicy = Field(
+        default=ResidualPolicy.EXCRETE,
+        description="How residuals are handled after compression",
+    )
+    residual_storage_steps: int = Field(
+        default=5,
+        ge=0,
+        le=20,
+        description="Max steps to store residuals before emission",
+    )
+    escalation_mode: EscalationMode = Field(
+        default=EscalationMode.FIXED,
+        description="How escalation threshold is calibrated",
+    )
+    escalation_memory_depth: int = Field(
+        default=50,
+        ge=3,
+        le=200,
+        description="History window for escalation baseline",
+    )
+    threshold_adaptation_rate: float = Field(
+        default=0.1,
+        ge=0.0,
+        le=1.0,
+        description="Rate for adaptive escalation threshold modes",
+    )
+
+    def total_compute_cost(
+        self,
+        config: SimulationConfig,
+        *,
+        residual_buffer_len: int = 0,
+        residual_buffer_dim: int = 0,
+    ) -> float:
+        """Total per-step information-energy cost for compute complexity traits."""
+        cost = self.compute_cost
+        cost += self.temporal_memory_depth * config.temporal_cost_rate
+        cost += self.working_dim * config.projection_cost_rate
+        if self.spatial_strategy != SpatialStrategy.GLOBAL:
+            cost += config.spatial_cost_rate
+        if self.residual_policy == ResidualPolicy.STORE and residual_buffer_len > 0:
+            cost += (
+                config.storage_cost_rate
+                * residual_buffer_dim
+                * residual_buffer_len
+            )
+        if self.residual_policy == ResidualPolicy.REFINE:
+            cost += self.compute_cost * config.refine_cost_multiplier
+        if self.escalation_mode != EscalationMode.FIXED:
+            cost += self.escalation_memory_depth * config.escalation_cost_rate
+        return cost
 
     def mutate(self, rng: np.random.Generator, rate: float = 0.1) -> Self:
         """Return a mutated copy of this genome."""
@@ -174,27 +325,76 @@ class Genome(BaseModel):
         if rng.random() < rate:
             data["lineage_signature"] = float(data["lineage_signature"] + rng.normal(0, 0.1))
 
-        # Mutate input preferences if they exist
-        if len(data["input_preference"]) > 0:
-            pref = np.array(data["input_preference"], dtype=np.float64)
-            mask = rng.random(len(pref)) < rate
-            pref[mask] += rng.normal(0, 0.1, size=int(mask.sum()))
-            pref = np.clip(pref, 0.0, None)
-            total = pref.sum()
-            if total > 0:
-                pref /= total
-            data["input_preference"] = pref
+        if rng.random() < rate:
+            strategies = list(SensingStrategy)
+            data["sensing_strategy"] = strategies[int(rng.integers(0, len(strategies)))]
 
-        # Mutate user affinity if it exists
-        if len(data["target_user_affinity"]) > 0:
-            aff = np.array(data["target_user_affinity"], dtype=np.float64)
-            mask = rng.random(len(aff)) < rate
-            aff[mask] += rng.normal(0, 0.1, size=int(mask.sum()))
-            aff = np.clip(aff, 0.0, None)
-            total = aff.sum()
-            if total > 0:
-                aff /= total
-            data["target_user_affinity"] = aff
+        if rng.random() < rate:
+            data["working_dim"] = int(np.clip(data["working_dim"] + rng.integers(-8, 9), 8, 256))
+
+        if rng.random() < rate:
+            data["dim_offset"] = int(np.clip(data["dim_offset"] + rng.integers(-5, 6), 0, 1000))
+
+        if rng.random() < rate:
+            data["block_index"] = int(np.clip(data["block_index"] + rng.integers(-2, 3), 0, 99))
+
+        if rng.random() < rate:
+            data["temporal_memory_depth"] = int(
+                np.clip(data["temporal_memory_depth"] + rng.integers(-5, 6), 0, 100)
+            )
+
+        if rng.random() < rate:
+            modes = list(TemporalFusionMode)
+            data["temporal_fusion_mode"] = modes[int(rng.integers(0, len(modes)))]
+
+        if rng.random() < rate:
+            strategies = list(SpatialStrategy)
+            data["spatial_strategy"] = strategies[int(rng.integers(0, len(strategies)))]
+
+        if rng.random() < rate:
+            row, col = data["spatial_region"]
+            data["spatial_region"] = (
+                int(np.clip(row + rng.integers(-2, 3), 0, 99)),
+                int(np.clip(col + rng.integers(-2, 3), 0, 99)),
+            )
+
+        if rng.random() < rate:
+            data["spatial_radius"] = int(np.clip(data["spatial_radius"] + rng.integers(-1, 2), 0, 20))
+
+        if rng.random() < rate:
+            policies = list(ResidualPolicy)
+            data["residual_policy"] = policies[int(rng.integers(0, len(policies)))]
+
+        if rng.random() < rate:
+            data["residual_storage_steps"] = int(
+                np.clip(data["residual_storage_steps"] + rng.integers(-2, 3), 0, 20)
+            )
+
+        if rng.random() < rate:
+            modes = list(EscalationMode)
+            data["escalation_mode"] = modes[int(rng.integers(0, len(modes)))]
+
+        if rng.random() < rate:
+            data["escalation_memory_depth"] = int(
+                np.clip(data["escalation_memory_depth"] + rng.integers(-10, 11), 3, 200)
+            )
+
+        if rng.random() < rate:
+            data["threshold_adaptation_rate"] = float(
+                np.clip(data["threshold_adaptation_rate"] + rng.normal(0, 0.05), 0.0, 1.0)
+            )
+
+        # Mutate array preferences
+        for key in ("input_preference", "target_user_affinity", "fusion_weights", "region_affinity"):
+            arr = np.array(data[key], dtype=np.float64)
+            if len(arr) > 0:
+                mask = rng.random(len(arr)) < rate
+                arr[mask] += rng.normal(0, 0.1, size=int(mask.sum()))
+                arr = np.clip(arr, 0.0, None)
+                total = arr.sum()
+                if total > 0 and key != "region_affinity":
+                    arr /= total
+                data[key] = arr
 
         return type(self).model_validate(data)
 
@@ -205,8 +405,9 @@ class Genome(BaseModel):
         data_b = parent_b.model_dump()
         child_data: dict[str, object] = {}
 
+        array_keys = ("input_preference", "target_user_affinity", "fusion_weights", "region_affinity")
         for key in data_a:
-            if key in ("input_preference", "target_user_affinity"):
+            if key in array_keys:
                 arr_a = np.array(data_a[key], dtype=np.float64)
                 arr_b = np.array(data_b[key], dtype=np.float64)
                 if len(arr_a) == len(arr_b) and len(arr_a) > 0:
@@ -214,7 +415,74 @@ class Genome(BaseModel):
                     child_data[key] = alpha * arr_a + (1 - alpha) * arr_b
                 else:
                     child_data[key] = arr_a if rng.random() < 0.5 else arr_b
+            elif key == "spatial_region":
+                child_data[key] = data_a[key] if rng.random() < 0.5 else data_b[key]
             else:
                 child_data[key] = data_a[key] if rng.random() < 0.5 else data_b[key]
 
         return cls.model_validate(child_data)
+
+    @classmethod
+    def random_genome(
+        cls,
+        rng: np.random.Generator,
+        *,
+        n_streams: int = 1,
+        n_users: int = 1,
+        gene_pool: object | None = None,
+    ) -> Genome:
+        """Generate a random genome, optionally constrained by gene pool config."""
+        from tattletots.engine.config import GenePoolConfig as PoolConfig
+
+        pool = gene_pool or PoolConfig()
+        comp_types = pool.available_compression_types or list(CompressionType)
+        comp_type = CompressionType(comp_types[int(rng.integers(0, len(comp_types)))])
+        lo, hi = pool.n_components_range
+        et_lo, et_hi = pool.escalation_threshold_range
+        me_lo, me_hi = pool.metabolic_efficiency_range
+        wd_lo, wd_hi = pool.working_dim_range
+        dd_lo, dd_hi = pool.development_duration_range
+
+        sensing_types = pool.available_sensing_strategies or list(SensingStrategy)
+        spatial_types = pool.available_spatial_strategies or [SpatialStrategy.GLOBAL]
+        residual_types = pool.available_residual_policies or [ResidualPolicy.EXCRETE]
+        escalation_types = pool.available_escalation_modes or [EscalationMode.FIXED]
+
+        return cls(
+            compression_type=comp_type,
+            n_components=int(rng.integers(lo, hi + 1)),
+            input_preference=rng.dirichlet(np.ones(max(n_streams, 1))),
+            escalation_threshold=float(rng.uniform(et_lo, et_hi)),
+            target_user_affinity=rng.dirichlet(np.ones(max(n_users, 1))),
+            metabolic_efficiency=float(rng.uniform(me_lo, me_hi)),
+            compute_cost=float(rng.uniform(0.05, 0.2)),
+            maintenance_cost=float(rng.uniform(0.02, 0.1)),
+            reproduction_threshold=float(rng.uniform(1.5, 3.0)),
+            domestication_sensitivity=float(rng.uniform(0.0, 0.3)),
+            development_duration=int(rng.integers(dd_lo, dd_hi + 1)),
+            sensing_strategy=SensingStrategy(
+                sensing_types[int(rng.integers(0, len(sensing_types)))]
+            ),
+            working_dim=int(rng.integers(wd_lo, wd_hi + 1)),
+            fusion_weights=rng.dirichlet(np.ones(max(n_streams, 1))),
+            dim_offset=int(rng.integers(0, 100)),
+            block_index=int(rng.integers(0, max(pool.n_blocks, 1))),
+            temporal_memory_depth=int(rng.integers(0, pool.max_temporal_depth + 1)),
+            temporal_fusion_mode=TemporalFusionMode(
+                pool.available_temporal_modes[
+                    int(rng.integers(0, len(pool.available_temporal_modes)))
+                ]
+            ),
+            spatial_strategy=SpatialStrategy(
+                spatial_types[int(rng.integers(0, len(spatial_types)))]
+            ),
+            spatial_region=(int(rng.integers(0, 10)), int(rng.integers(0, 10))),
+            spatial_radius=int(rng.integers(0, 5)),
+            residual_policy=ResidualPolicy(
+                residual_types[int(rng.integers(0, len(residual_types)))]
+            ),
+            escalation_mode=EscalationMode(
+                escalation_types[int(rng.integers(0, len(escalation_types)))]
+            ),
+        )
+
