@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from tattletots.engine.response_judgment import aggregate_outcomes, judge_necessity
 from tattletots.models.response_outcome import ResponseOutcome
 

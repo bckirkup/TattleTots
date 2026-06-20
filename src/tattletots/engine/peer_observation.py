@@ -76,7 +76,9 @@ def collect_whistleblower_suspicions(
 ) -> list[WhistleblowerReport]:
     """Collect false-report suspicions from observable dispatch outcomes only."""
     suspicions: list[WhistleblowerReport] = []
-    living = [a for a in agents.values() if a.is_alive and a.state.lifecycle == LifecycleStage.ADULT]
+    living = [
+        a for a in agents.values() if a.is_alive and a.state.lifecycle == LifecycleStage.ADULT
+    ]
     user_ids = list(users.keys())
     if not user_ids:
         return suspicions
@@ -136,7 +138,9 @@ def apply_peer_witness_trust(
 ) -> int:
     """Update peer_trust from witnessed escalations, dispatches, outcomes, and rewards."""
     updates = 0
-    living = [a for a in agents.values() if a.is_alive and a.state.lifecycle == LifecycleStage.ADULT]
+    living = [
+        a for a in agents.values() if a.is_alive and a.state.lifecycle == LifecycleStage.ADULT
+    ]
     reports_by_location: dict[EventLocation, list[Report]] = {}
     for report in reports:
         if report.verified:

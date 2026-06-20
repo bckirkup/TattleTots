@@ -60,9 +60,7 @@ class TestPriorityRemap:
     def test_align_user_priorities_at_setup(self) -> None:
         config = SimulationConfig(initial_population=5, max_steps=5, seed=1)
         world = World(config=config)
-        world.add_user(
-            User(name="Chief", priority_vector=_fire_style_priority(56, "ops"))
-        )
+        world.add_user(User(name="Chief", priority_vector=_fire_style_priority(56, "ops")))
         world.seed_population()
         before = canonical_report_dim(world)
         report_dim = align_user_priorities_to_report_space(world)

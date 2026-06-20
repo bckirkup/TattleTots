@@ -13,8 +13,8 @@ import numpy as np
 from numpy.typing import NDArray
 
 from tattletots.interface.domain_adapter import DomainAdapter
+from tattletots.models.dispatch_target import DispatchTarget
 from tattletots.models.location import EventLocation
-from tattletots.models.report import Report
 from tattletots.models.response_outcome import ResponseOutcome
 from tattletots.models.stream import Stream, StreamType
 from tattletots.models.user import User
@@ -132,7 +132,7 @@ class HighDimShiftScenario(DomainAdapter):
 
     def dispatch_and_judge_responses(
         self,
-        targets: list,
+        targets: list[DispatchTarget],
         time_step: int,
     ) -> list[ResponseOutcome]:
         """Built-in scenario has no physical response actions."""

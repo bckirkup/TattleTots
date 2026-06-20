@@ -114,9 +114,7 @@ class TelemetryRecorder:
             "missed_events": [r.missed_events for r in self.history],
             "responses_dispatched": [r.responses_dispatched for r in self.history],
             "responses_judged_necessary": [r.responses_judged_necessary for r in self.history],
-            "responses_judged_unnecessary": [
-                r.responses_judged_unnecessary for r in self.history
-            ],
+            "responses_judged_unnecessary": [r.responses_judged_unnecessary for r in self.history],
             "mean_info_energy": [r.mean_info_energy for r in self.history],
             "mean_attn_energy": [r.mean_attn_energy for r in self.history],
             "births": [r.births for r in self.history],
@@ -169,7 +167,7 @@ class TelemetryRecorder:
             "compression_types": [float(r.n_compression_types) for r in self.history],
         }
 
-    def summary(self) -> dict[str, object]:
+    def summary(self) -> dict[str, int | float | bool]:
         """Summary statistics for the entire run."""
         return {
             "total_steps": self.total_steps,

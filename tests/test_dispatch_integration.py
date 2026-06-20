@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+
 from tattletots.engine.config import SimulationConfig
 from tattletots.engine.dispatch_integration import init_user_cops, run_dispatch_cycle
 from tattletots.engine.world import World

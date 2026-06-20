@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from tattletots.models.response_outcome import ResponseOutcome
+from tattletots.telemetry.recorder import StepRecord
 
 
 def judge_necessity(
@@ -35,7 +36,7 @@ def aggregate_outcomes(outcomes: list[ResponseOutcome]) -> dict[str, int]:
 
 
 def patch_step_record_responses(
-    history: list[object],
+    history: list[StepRecord],
     outcomes: list[ResponseOutcome],
 ) -> None:
     """Update the most recent StepRecord with response outcome counts."""

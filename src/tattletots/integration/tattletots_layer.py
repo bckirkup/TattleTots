@@ -22,9 +22,7 @@ try:
     from domain_runner.layer import SimulationLayer
     from domain_runner.types import RunContext
 except ImportError as exc:
-    raise ImportError(
-        "TattleTots integration layer requires the domain-runner package"
-    ) from exc
+    raise ImportError("TattleTots integration layer requires the domain-runner package") from exc
 
 
 class TattleTotsLayer:
@@ -119,7 +117,9 @@ class TattleTotsLayer:
                 reached_equilibrium=bool(summary["reached_equilibrium"]),
                 total_responses_dispatched=int(summary["total_responses_dispatched"]),
                 total_responses_judged_necessary=int(summary["total_responses_judged_necessary"]),
-                total_responses_judged_unnecessary=int(summary["total_responses_judged_unnecessary"]),
+                total_responses_judged_unnecessary=int(
+                    summary["total_responses_judged_unnecessary"]
+                ),
                 responder_necessity_rate=float(summary["responder_necessity_rate"]),
                 unnecessary_dispatch_rate=float(summary["unnecessary_dispatch_rate"]),
             ),
@@ -131,9 +131,7 @@ class TattleTotsLayer:
                 mean_cost_per_step=cost_summary["mean_cost_per_step"],
             ),
             domain_metrics={},
-            time_series=TimeSeries.from_telemetry(
-                world.telemetry, cost_accumulator.cost_history()
-            ),
+            time_series=TimeSeries.from_telemetry(world.telemetry, cost_accumulator.cost_history()),
         )
 
         return {
@@ -152,7 +150,4 @@ def resolve_layer(name: str) -> SimulationLayer:
         return DomainOnlyLayer()
     if name in ("tattletots", "tots"):
         return TattleTotsLayer()
-    raise ValueError(
-        f"Unknown simulation layer {name!r}. "
-        "Supported: domain_only, tattletots"
-    )
+    raise ValueError(f"Unknown simulation layer {name!r}. Supported: domain_only, tattletots")

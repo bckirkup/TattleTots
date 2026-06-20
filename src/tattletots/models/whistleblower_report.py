@@ -16,6 +16,4 @@ class WhistleblowerReport(BaseModel):
     time_step: int = Field(ge=0)
     location: EventLocation
     suspicion_score: float = Field(ge=0.0)
-    basis: str = Field(
-        description="unnecessary_response"
-    )
+    basis: str = Field(description="unnecessary_response")

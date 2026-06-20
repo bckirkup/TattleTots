@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from tattletots.engine.config import SimulationConfig
 from tattletots.engine.peer_observation import observable_prestige
 from tattletots.models.agent import Agent, LifecycleStage
 from tattletots.models.genome import MimesisMode, ParentalStrategy

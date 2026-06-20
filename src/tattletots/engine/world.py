@@ -20,17 +20,17 @@ from tattletots.engine.development import (
 )
 from tattletots.engine.domestication import apply_shaping, compute_shaping_signal
 from tattletots.engine.escalation import should_escalate
+from tattletots.engine.peer_observation import (
+    apply_peer_witness_trust,
+    collect_whistleblower_suspicions,
+    record_observable_outcomes,
+)
 from tattletots.engine.reproduction import attempt_reproduction
 from tattletots.engine.residual import apply_residual_policy
 from tattletots.engine.sensing import gather_raw_stream_data, prepare_agent_input
 from tattletots.engine.spatial import apply_spatial_mask, infer_spatial_location
 from tattletots.engine.temporal import apply_temporal_fusion
 from tattletots.engine.trophic import compute_trophic_level, select_input_streams
-from tattletots.engine.peer_observation import (
-    apply_peer_witness_trust,
-    collect_whistleblower_suspicions,
-    record_observable_outcomes,
-)
 from tattletots.engine.trust import (
     apply_response_outcome_trust,
     apply_whistleblower_trust,
@@ -45,11 +45,11 @@ from tattletots.models.energy import EnergyReserves
 from tattletots.models.genome import Genome, ParentalStrategy, ResidualPolicy, SpatialStrategy
 from tattletots.models.location import EventLocation
 from tattletots.models.report import Report
+from tattletots.models.response_outcome import ResponseOutcome
 from tattletots.models.stream import Stream, StreamType
 from tattletots.models.user import User
 from tattletots.models.user_cop import UserCOP
 from tattletots.models.whistleblower_report import WhistleblowerReport
-from tattletots.models.response_outcome import ResponseOutcome
 from tattletots.telemetry.recorder import StepRecord, TelemetryRecorder
 
 LocationInferenceFn = Callable[[list[NDArray[np.float64]], list[str]], EventLocation]
@@ -272,9 +272,7 @@ class World:
     ) -> list[WhistleblowerReport]:
         """Apply response-outcome trust, peer witness updates, and whistleblower corroboration."""
         record_observable_outcomes(self.agents, outcomes)
-        apply_response_outcome_trust(
-            self.last_reports, outcomes, self.users, self.config
-        )
+        apply_response_outcome_trust(self.last_reports, outcomes, self.users, self.config)
         apply_peer_witness_trust(
             self.agents,
             self.last_reports,
@@ -307,9 +305,7 @@ class World:
         for wb in whistleblower_reports:
             agent = self.agents.get(wb.whistleblower_id)
             if agent is not None and agent.is_alive:
-                agent.state.energy.apply_attention_delta(
-                    self.config.whistleblower_attention_reward
-                )
+                agent.state.energy.apply_attention_delta(self.config.whistleblower_attention_reward)
 
         return whistleblower_reports
 
