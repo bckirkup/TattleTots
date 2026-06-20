@@ -40,6 +40,11 @@ class EcologyMetrics(BaseModel):
     precision: float = Field(default=0.0, ge=0.0, le=1.0)
     max_trophic_depth: float = Field(default=0.0, ge=0.0)
     reached_equilibrium: bool = Field(default=False)
+    total_responses_dispatched: int = Field(default=0, ge=0)
+    total_responses_judged_necessary: int = Field(default=0, ge=0)
+    total_responses_judged_unnecessary: int = Field(default=0, ge=0)
+    responder_necessity_rate: float = Field(default=0.0, ge=0.0, le=1.0)
+    unnecessary_dispatch_rate: float = Field(default=0.0, ge=0.0, le=1.0)
 
 
 class CostMetrics(BaseModel):
@@ -61,6 +66,9 @@ class TimeSeries(BaseModel):
     correct_reports: list[int] = Field(default_factory=list)
     false_alarms: list[int] = Field(default_factory=list)
     missed_events: list[int] = Field(default_factory=list)
+    responses_dispatched: list[int] = Field(default_factory=list)
+    responses_judged_necessary: list[int] = Field(default_factory=list)
+    responses_judged_unnecessary: list[int] = Field(default_factory=list)
     mean_info_energy: list[float] = Field(default_factory=list)
     mean_attn_energy: list[float] = Field(default_factory=list)
     births: list[int] = Field(default_factory=list)

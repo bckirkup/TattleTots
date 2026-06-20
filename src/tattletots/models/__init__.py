@@ -5,6 +5,7 @@ from tattletots.models.energy import EnergyReserves
 from tattletots.models.genome import CompressionType, Genome
 from tattletots.models.location import EventLocation
 from tattletots.models.report import Report
+from tattletots.models.response_outcome import ResponseOutcome
 from tattletots.models.stream import Stream, StreamType
 from tattletots.models.user import User
 
@@ -17,6 +18,7 @@ __all__ = [
     "EventLocation",
     "LifecycleStage",
     "Report",
+    "ResponseOutcome",
     "Stream",
     "StreamType",
     "User",

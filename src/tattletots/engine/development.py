@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from tattletots.engine.config import SimulationConfig
+from tattletots.engine.peer_observation import observable_prestige
 from tattletots.models.agent import Agent, LifecycleStage
 from tattletots.models.genome import MimesisMode, ParentalStrategy
 from tattletots.models.user import User
@@ -89,12 +89,12 @@ def select_role_models(
         return [a for a in adults if j_inputs & set(a.state.input_stream_ids)]
 
     if mode == MimesisMode.OPPORTUNISTIC:
-        best_trust = -1.0
+        best_score = -1.0
         best: Agent | None = None
         for a in adults:
-            trust = max((u.get_trust(a.id) for u in users.values()), default=0.0)
-            if trust > best_trust:
-                best_trust = trust
+            score = observable_prestige(juvenile, a)
+            if score > best_score:
+                best_score = score
                 best = a
         return [best] if best is not None else []
 

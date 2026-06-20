@@ -18,6 +18,8 @@ from numpy.typing import NDArray
 
 from tattletots.interface.domain_adapter import DomainAdapter
 from tattletots.models.location import EventLocation
+from tattletots.models.report import Report
+from tattletots.models.response_outcome import ResponseOutcome
 from tattletots.models.stream import Stream
 from tattletots.models.user import User
 
@@ -173,6 +175,17 @@ class GaussianShiftScenario(DomainAdapter):
             "response_cost": n_correct * 1.0 + n_false_alarms * 2.0,
             "damage_cost": n_missed * 5.0,
         }
+
+    def get_responder_user_id(self) -> str:
+        return self._users[0].id
+
+    def dispatch_and_judge_responses(
+        self,
+        targets: list,
+        time_step: int,
+    ) -> list[ResponseOutcome]:
+        """Built-in scenario has no physical response actions."""
+        return []
 
     def _generate_data(self, time_step: int) -> NDArray[np.float64]:
         """Generate multivariate Gaussian data with structured components."""

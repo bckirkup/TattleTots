@@ -134,6 +134,11 @@ class TestTelemetryRecorder:
             "precision",
             "max_trophic_depth",
             "reached_equilibrium",
+            "total_responses_dispatched",
+            "total_responses_judged_necessary",
+            "total_responses_judged_unnecessary",
+            "responder_necessity_rate",
+            "unnecessary_dispatch_rate",
         }
         assert set(s.keys()) == expected_keys
 
@@ -217,6 +222,9 @@ class TestTelemetryRecorder:
         assert ts["mean_attn_energy"] == [0.8, 0.9]
         assert ts["n_compression_types"] == [3, 4]
         assert ts["max_trophic_level"] == [2.0, 2.5]
+        assert ts["responses_dispatched"] == [0, 0]
+        assert ts["responses_judged_necessary"] == [0, 0]
+        assert ts["responses_judged_unnecessary"] == [0, 0]
 
     def test_time_series_from_telemetry(self) -> None:
         rec = TelemetryRecorder()

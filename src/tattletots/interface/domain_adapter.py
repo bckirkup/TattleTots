@@ -11,7 +11,9 @@ from abc import ABC, abstractmethod
 import numpy as np
 from numpy.typing import NDArray
 
+from tattletots.models.dispatch_target import DispatchTarget
 from tattletots.models.location import EventLocation
+from tattletots.models.response_outcome import ResponseOutcome
 from tattletots.models.stream import Stream
 from tattletots.models.user import User
 
@@ -74,6 +76,18 @@ class DomainAdapter(ABC):
 
         Returns dict with keys: surveillance_cost, response_cost, damage_cost.
         """
+
+    @abstractmethod
+    def get_responder_user_id(self) -> str:
+        """Return the user id authorized to dispatch physical responses from their COP."""
+
+    @abstractmethod
+    def dispatch_and_judge_responses(
+        self,
+        targets: list[DispatchTarget],
+        time_step: int,
+    ) -> list[ResponseOutcome]:
+        """Execute physical responses at COP-selected locations and return judgments."""
 
     def get_spatial_dim_map(self) -> dict[str, slice]:
         """Optional mapping from stream labels to dimension slices for spatial specialization."""

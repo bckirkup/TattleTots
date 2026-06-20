@@ -37,6 +37,9 @@ class StepRecord:
     mean_memory_depth: float = 0.0
     n_sensing_strategies: int = 0
     n_residual_policies: int = 0
+    responses_dispatched: int = 0
+    responses_judged_necessary: int = 0
+    responses_judged_unnecessary: int = 0
 
 
 @dataclass
@@ -80,6 +83,18 @@ class TelemetryRecorder:
         return sum(r.false_alarms for r in self.history)
 
     @property
+    def total_responses_dispatched(self) -> int:
+        return sum(r.responses_dispatched for r in self.history)
+
+    @property
+    def total_responses_judged_necessary(self) -> int:
+        return sum(r.responses_judged_necessary for r in self.history)
+
+    @property
+    def total_responses_judged_unnecessary(self) -> int:
+        return sum(r.responses_judged_unnecessary for r in self.history)
+
+    @property
     def max_trophic_depth(self) -> float:
         if not self.history:
             return 0.0
@@ -97,6 +112,11 @@ class TelemetryRecorder:
             "correct_reports": [r.correct_reports for r in self.history],
             "false_alarms": [r.false_alarms for r in self.history],
             "missed_events": [r.missed_events for r in self.history],
+            "responses_dispatched": [r.responses_dispatched for r in self.history],
+            "responses_judged_necessary": [r.responses_judged_necessary for r in self.history],
+            "responses_judged_unnecessary": [
+                r.responses_judged_unnecessary for r in self.history
+            ],
             "mean_info_energy": [r.mean_info_energy for r in self.history],
             "mean_attn_energy": [r.mean_attn_energy for r in self.history],
             "births": [r.births for r in self.history],
@@ -161,4 +181,13 @@ class TelemetryRecorder:
             "precision": (self.total_correct_reports / max(self.total_reports, 1)),
             "max_trophic_depth": self.max_trophic_depth,
             "reached_equilibrium": self.is_stable(),
+            "total_responses_dispatched": self.total_responses_dispatched,
+            "total_responses_judged_necessary": self.total_responses_judged_necessary,
+            "total_responses_judged_unnecessary": self.total_responses_judged_unnecessary,
+            "responder_necessity_rate": (
+                self.total_responses_judged_necessary / max(self.total_responses_dispatched, 1)
+            ),
+            "unnecessary_dispatch_rate": (
+                self.total_responses_judged_unnecessary / max(self.total_responses_dispatched, 1)
+            ),
         }

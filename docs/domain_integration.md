@@ -56,6 +56,53 @@ class MyDomainAdapter(DomainAdapter):
     def compute_costs(self, n_escalations, n_correct, n_false_alarms, n_missed):
         """Return domain-specific cost breakdown."""
         ...
+
+    def get_responder_user_id(self) -> str:
+        """User id authorized to dispatch physical responses from their COP."""
+
+    def dispatch_and_judge_responses(
+        self,
+        targets: list[DispatchTarget],
+        time_step: int,
+    ) -> list[ResponseOutcome]:
+        """Execute COP-selected responses and return outcome judgments."""
+        ...
+```
+
+Import `DispatchTarget` from `tattletots.models.dispatch_target` and
+`ResponseOutcome` from `tattletots.models.response_outcome`.
+
+**Trust boundary:** Agents must not read `User.trust`. That field is for user-side
+attention and COP fusion only. Agents update `peer_trust` from observable signals
+(reports, dispatch outcomes, whistleblower verification).
+
+## domain-runner Layers
+
+Domain repos ship `{package}/runner.py` with a `*DomainHooks` class. The shared
+[domain-runner](https://github.com/bckirkup/domain-runner) package orchestrates runs:
+
+| Layer | Requires TattleTots | Behavior |
+|-------|---------------------|----------|
+| `domain_only` | No | Advance adapter physics only |
+| `tattletots` | Yes | Full agent ecology + COP dispatch loop |
+
+```bash
+pip install -e domain-runner[dev]
+pip install -e TattleTots[dev]   # only for --layer tattletots
+
+fire-ecology sim --layer domain_only --steps 200
+fire-ecology sim --layer tattletots --config configs/tattletots_integration.json
+fire-ecology batch --config configs/batch_example.json
+```
+
+Programmatic use:
+
+```python
+from fire_ecology.runner import FireDomainHooks, run_fire_simulation
+
+hooks = FireDomainHooks()
+run = hooks.load_run_context(cli_overrides={"layer": "tattletots", "domain": {"steps": 200}})
+result = run_fire_simulation(run)
 ```
 
 ## Step-by-Step Implementation
@@ -182,6 +229,8 @@ These costs feed into the `CostAccumulator` telemetry module for analysis.
 
 ## Running a Simulation with Your Adapter
 
+### Manual loop (low-level)
+
 ```python
 from tattletots.engine.config import SimulationConfig
 from tattletots.engine.world import World
@@ -214,6 +263,14 @@ for step_num in range(config.max_steps):
 # Analyze results
 print(world.telemetry.summary())
 ```
+
+### Recommended: domain-runner + TattleTots layer
+
+Use each domain's `run_*_simulation()` entry point (see `{domain}/runner.py`) with
+`--layer tattletots` or `TattleTotsLayer` directly. The layer runs `world.step()`,
+then `run_dispatch_cycle()` and `apply_post_dispatch_feedback()` automatically.
+
+See `integration/tattletots_layer.py` and `docs/COORDINATION.md`.
 
 ## Using Cost Accounting
 

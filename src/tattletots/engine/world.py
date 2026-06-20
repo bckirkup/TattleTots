@@ -26,11 +26,19 @@ from tattletots.engine.sensing import gather_raw_stream_data, prepare_agent_inpu
 from tattletots.engine.spatial import apply_spatial_mask, infer_spatial_location
 from tattletots.engine.temporal import apply_temporal_fusion
 from tattletots.engine.trophic import compute_trophic_level, select_input_streams
-from tattletots.engine.trust import penalize_missed_events, verify_reports
+from tattletots.engine.peer_observation import (
+    apply_peer_witness_trust,
+    collect_whistleblower_suspicions,
+    record_observable_outcomes,
+)
+from tattletots.engine.trust import (
+    apply_response_outcome_trust,
+    apply_whistleblower_trust,
+    penalize_missed_events,
+    verify_reports,
+)
 from tattletots.engine.whistleblowing import (
-    compute_dishonesty_score,
     create_output_stream,
-    identify_whistleblower_targets,
 )
 from tattletots.models.agent import Agent, AgentState, LifecycleStage
 from tattletots.models.energy import EnergyReserves
@@ -39,6 +47,9 @@ from tattletots.models.location import EventLocation
 from tattletots.models.report import Report
 from tattletots.models.stream import Stream, StreamType
 from tattletots.models.user import User
+from tattletots.models.user_cop import UserCOP
+from tattletots.models.whistleblower_report import WhistleblowerReport
+from tattletots.models.response_outcome import ResponseOutcome
 from tattletots.telemetry.recorder import StepRecord, TelemetryRecorder
 
 LocationInferenceFn = Callable[[list[NDArray[np.float64]], list[str]], EventLocation]
@@ -65,6 +76,7 @@ class World:
     _dim_to_location: DimToLocationFn | None = None
     _ground_truth_vector: NDArray[np.float64] | None = None
     last_reports: list[Report] = field(default_factory=list)
+    last_whistleblower_reports: list[WhistleblowerReport] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if self.config.seed is not None:
@@ -135,6 +147,15 @@ class World:
 
         living_agents = [a for a in self.agents.values() if a.is_alive]
 
+        for agent in living_agents:
+            agent.state.last_escalated = False
+            agent.state.last_published_output = False
+            agent.state.last_whistleblower_reports_issued = 0
+            agent.state.last_step_attention_income = 0.0
+            agent.state.last_step_info_subsidy = 0.0
+            agent.state.last_observed_dispatch = False
+            agent.state.last_observed_outcome_necessary = None
+
         # 1. Trophic attachment
         available_streams = list(self.streams.values())
         for agent in living_agents:
@@ -160,8 +181,7 @@ class World:
                 reports.append(report)
                 self._publish_output_stream(agent)
 
-        # 5. Whistleblowing checks
-        self._process_whistleblowing(living_agents)
+        # 5. Whistleblowing structured suspicions run post-dispatch in apply_post_dispatch_feedback
 
         # 6. Trust verification
         verified_reports = verify_reports(reports, self._active_locations, self.users, self.config)
@@ -244,6 +264,54 @@ class World:
         )
         self.telemetry.record_step(record)
         return record
+
+    def apply_post_dispatch_feedback(
+        self,
+        outcomes: list[ResponseOutcome],
+        cops: dict[str, UserCOP] | None = None,
+    ) -> list[WhistleblowerReport]:
+        """Apply response-outcome trust, peer witness updates, and whistleblower corroboration."""
+        record_observable_outcomes(self.agents, outcomes)
+        apply_response_outcome_trust(
+            self.last_reports, outcomes, self.users, self.config
+        )
+        apply_peer_witness_trust(
+            self.agents,
+            self.last_reports,
+            outcomes,
+            self.config,
+        )
+
+        whistleblower_reports = collect_whistleblower_suspicions(
+            self.agents,
+            self.last_reports,
+            outcomes,
+            self.users,
+            self.config,
+        )
+        self.last_whistleblower_reports = whistleblower_reports
+
+        if cops is not None and whistleblower_reports:
+            from tattletots.engine.cop import apply_whistleblower_to_cops
+
+            apply_whistleblower_to_cops(cops, whistleblower_reports)
+
+        apply_whistleblower_trust(
+            whistleblower_reports,
+            self.last_reports,
+            outcomes,
+            self.users,
+            self.config,
+        )
+
+        for wb in whistleblower_reports:
+            agent = self.agents.get(wb.whistleblower_id)
+            if agent is not None and agent.is_alive:
+                agent.state.energy.apply_attention_delta(
+                    self.config.whistleblower_attention_reward
+                )
+
+        return whistleblower_reports
 
     def run(self, steps: int | None = None) -> list[StepRecord]:
         """Run the simulation for the specified number of steps."""
@@ -391,6 +459,13 @@ class World:
             return None
 
         anomaly, threshold, fire = should_escalate(agent, model, combined)
+        agent.state.last_anomaly_score = anomaly
+        agent.state.last_inferred_location = infer_spatial_location(
+            agent,
+            combined,
+            n_blocks=self.config.n_spatial_blocks,
+            dim_to_location=self._dim_to_location,
+        )
         if not fire:
             return None
 
@@ -405,13 +480,16 @@ class World:
             target_idx = int(self.rng.integers(0, len(user_ids)))
 
         agent.state.reports_issued += 1
+        agent.state.last_escalated = True
 
-        location = infer_spatial_location(
-            agent,
-            combined,
-            n_blocks=self.config.n_spatial_blocks,
-            dim_to_location=self._dim_to_location,
-        )
+        location = agent.state.last_inferred_location
+        if location is None:
+            location = infer_spatial_location(
+                agent,
+                combined,
+                n_blocks=self.config.n_spatial_blocks,
+                dim_to_location=self._dim_to_location,
+            )
         if (
             agent.genome.spatial_strategy == SpatialStrategy.GLOBAL
             and self._location_inference is not None
@@ -432,6 +510,7 @@ class World:
 
     def _publish_output_stream(self, agent: Agent) -> None:
         """Publish OUTPUT stream on escalation for whistleblower consumption."""
+        agent.state.last_published_output = True
         signal = agent.state.signal_vector
         if signal.size == 0:
             return
@@ -445,23 +524,6 @@ class World:
                 if stream.dimensionality != signal.size:
                     stream.dimensionality = signal.size
                 stream.update(signal)
-
-    def _process_whistleblowing(self, living_agents: list[Agent]) -> None:
-        """Agents consuming OUTPUT streams detect dishonesty."""
-        if self._ground_truth_vector is None:
-            return
-        gt = self._ground_truth_vector
-        for agent in living_agents:
-            targets = identify_whistleblower_targets(agent, self.streams)
-            if not targets:
-                continue
-            for stream_id in targets:
-                stream = self.streams.get(stream_id)
-                if stream is None or stream.current_data.size == 0:
-                    continue
-                score = compute_dishonesty_score(stream.current_data, gt)
-                if score > 0.5:
-                    agent.state.energy.apply_attention_delta(0.05)
 
     def _apply_parental_effects(self, child: Agent) -> None:
         """Apply parental strategy after child creation."""
@@ -516,11 +578,14 @@ class World:
                 for a in self.agents.values()
                 if a.is_alive and agent.state.output_stream_id in a.state.input_stream_ids
             )
-            info_delta += downstream_count * self.config.subsidy_rate
+            subsidy = downstream_count * self.config.subsidy_rate
+            info_delta += subsidy
+            agent.state.last_step_info_subsidy = subsidy
 
         agent.state.energy.apply_info_delta(info_delta)
 
         attn_income = compute_attention_income(agent, list(self.users.values()), allocations)
+        agent.state.last_step_attention_income = attn_income
         agent.state.cumulative_attention += attn_income
         maint = juvenile_maintenance_cost(agent, self.config)
         attn_delta = attn_income - maint

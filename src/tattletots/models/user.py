@@ -42,9 +42,19 @@ class User(BaseModel):
         correct_alarm: bool = False,
         false_alarm: bool = False,
         missed_event: bool = False,
+        response_necessary: bool = False,
+        response_unnecessary: bool = False,
+        whistleblower_corroborated: bool = False,
+        whistleblower_refuted: bool = False,
+        accused_corroborated: bool = False,
         delta_pos: float = 0.05,
         delta_neg: float = 0.2,
         delta_miss: float = 0.1,
+        delta_response_necessary: float = 0.03,
+        delta_unnecessary_response: float = 0.15,
+        delta_whistleblower_corroborated: float = 0.04,
+        delta_whistleblower_refuted: float = 0.12,
+        delta_accused_corroborated: float = 0.25,
     ) -> None:
         """Update trust based on verified outcomes. Asymmetric: hard to build, easy to destroy."""
         current = self.get_trust(agent_id)
@@ -54,6 +64,16 @@ class User(BaseModel):
             new_trust = max(0.0, current - delta_neg)
         elif missed_event:
             new_trust = max(0.0, current - delta_miss)
+        elif response_necessary:
+            new_trust = min(1.0, current + delta_response_necessary)
+        elif response_unnecessary:
+            new_trust = max(0.0, current - delta_unnecessary_response)
+        elif whistleblower_corroborated:
+            new_trust = min(1.0, current + delta_whistleblower_corroborated)
+        elif whistleblower_refuted:
+            new_trust = max(0.0, current - delta_whistleblower_refuted)
+        elif accused_corroborated:
+            new_trust = max(0.0, current - delta_accused_corroborated)
         else:
             new_trust = current
         self.trust[agent_id] = new_trust

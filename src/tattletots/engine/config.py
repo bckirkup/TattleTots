@@ -104,3 +104,32 @@ class SimulationConfig(BaseModel):
     n_spatial_blocks: int = Field(
         default=10, ge=1, description="Uniform blocks for high-dim streams"
     )
+    # Common Operating Picture
+    cop_dispatch_threshold: float = Field(default=1.0, ge=0.0)
+    cop_min_supporting_reports: int = Field(default=1, ge=1)
+    cop_min_supporting_weight: float = Field(default=0.3, ge=0.0)
+    cop_decay_factor: float = Field(default=0.95, gt=0.0, le=1.0)
+    cop_non_target_weight_scale: float = Field(default=0.5, ge=0.0, le=1.0)
+    cop_reinforce_factor: float = Field(default=1.2, gt=0.0)
+    cop_dampen_factor: float = Field(default=0.5, gt=0.0, le=1.0)
+    cop_confirm_bonus: float = Field(default=0.2, ge=0.0)
+    # Response-outcome trust
+    trust_delta_response_necessary: float = Field(default=0.03, gt=0.0)
+    trust_delta_unnecessary_response: float = Field(default=0.15, gt=0.0)
+    trust_delta_whistleblower_corroborated: float = Field(default=0.04, gt=0.0)
+    trust_delta_whistleblower_refuted: float = Field(default=0.12, gt=0.0)
+    trust_delta_accused_corroborated: float = Field(default=0.25, gt=0.0)
+    # Peer observation and whistleblowing
+    peer_overlap_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
+    peer_trust_delta_pos: float = Field(default=0.05, gt=0.0)
+    peer_trust_delta_neg: float = Field(default=0.15, gt=0.0)
+    peer_trust_delta_miss: float = Field(default=0.1, gt=0.0)
+    peer_witness_user_trust_scale: float = Field(default=0.25, ge=0.0, le=1.0)
+    peer_witness_min_anomaly: float = Field(default=0.3, ge=0.0, le=1.0)
+    peer_witness_reward_threshold: float = Field(
+        default=0.05,
+        ge=0.0,
+        description="Minimum attention income for peers to treat resourcing as witnessed reward",
+    )
+    whistleblower_suspicion_threshold: float = Field(default=0.5, ge=0.0)
+    whistleblower_attention_reward: float = Field(default=0.05, ge=0.0)

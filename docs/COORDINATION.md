@@ -6,6 +6,7 @@ TattleTots is designed to work as a standalone engine or integrated with domain-
 
 | Repository | Role | CLI Command |
 |------------|------|-------------|
+| **domain-runner** | Layer-agnostic single/batch runners (no TattleTots required) | *(library)* |
 | **TattleTots** | Domain-agnostic agent ecology engine | `tattletots` |
 | **Coral_Key_in_Three_Hour_Epochs** | ReefWatch fishery monitoring domain | `coral-key` |
 | **Xylella_SPQR** | GrainGuard precision agriculture domain | `grain-guard` |
@@ -36,12 +37,14 @@ Each domain repo:
 
 ```bash
 # Clone all repos
+git clone https://github.com/bckirkup/domain-runner.git
 git clone https://github.com/bckirkup/TattleTots.git
 git clone https://github.com/bckirkup/Coral_Key_in_Three_Hour_Epochs.git
 git clone https://github.com/bckirkup/Xylella_SPQR.git
 git clone https://github.com/bckirkup/Scrapiron_and_the_Bear.git
 
-# Install TattleTots first (all domain repos depend on it)
+# Install shared runner first, then TattleTots, then domains
+pip install -e domain-runner[dev]
 pip install -e TattleTots[dev]
 
 # Install domain repos (they reference TattleTots via git dependency,
@@ -54,7 +57,8 @@ pip install -e Scrapiron_and_the_Bear[dev]
 ### Single domain repo
 
 ```bash
-pip install -e TattleTots[dev]
+pip install -e domain-runner
+pip install -e TattleTots[dev]   # only if using --layer tattletots
 pip install -e <domain_repo>[dev]
 ```
 
@@ -70,26 +74,39 @@ Tests the engine with an abstract Gaussian distribution shift — no domain know
 
 ### 2. Domain Standalone (no agent ecology)
 
-Each domain has its own CLI for exercising domain logic in isolation:
+Each domain uses [domain-runner](https://github.com/bckirkup/domain-runner) for layer-agnostic runs:
 
 ```bash
-# Fishery monitoring
+# Domain physics only (default layer)
+fire-ecology sim --layer domain_only --steps 200 --verbose
+grain-guard sim --layer domain_only --steps 200 --verbose
+coral-key sim --layer domain_only --epochs 200 --verbose
+
+# Batch sweeps (see configs/batch_example.json in each domain repo)
+fire-ecology batch --config configs/batch_example.json
+```
+
+Legacy standalone CLIs still work for quick runs:
+
+```bash
 coral-key --epochs 200 --verbose
-
-# Precision agriculture
 grain-guard --steps 200 --landscape monoculture --verbose
-
-# Wildfire management
 fire-ecology --steps 200 --verbose
 ```
 
 ### 3. Integrated Mode (domain + TattleTots agent ecology)
 
 The full integration runs the domain adapter inside the TattleTots World engine.
-Agents evolve, compete, and self-organize to monitor the domain.
+Agents evolve, compete, and self-organize to monitor the domain. COP-gated dispatch
+selects physical response targets each step.
 
 ```bash
-# From the domain repo directory:
+# Preferred: domain CLI with TattleTots layer
+fire-ecology sim --layer tattletots --config configs/tattletots_integration.json
+grain-guard sim --layer tattletots --config configs/tattletots_integration.json
+coral-key sim --layer tattletots --config configs/tattletots_integration.json
+
+# Legacy wrapper (same loop)
 python scripts/run_with_tattletots.py \
     --config configs/tattletots_integration.json \
     --output results.json \
@@ -191,7 +208,27 @@ for r in results:
 ## Key Design Decisions
 
 1. **TattleTots is never modified by domain repos** — they only implement the ABC
-2. **Domain repos remain independently runnable** — the standalone CLI still works
+2. **Domain repos remain independently runnable** — `domain_only` layer needs no TattleTots install
 3. **Unified output enables apples-to-apples comparison** — same structure regardless of domain
 4. **Configuration is self-contained** — one JSON file per run with all parameters
 5. **Domain metrics are extensible** — the `domain_metrics` field is free-form per domain
+6. **Agents never read `User.trust`** — trust is user-side (attention, COP fusion); agents learn from observable rewards, dispatch events, and peer observation only
+
+## COP Dispatch Loop (integrated mode)
+
+When running with `--layer tattletots`, each world step is followed by:
+
+```
+world.step()
+  → run_dispatch_cycle()      # fuse COP signals → select DispatchTarget list
+  → adapter.dispatch_and_judge_responses()
+  → apply_post_dispatch_feedback()   # peer trust, whistleblowing, response outcomes
+```
+
+Domain adapters implement:
+
+- `get_responder_user_id()` — which user may authorize physical responses
+- `dispatch_and_judge_responses(targets, time_step)` — execute responses, return `ResponseOutcome` list
+
+Orchestration lives in `tattletots.engine.dispatch_integration` and `integration/tattletots_layer.py`.
+See `docs/domain_integration.md` for adapter requirements.

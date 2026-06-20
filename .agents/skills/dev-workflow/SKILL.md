@@ -6,6 +6,7 @@ description: Development workflow, testing, and configuration reference for the 
 ## Setup
 
 ```bash
+pip install -e domain-runner[dev]   # for integration/tattletots_layer tests
 pip install -e ".[dev]"
 pre-commit install
 ```
@@ -89,6 +90,40 @@ pytest --cov=tattletots  # with coverage
 | `engine/sensing.py` | Multi-stream fusion strategies (CONCAT, WEIGHTED_FUSE, SUBSPACE_SAMPLE, BLOCK_SPECIALIZE) |
 | `engine/residual.py` | Residual output policies (EXCRETE, STORE, REFINE, COMPRESS_OUT) |
 | `engine/whistleblowing.py` | Dishonesty detection and output stream publishing |
+| `engine/cop.py` | User COP fusion (attention-weighted signal combination) |
+| `engine/dispatch_integration.py` | `run_dispatch_cycle()` — fuse COP → dispatch targets |
+| `engine/trust.py` | Peer trust updates, whistleblower verification |
+| `engine/peer_observation.py` | Observable reward signals for agents |
+| `integration/tattletots_layer.py` | domain-runner layer wrapping World + dispatch loop |
+
+## Domain Integration via domain-runner
+
+Domain repos implement `DomainAdapter` plus `{package}/runner.py`. Install order:
+
+```bash
+pip install -e domain-runner[dev]
+pip install -e TattleTots[dev]
+pip install -e <domain_repo>[dev]
+```
+
+| Repo | Domain | CLI |
+|------|--------|-----|
+| `Scrapiron_and_the_Bear` | Wildfire | `fire-ecology sim\|batch --layer domain_only\|tattletots` |
+| `Xylella_SPQR` | Agriculture | `grain-guard sim\|batch --layer domain_only\|tattletots` |
+| `Coral_Key_in_Three_Hour_Epochs` | Fishery/IUU | `coral-key sim\|batch --layer domain_only\|tattletots` |
+
+Legacy: `scripts/run_with_tattletots.py` in each domain repo.
+
+All integrated runs output unified JSON (`tattletots.output_schema.SimulationOutput`).
+See `docs/COORDINATION.md` and `docs/domain_integration.md`.
+
+### Dispatch adapter methods
+
+Domains must implement:
+- `get_responder_user_id()` → str
+- `dispatch_and_judge_responses(targets, time_step)` → list[ResponseOutcome]
+
+Agents must **not** read `User.trust` (user-side only).
 
 ## GPU Acceleration
 
@@ -114,37 +149,12 @@ Implement `DomainAdapter` ABC from `tattletots.interface`. Required methods:
 - `infer_report_location(stream_data, stream_labels)` → `EventLocation` mapping agent inputs to a spatial coordinate
 - `score_relevance(signal, user)` → domain-specific relevance score
 - `compute_costs(...)` → surveillance/response/damage cost dict
+- `get_responder_user_id()` → user authorized for COP dispatch
+- `dispatch_and_judge_responses(targets, time_step)` → physical response outcomes
 
 Set `max_stream_dim` in `SimulationConfig` to match your adapter's stream dimensionality if it exceeds 30.
 
 See `docs/domain_integration.md` for the full guide and `scenarios/gaussian_shift.py` for a reference implementation.
-
-### Available Domain Repos
-
-| Repo | Domain | Runner |
-|------|--------|--------|
-| `Coral_Key_in_Three_Hour_Epochs` | Fishery/IUU | `scripts/run_with_tattletots.py` |
-| `Xylella_SPQR` | Precision agriculture | `scripts/run_with_tattletots.py` |
-| `Scrapiron_and_the_Bear` | Wildfire | `scripts/run_with_tattletots.py` |
-
-All runners output unified JSON (`tattletots.output_schema.SimulationOutput`).
-See `docs/COORDINATION.md` for the full cross-repo guide.
-
-## Parameter Scans
-
-For large sweeps, generate config variants and run in parallel:
-
-```bash
-# Each run produces a SimulationOutput JSON file
-python scripts/run_with_tattletots.py --config <cfg>.json --output <out>.json
-
-# Load results programmatically
-from tattletots.output_schema import SimulationOutput
-result = SimulationOutput.model_validate_json(path.read_text())
-```
-
-Key parameters to sweep: `mutation_rate`, `initial_population`, `max_population`,
-`false_alarm_penalty`, `trust_delta_neg`, `seed` (replicate).
 
 ## Pre-existing Configs
 

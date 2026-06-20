@@ -94,6 +94,36 @@ class AgentState(BaseModel):
         default_factory=lambda: np.array([], dtype=np.float64),
         description="Last sensing+temporal+spatial processed input",
     )
+    peer_trust: dict[str, float] = Field(
+        default_factory=dict,
+        description="Agent-to-agent trust, values in [0, 1]",
+    )
+    last_inferred_location: tuple[int, int] | None = Field(
+        default=None,
+        description="Where this agent observed signal this step",
+    )
+    last_anomaly_score: float = Field(default=0.0, ge=0.0)
+    last_escalated: bool = Field(default=False)
+    last_published_output: bool = Field(default=False)
+    last_whistleblower_reports_issued: int = Field(default=0, ge=0)
+    last_step_attention_income: float = Field(
+        default=0.0,
+        ge=0.0,
+        description="Attention income this step (observable resourcing reward)",
+    )
+    last_step_info_subsidy: float = Field(
+        default=0.0,
+        ge=0.0,
+        description="Downstream information subsidy received this step (observable)",
+    )
+    last_observed_dispatch: bool = Field(
+        default=False,
+        description="Whether this agent's escalation was linked to a dispatch this cycle",
+    )
+    last_observed_outcome_necessary: bool | None = Field(
+        default=None,
+        description="Observed post-dispatch necessity judgment when dispatched",
+    )
 
 
 class Agent(BaseModel):
@@ -135,6 +165,28 @@ class Agent(BaseModel):
     def kill(self) -> None:
         """Mark agent as dead."""
         self.state.lifecycle = LifecycleStage.DEAD
+
+    def get_peer_trust(self, agent_id: str) -> float:
+        return self.state.peer_trust.get(agent_id, 0.5)
+
+    def update_peer_trust(
+        self,
+        agent_id: str,
+        *,
+        positive: bool = False,
+        negative: bool = False,
+        missed: bool = False,
+        delta_pos: float = 0.05,
+        delta_neg: float = 0.15,
+        delta_miss: float = 0.1,
+    ) -> None:
+        current = self.get_peer_trust(agent_id)
+        if positive:
+            self.state.peer_trust[agent_id] = min(1.0, current + delta_pos)
+        elif negative:
+            self.state.peer_trust[agent_id] = max(0.0, current - delta_neg)
+        elif missed:
+            self.state.peer_trust[agent_id] = max(0.0, current - delta_miss)
 
     def spawn_offspring(self, rng: np.random.Generator, mutation_rate: float = 0.1) -> Agent:
         """Asexual reproduction: create a mutated offspring."""

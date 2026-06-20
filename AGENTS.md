@@ -6,6 +6,7 @@ that will integrate with domain-specific repos (FireEcology, CruiseEcology, etc.
 
 ## Setup
 ```bash
+pip install -e domain-runner[dev]   # required for tests/test_dispatch_integration.py
 pip install -e ".[dev]"
 pre-commit install
 ```
@@ -24,7 +25,7 @@ pytest
 - **Never modify tests to make them pass** — fix the implementation
 - **Genome fields are heritable** — runtime state is NOT
 - **Compression models must handle variable-dimension input gracefully** (reset on dim change)
-- **Input/residual streams are capped at `config.max_stream_dim`** (default 30) to prevent exponential blowup
+- **Agents never read `User.trust`** — user-side attention/COP only; agents use peer_trust + observable signals
 
 ## Key Files
 | File | Purpose |
@@ -40,7 +41,11 @@ pytest
 | `src/tattletots/engine/sensing.py` | Multi-stream fusion strategies |
 | `src/tattletots/engine/residual.py` | Residual output policies |
 | `src/tattletots/engine/whistleblowing.py` | Dishonesty detection |
-| `src/tattletots/interface/domain_adapter.py` | DomainAdapter ABC (8 abstract methods) |
+| `src/tattletots/engine/cop.py` | User COP fusion and signal weighting |
+| `src/tattletots/engine/dispatch_integration.py` | COP-gated dispatch cycle |
+| `src/tattletots/engine/trust.py` | Peer trust and whistleblower verification |
+| `src/tattletots/integration/tattletots_layer.py` | domain-runner SimulationLayer |
+| `src/tattletots/interface/domain_adapter.py` | DomainAdapter ABC (incl. dispatch hooks) |
 | `src/tattletots/scenarios/gaussian_shift.py` | Built-in smoke test scenario |
 | `tests/test_smoke.py` | Success criteria validation |
 

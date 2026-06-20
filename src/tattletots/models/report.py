@@ -6,6 +6,7 @@ import numpy as np
 from pydantic import BaseModel, Field
 
 from tattletots.models.location import EventLocation
+from tattletots.models.response_outcome import ResponseOutcome
 
 
 class Report(BaseModel):
@@ -29,4 +30,8 @@ class Report(BaseModel):
     verified: bool = Field(default=False, description="Whether this report has been verified")
     correct: bool | None = Field(
         default=None, description="Whether the report was correct (None if unverified)"
+    )
+    response_outcome: ResponseOutcome | None = Field(
+        default=None,
+        description="Post-dispatch responder judgment, if a physical response was attempted",
     )

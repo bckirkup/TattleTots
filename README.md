@@ -111,7 +111,7 @@ The engine uses `get_active_locations()` for spatial report verification — eac
 | [Xylella_SPQR](https://github.com/bckirkup/Xylella_SPQR) | Precision agriculture & pest management | `grain-guard` |
 | [Scrapiron_and_the_Bear](https://github.com/bckirkup/Scrapiron_and_the_Bear) | Wildfire detection & suppression | `fire-ecology` |
 
-Each domain repo includes a `scripts/run_with_tattletots.py` runner that plugs its adapter into the full TattleTots engine, producing unified JSON output for cross-domain comparison. See [docs/COORDINATION.md](docs/COORDINATION.md) for details on installation, configuration, and output schema.
+Each domain repo includes `{package}/runner.py` and CLI commands (`sim`, `batch`, `--layer domain_only|tattletots`) via [domain-runner](https://github.com/bckirkup/domain-runner). Legacy `scripts/run_with_tattletots.py` wrappers still work. See [docs/COORDINATION.md](docs/COORDINATION.md) for installation, configuration, and output schema.
 
 ## GPU Acceleration
 

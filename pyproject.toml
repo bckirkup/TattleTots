@@ -24,6 +24,7 @@ dependencies = [
     "scipy>=1.10",
     "pydantic>=2.0",
     "networkx>=3.0",
+    "domain-runner @ git+https://github.com/bckirkup/domain-runner.git",
 ]
 
 [project.optional-dependencies]
@@ -40,6 +41,9 @@ gpu = [
 
 [project.scripts]
 tattletots = "tattletots.cli:main"
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/tattletots"]
@@ -70,6 +74,7 @@ addopts = "--strict-markers -ra"
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "smoke: smoke test scenario validating emergent behavior",
+    "integration: integration tests requiring domain-runner or dispatch loop",
 ]
 
 [tool.coverage.run]
