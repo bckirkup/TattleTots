@@ -39,12 +39,37 @@ def _report(
 
 
 class TestUserCOPFusion:
+    def test_fuse_builds_responder_threat_for_compressed_signal(self) -> None:
+        """Responder with middle-band priorities still fuses compressed reports."""
+        n = 9
+        priority = np.zeros(n)
+        priority[n // 3 : 2 * n // 3] = 1.0
+        priority /= np.linalg.norm(priority)
+        responder = User(name="Ops Chief", priority_vector=priority)
+        users = {responder.id: responder}
+        cops = create_initial_cops(users, dispatch_threshold=0.5)
+        report = Report(
+            agent_id="a1",
+            target_user_id=responder.id,
+            time_step=1,
+            signal_vector=np.array([2.0, 1.5]),
+            confidence=0.9,
+            anomaly_score=1.0,
+            location=(4, 5),
+            verified=True,
+            correct=True,
+        )
+        fuse_reports_into_cops(cops, [report], users, 1, adapter=None)
+        belief = cops[responder.id].get_belief((4, 5))
+        assert belief.threat_level > 0
+        assert belief.supporting_weight > 0
+
     def test_fuse_builds_threat_at_report_location(self) -> None:
         user = User(name="Responder", priority_vector=np.ones(5))
         users = {user.id: user}
         cops = create_initial_cops(users, dispatch_threshold=0.5)
         report = _report("a1", user.id, (3, 4))
-        fuse_reports_into_cops(cops, [report], users, 1)
+        fuse_reports_into_cops(cops, [report], users, 1, adapter=None)
         belief = cops[user.id].get_belief((3, 4))
         assert belief.threat_level > 0
         assert belief.supporting_reports == 1
@@ -55,7 +80,7 @@ class TestUserCOPFusion:
         users = {responder.id: responder, other.id: other}
         cops = create_initial_cops(users, dispatch_threshold=0.1)
         false_report = _report("a1", other.id, (1, 1), correct=False)
-        fuse_reports_into_cops(cops, [false_report], users, 1)
+        fuse_reports_into_cops(cops, [false_report], users, 1, adapter=None)
 
         targets = select_dispatch_targets(cops, responder.id, [false_report])
         assert len(targets) == 1
@@ -66,7 +91,7 @@ class TestUserCOPFusion:
         users = {user.id: user}
         cops = create_initial_cops(users, dispatch_threshold=0.1)
         report = _report("a1", user.id, (2, 2))
-        fuse_reports_into_cops(cops, [report], users, 1)
+        fuse_reports_into_cops(cops, [report], users, 1, adapter=None)
         before = cops[user.id].get_belief((2, 2)).threat_level
 
         outcome = ResponseOutcome(

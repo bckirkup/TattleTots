@@ -219,14 +219,20 @@ for r in results:
 When running with `--layer tattletots`, each world step is followed by:
 
 ```
+TattleTotsLayer.setup()
+  → align_user_priorities_to_report_space()   # raw-stream role bands → median report dim
+
 world.step()
-  → run_dispatch_cycle()      # fuse COP signals → select DispatchTarget list
-  → adapter.dispatch_and_judge_responses()
+  → run_dispatch_cycle()
+       fuse_reports_into_cops(..., adapter=adapter)   # adapter.score_relevance per report
+       select_dispatch_targets()                    # responder COP locations above threshold
+       adapter.dispatch_and_judge_responses()
   → apply_post_dispatch_feedback()   # peer trust, whistleblowing, response outcomes
 ```
 
 Domain adapters implement:
 
+- `score_relevance(signal_vector, user)` — role-weighted relevance for COP fusion (see `engine/relevance.py`)
 - `get_responder_user_id()` — which user may authorize physical responses
 - `dispatch_and_judge_responses(targets, time_step)` — execute responses, return `ResponseOutcome` list
 

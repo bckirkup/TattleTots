@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
-from tattletots.engine.config import SimulationConfig
+from typing import TYPE_CHECKING
+
 from tattletots.models.dispatch_target import DispatchTarget
+
+if TYPE_CHECKING:
+    from tattletots.interface.domain_adapter import DomainAdapter
 from tattletots.models.report import Report
 from tattletots.models.response_outcome import ResponseOutcome
 from tattletots.models.user import User
@@ -44,6 +48,7 @@ def fuse_reports_into_cops(
     users: dict[str, User],
     time_step: int,
     *,
+    adapter: DomainAdapter | None = None,
     non_target_weight_scale: float = 0.5,
 ) -> None:
     """Fuse verified escalations into every user's COP with role-specific weights."""
@@ -58,7 +63,10 @@ def fuse_reports_into_cops(
             user = users.get(user_id)
             if user is None:
                 continue
-            relevance = max(user.compute_relevance(report.signal_vector), 0.0)
+            if adapter is not None:
+                relevance = max(adapter.score_relevance(report.signal_vector, user), 0.0)
+            else:
+                relevance = max(user.compute_relevance(report.signal_vector), 0.0)
             trust = user.get_trust(report.agent_id)
             target_scale = 1.0 if report.target_user_id == user_id else non_target_weight_scale
             weight = trust * relevance * report.confidence * target_scale

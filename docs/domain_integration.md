@@ -200,17 +200,25 @@ def infer_report_location(self, stream_data, stream_labels) -> tuple[int, int]:
 
 ### 5. Score Relevance
 
-Domain-specific relevance scoring. How useful is a compressed signal to a
-particular user?
+Role-weighted relevance for COP fusion and attention. Agent reports use **compressed**
+`signal_vector`s; user `priority_vector`s are defined in **raw stream space** with
+role-specific bands (e.g. first/middle/last third).
+
+**COP fusion calls `adapter.score_relevance()`**, not a blind dot product on the
+first N components. The default helper is `tattletots.engine.relevance.score_report_relevance()`,
+which uses proportional band mapping when dimensions differ.
+
+At integrated setup, `TattleTotsLayer` remaps user priorities to the median agent
+report dimension via `align_user_priorities_to_report_space()`.
 
 ```python
 def score_relevance(self, signal_vector, user) -> float:
-    # Example: cosine similarity between signal and user's priority
-    cos_sim = np.dot(signal_vector, user.priority_vector) / (
-        np.linalg.norm(signal_vector) * np.linalg.norm(user.priority_vector) + 1e-10
-    )
-    return max(float(cos_sim), 0.0)
+    from tattletots.engine.relevance import score_report_relevance
+    return score_report_relevance(signal_vector, user)
 ```
+
+Override when your domain has custom role logic (e.g. fisheries enforcement vs stock signals).
+See `tests/test_relevance.py` for band-mapping examples.
 
 ### 6. Compute Domain Costs
 

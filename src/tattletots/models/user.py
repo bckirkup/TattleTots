@@ -80,9 +80,6 @@ class User(BaseModel):
 
     def compute_relevance(self, signal_vector: np.ndarray) -> float:
         """Compute relevance of a signal to this user's priorities."""
-        if self.priority_vector.size == 0 or signal_vector.size == 0:
-            return 0.0
-        if self.priority_vector.shape != signal_vector.shape:
-            min_dim = min(len(self.priority_vector), len(signal_vector))
-            return float(np.dot(self.priority_vector[:min_dim], signal_vector[:min_dim]))
-        return float(np.dot(self.priority_vector, signal_vector))
+        from tattletots.engine.relevance import band_relevance
+
+        return band_relevance(self.priority_vector, signal_vector)

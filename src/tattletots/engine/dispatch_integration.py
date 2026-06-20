@@ -5,7 +5,6 @@ from __future__ import annotations
 from tattletots.engine.config import SimulationConfig
 from tattletots.engine.cop import (
     apply_outcomes_to_cops,
-    apply_whistleblower_to_cops,
     create_initial_cops,
     fuse_reports_into_cops,
     select_dispatch_targets,
@@ -51,6 +50,7 @@ def run_dispatch_cycle(
         world.last_reports,
         world.users,
         time_step,
+        adapter=adapter,
         non_target_weight_scale=config.cop_non_target_weight_scale,
     )
 

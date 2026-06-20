@@ -6,6 +6,7 @@ from typing import Any
 
 from tattletots.engine.config import SimulationConfig
 from tattletots.engine.dispatch_integration import init_user_cops, run_dispatch_cycle
+from tattletots.engine.relevance import align_user_priorities_to_report_space
 from tattletots.engine.response_judgment import aggregate_outcomes
 from tattletots.engine.world import World
 from tattletots.output_schema import (
@@ -40,6 +41,7 @@ class TattleTotsLayer:
             world.add_user(user)
         world.set_location_inference(adapter.infer_report_location)
         world.seed_population()
+        align_user_priorities_to_report_space(world)
         cops = init_user_cops(world, adapter, sim_config)
         return {
             "world": world,

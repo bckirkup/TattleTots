@@ -41,7 +41,8 @@ pytest
 | `src/tattletots/engine/sensing.py` | Multi-stream fusion strategies |
 | `src/tattletots/engine/residual.py` | Residual output policies |
 | `src/tattletots/engine/whistleblowing.py` | Dishonesty detection |
-| `src/tattletots/engine/cop.py` | User COP fusion and signal weighting |
+| `src/tattletots/engine/cop.py` | User COP fusion; calls `adapter.score_relevance()` |
+| `src/tattletots/engine/relevance.py` | Band relevance + priority remapping for compressed reports |
 | `src/tattletots/engine/dispatch_integration.py` | COP-gated dispatch cycle |
 | `src/tattletots/engine/trust.py` | Peer trust and whistleblower verification |
 | `src/tattletots/integration/tattletots_layer.py` | domain-runner SimulationLayer |

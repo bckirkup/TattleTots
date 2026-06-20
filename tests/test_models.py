@@ -127,6 +127,16 @@ class TestUser:
         sig = np.array([0.5, 0.5, 0.5])
         assert u.compute_relevance(sig) == pytest.approx(0.5)
 
+    def test_compute_relevance_compressed_signal_outside_priority_band(self) -> None:
+        """Fire Ops Chief-style priority: nonzero only in the middle third."""
+        n = 9
+        priority = np.zeros(n)
+        priority[n // 3 : 2 * n // 3] = 1.0
+        priority /= np.linalg.norm(priority)
+        user = User(name="Fire Operations Chief", priority_vector=priority)
+        compressed = np.array([2.0, 1.5])
+        assert user.compute_relevance(compressed) > 0.0
+
 
 class TestAgent:
     def test_lifecycle_transition(self) -> None:

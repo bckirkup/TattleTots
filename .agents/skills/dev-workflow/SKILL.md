@@ -90,11 +90,20 @@ pytest --cov=tattletots  # with coverage
 | `engine/sensing.py` | Multi-stream fusion strategies (CONCAT, WEIGHTED_FUSE, SUBSPACE_SAMPLE, BLOCK_SPECIALIZE) |
 | `engine/residual.py` | Residual output policies (EXCRETE, STORE, REFINE, COMPRESS_OUT) |
 | `engine/whistleblowing.py` | Dishonesty detection and output stream publishing |
-| `engine/cop.py` | User COP fusion (attention-weighted signal combination) |
+| `engine/cop.py` | User COP fusion; uses `adapter.score_relevance()` per report |
+| `engine/relevance.py` | Proportional band relevance + setup priority remapping |
 | `engine/dispatch_integration.py` | `run_dispatch_cycle()` — fuse COP → dispatch targets |
 | `engine/trust.py` | Peer trust updates, whistleblower verification |
 | `engine/peer_observation.py` | Observable reward signals for agents |
-| `integration/tattletots_layer.py` | domain-runner layer wrapping World + dispatch loop |
+| `integration/tattletots_layer.py` | domain-runner layer; remaps user priorities after `seed_population()` |
+
+### COP relevance and dispatch
+
+Agent reports carry **compressed** `signal_vector`s; domain users define **raw-stream** role priority bands (e.g. Fire Operations Chief = middle third). At setup, `align_user_priorities_to_report_space()` resamples priorities to the median agent working dimension. During fusion, `fuse_reports_into_cops()` calls **`adapter.score_relevance(signal, user)`** (not a raw prefix dot product).
+
+Default implementation: `tattletots.engine.relevance.band_relevance()` — maps each compressed component to the proportional priority band. Domain adapters may override `score_relevance()` for custom role logic.
+
+Dispatch still gates on responder COP `threat_level` at **reported locations** (not ground truth). Low early necessity usually means wrong report locations, not broken judgment.
 
 ## Domain Integration via domain-runner
 
@@ -147,7 +156,7 @@ Implement `DomainAdapter` ABC from `tattletots.interface`. Required methods:
 - `get_ground_truth(time_step)` → bool (shorthand for `len(get_active_locations(...)) > 0`)
 - `get_active_locations(time_step)` → list of `EventLocation` tuples where events are occurring
 - `infer_report_location(stream_data, stream_labels)` → `EventLocation` mapping agent inputs to a spatial coordinate
-- `score_relevance(signal, user)` → domain-specific relevance score
+- `score_relevance(signal, user)` → role-weighted relevance (used by COP fusion; default: band alignment)
 - `compute_costs(...)` → surveillance/response/damage cost dict
 - `get_responder_user_id()` → user authorized for COP dispatch
 - `dispatch_and_judge_responses(targets, time_step)` → physical response outcomes

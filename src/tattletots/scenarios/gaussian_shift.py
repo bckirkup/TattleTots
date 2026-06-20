@@ -153,7 +153,9 @@ class GaussianShiftScenario(DomainAdapter):
 
     def score_relevance(self, signal_vector: NDArray[np.float64], user: User) -> float:
         """Domain-specific relevance scoring."""
-        return user.compute_relevance(signal_vector)
+        from tattletots.engine.relevance import score_report_relevance
+
+        return score_report_relevance(signal_vector, user)
 
     def dim_index_to_location(self, dim_index: int) -> EventLocation:
         """Map dimension index to component block."""

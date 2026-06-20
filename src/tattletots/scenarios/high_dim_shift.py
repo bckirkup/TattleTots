@@ -110,7 +110,9 @@ class HighDimShiftScenario(DomainAdapter):
         }
 
     def score_relevance(self, signal_vector: NDArray[np.float64], user: User) -> float:
-        return user.compute_relevance(signal_vector)
+        from tattletots.engine.relevance import score_report_relevance
+
+        return score_report_relevance(signal_vector, user)
 
     def compute_costs(
         self,
