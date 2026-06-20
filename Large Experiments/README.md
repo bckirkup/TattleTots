@@ -99,5 +99,43 @@ d:\TotsFiles\
 
 ## Baseline Parameter Scans
 
-Non-Tots baseline scans live in each domain repo under `baselines/`. See the workspace root `README.md` at the parent of all repos for run commands.
+Non-Tots baseline scans live in each domain repo under `baselines/`. Orchestrator:
+
+```bash
+cd TattleTots/Large\ Experiments
+python run_all_baselines.py --smoke-test
+python run_all_baselines.py --domain coral_key --workers 8
+```
+
+See the workspace root `README.md` for install steps and run counts.
+
+## Baseline Archive Validation
+
+Before trusting archived A0–A3 results for BMA comparisons, spot-check equivalence against current code:
+
+```bash
+cd TattleTots/Large\ Experiments
+python baseline_spot_check.py --domain all --sample 100 --workers 8
+```
+
+Output: `baseline_spot_check_results/spot_check_report.json` (same-seed determinism gate at 1% relative tolerance).
+
+## BMA vs Baseline Comparison
+
+After `run_quick_validation.py`, compare BMA runs to archived baselines and configured targets:
+
+```bash
+python compare_bma_baselines.py
+python compare_bma_baselines.py --bma-key quick_validation_results/key.json
+```
+
+Output: `quick_validation_results/bma_baseline_comparison.json` (default paths).
+
+## Fire COP Diagnostics
+
+```bash
+python debug_fire_dispatch.py
+```
+
+Logs COP threat levels and dispatch target counts for a fire quick-validation config (smoke/debug only).
 

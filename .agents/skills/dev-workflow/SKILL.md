@@ -96,6 +96,11 @@ pytest --cov=tattletots  # with coverage
 | `engine/trust.py` | Peer trust updates, whistleblower verification |
 | `engine/peer_observation.py` | Observable reward signals for agents |
 | `integration/tattletots_layer.py` | domain-runner layer; remaps user priorities after `seed_population()` |
+| `Large Experiments/baseline_parallel.py` | ProcessPoolExecutor helpers + workspace root detection |
+| `Large Experiments/run_all_baselines.py` | Orchestrator for A0–A3 scans across all domains |
+| `Large Experiments/baseline_spot_check.py` | Archive vs rerun equivalence spot-check |
+| `Large Experiments/compare_bma_baselines.py` | BMA quick-validation vs archived baselines |
+| `Large Experiments/debug_fire_dispatch.py` | COP dispatch diagnostic (fire smoke) |
 
 ### COP relevance and dispatch
 

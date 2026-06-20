@@ -15,16 +15,29 @@ from typing import Any, Callable, Dict, List, Tuple, TypeVar
 
 R = TypeVar("R")
 
+# Sibling repos expected under the workspace root (order: install dependency first).
+WORKSPACE_REPOS: tuple[str, ...] = (
+    "domain_runner",
+    "TattleTots",
+    "Coral_Key_in_Three_Hour_Epochs",
+    "Scrapiron_and_the_Bear",
+    "Xylella_SPQR",
+)
+
 
 def resolve_workspace_root(start: Path | None = None) -> Path:
     """Walk up from start to find the sibling-repo workspace root."""
     anchor = (start or Path(__file__)).resolve()
     for parent in [anchor, *anchor.parents]:
-        if (parent / "Coral_Key_in_Three_Hour_Epochs").is_dir() and (
-            parent / "TattleTots"
-        ).is_dir():
+        if all((parent / name).is_dir() for name in WORKSPACE_REPOS):
             return parent
     return anchor.parents[2] if len(anchor.parents) >= 3 else anchor
+
+
+def missing_workspace_repos(root: Path | None = None) -> list[str]:
+    """Return sibling repo directory names missing from the workspace root."""
+    workspace = root or resolve_workspace_root()
+    return [name for name in WORKSPACE_REPOS if not (workspace / name).is_dir()]
 
 
 def resolve_worker_count(requested: int | None, n_jobs: int) -> int:
