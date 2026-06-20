@@ -21,7 +21,7 @@ def _try_import_cupy() -> ModuleType | None:
         return _cupy
     _cupy_import_attempted = True
     try:
-        import cupy as cp  # type: ignore[import-untyped]
+        import cupy as cp
 
         _cupy = cp
     except Exception:
