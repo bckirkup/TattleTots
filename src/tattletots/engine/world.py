@@ -68,7 +68,7 @@ class World:
     compression_models: dict[str, CompressionModel] = field(default_factory=dict)
     refine_models: dict[str, CompressionModel] = field(default_factory=dict)
     time_step: int = 0
-    rng: np.random.Generator = field(default_factory=lambda: np.random.default_rng())
+    rng: np.random.Generator = field(default_factory=lambda: np.random.default_rng(0))
     telemetry: TelemetryRecorder = field(default_factory=TelemetryRecorder)
     _active_locations: frozenset[EventLocation] = field(default_factory=frozenset)
     _ground_truth_active: bool = False
@@ -79,8 +79,8 @@ class World:
     last_whistleblower_reports: list[WhistleblowerReport] = field(default_factory=list)
 
     def __post_init__(self) -> None:
-        if self.config.seed is not None:
-            self.rng = np.random.default_rng(self.config.seed)
+        seed = self.config.seed if self.config.seed is not None else 0
+        self.rng = np.random.default_rng(seed)
 
     def add_stream(self, stream: Stream) -> None:
         """Register a data stream in the world."""
@@ -138,15 +138,7 @@ class World:
         """Optional ground truth vector for whistleblowing."""
         self._ground_truth_vector = vec
 
-    def step(self) -> StepRecord:
-        """Execute one simulation time step."""
-        self.time_step += 1
-        reports: list[Report] = []
-        births: list[str] = []
-        deaths: list[str] = []
-
-        living_agents = [a for a in self.agents.values() if a.is_alive]
-
+    def _reset_agent_step_state(self, living_agents: list[Agent]) -> None:
         for agent in living_agents:
             agent.state.last_escalated = False
             agent.state.last_published_output = False
@@ -156,69 +148,42 @@ class World:
             agent.state.last_observed_dispatch = False
             agent.state.last_observed_outcome_necessary = None
 
-        # 1. Trophic attachment
+    def _attach_trophic_inputs(self, living_agents: list[Agent]) -> None:
         available_streams = list(self.streams.values())
         for agent in living_agents:
             new_inputs = select_input_streams(agent, available_streams, max_inputs=3, rng=self.rng)
             agent.state.input_stream_ids = new_inputs
 
-        # 2. Development / mimesis (juveniles)
+    def _run_juvenile_mimesis(self, living_agents: list[Agent]) -> None:
         for agent in living_agents:
             if agent.state.lifecycle == LifecycleStage.JUVENILE:
                 models = select_role_models(agent, self.agents, self.users)
                 apply_mimesis(agent, models, self.config)
 
-        # 3. Sensing → temporal → spatial → compression → residual
-        for agent in living_agents:
-            self._compress(agent)
+    def _collect_missed_agents(
+        self,
+        living_agents: list[Agent],
+        reports: list[Report],
+    ) -> list[str]:
+        if not self._active_locations:
+            return []
+        reports_by_agent: dict[str, list[Report]] = {}
+        for report in reports:
+            reports_by_agent.setdefault(report.agent_id, []).append(report)
 
-        # 4. Escalation (adults only)
+        missed: list[str] = []
         for agent in living_agents:
             if agent.state.lifecycle != LifecycleStage.ADULT:
                 continue
-            report = self._maybe_escalate(agent)
-            if report is not None:
-                reports.append(report)
-                self._publish_output_stream(agent)
+            agent_reports = reports_by_agent.get(agent.id, [])
+            if not agent_reports:
+                missed.append(agent.id)
+                continue
+            if not any(r.location in self._active_locations for r in agent_reports):
+                missed.append(agent.id)
+        return missed
 
-        # 5. Whistleblowing structured suspicions run post-dispatch in apply_post_dispatch_feedback
-
-        # 6. Trust verification
-        verified_reports = verify_reports(reports, self._active_locations, self.users, self.config)
-        self.last_reports = verified_reports
-
-        missed: list[str] = []
-        if self._active_locations:
-            reports_by_agent: dict[str, list[Report]] = {}
-            for report in reports:
-                reports_by_agent.setdefault(report.agent_id, []).append(report)
-
-            for agent in living_agents:
-                if agent.state.lifecycle != LifecycleStage.ADULT:
-                    continue
-                agent_reports = reports_by_agent.get(agent.id, [])
-                if not agent_reports:
-                    missed.append(agent.id)
-                    continue
-                if not any(r.location in self._active_locations for r in agent_reports):
-                    missed.append(agent.id)
-            penalize_missed_events(missed, self.users, self.config)
-
-        # 7. Attention allocation
-        all_allocations: dict[str, dict[str, float]] = {}
-        for user in self.users.values():
-            all_allocations[user.id] = allocate_attention(
-                user, living_agents, use_gpu=self.config.use_gpu
-            )
-
-        # 8. Energy accounting
-        for agent in living_agents:
-            self._apply_energy(agent, all_allocations, verified_reports)
-
-        # 9. Domestication
-        self._apply_domestication(living_agents)
-
-        # 10. Death check
+    def _purge_dead_agents(self, living_agents: list[Agent], deaths: list[str]) -> None:
         for agent in living_agents:
             if not agent.state.energy.is_alive:
                 agent.kill()
@@ -232,21 +197,7 @@ class World:
                 self.compression_models.pop(agent.id, None)
                 self.refine_models.pop(agent.id, None)
 
-        # 11. Reproduction
-        still_alive = [a for a in self.agents.values() if a.is_alive]
-        offspring = attempt_reproduction(still_alive, self.config, self.rng)
-        for child in offspring:
-            self.agents[child.id] = child
-            self._init_agent_model(child)
-            self._apply_parental_effects(child)
-            births.append(child.id)
-
-        # 12. Age advancement
-        for agent in self.agents.values():
-            if agent.is_alive:
-                agent.advance_age()
-
-        # Cleanup orphaned streams
+    def _cleanup_orphan_streams(self) -> None:
         living_ids = {a.id for a in self.agents.values() if a.is_alive}
         orphaned = [
             sid
@@ -255,6 +206,62 @@ class World:
         ]
         for sid in orphaned:
             del self.streams[sid]
+
+    def step(self) -> StepRecord:
+        """Execute one simulation time step."""
+        self.time_step += 1
+        reports: list[Report] = []
+        births: list[str] = []
+        deaths: list[str] = []
+
+        living_agents = [a for a in self.agents.values() if a.is_alive]
+        self._reset_agent_step_state(living_agents)
+        self._attach_trophic_inputs(living_agents)
+        self._run_juvenile_mimesis(living_agents)
+
+        for agent in living_agents:
+            self._compress(agent)
+
+        for agent in living_agents:
+            if agent.state.lifecycle != LifecycleStage.ADULT:
+                continue
+            report = self._maybe_escalate(agent)
+            if report is not None:
+                reports.append(report)
+                self._publish_output_stream(agent)
+
+        verified_reports = verify_reports(reports, self._active_locations, self.users, self.config)
+        self.last_reports = verified_reports
+
+        missed = self._collect_missed_agents(living_agents, reports)
+        if missed:
+            penalize_missed_events(missed, self.users, self.config)
+
+        all_allocations: dict[str, dict[str, float]] = {}
+        for user in self.users.values():
+            all_allocations[user.id] = allocate_attention(
+                user, living_agents, use_gpu=self.config.use_gpu
+            )
+
+        for agent in living_agents:
+            self._apply_energy(agent, all_allocations, verified_reports)
+
+        self._apply_domestication(living_agents)
+        self._purge_dead_agents(living_agents, deaths)
+
+        still_alive = [a for a in self.agents.values() if a.is_alive]
+        offspring = attempt_reproduction(still_alive, self.config, self.rng)
+        for child in offspring:
+            self.agents[child.id] = child
+            self._init_agent_model(child)
+            self._apply_parental_effects(child)
+            births.append(child.id)
+
+        for agent in self.agents.values():
+            if agent.is_alive:
+                agent.advance_age()
+
+        self._cleanup_orphan_streams()
 
         record = self._build_step_record(
             reports=verified_reports,
@@ -442,6 +449,34 @@ class World:
                     out_stream.dimensionality = out_dim
                 out_stream.update(output)
 
+    def _select_escalation_target(self, agent: Agent, user_ids: list[str]) -> int:
+        affinity = agent.genome.target_user_affinity
+        if affinity.size >= len(user_ids):
+            return int(np.argmax(affinity[: len(user_ids)]))
+        return int(self.rng.integers(0, len(user_ids)))
+
+    def _resolve_report_location(
+        self,
+        agent: Agent,
+        combined: NDArray[np.float64],
+    ) -> EventLocation:
+        location = agent.state.last_inferred_location
+        if location is None:
+            location = infer_spatial_location(
+                agent,
+                combined,
+                n_blocks=self.config.n_spatial_blocks,
+                dim_to_location=self._dim_to_location,
+            )
+        if (
+            agent.genome.spatial_strategy == SpatialStrategy.GLOBAL
+            and self._location_inference is not None
+        ):
+            raw_data, raw_labels = gather_raw_stream_data(agent, self.streams)
+            if raw_data:
+                location = self._location_inference(raw_data, raw_labels)
+        return location
+
     def _maybe_escalate(self, agent: Agent) -> Report | None:
         """Agent decides whether to escalate based on anomaly score vs threshold."""
         model = self.compression_models.get(agent.id)
@@ -469,30 +504,12 @@ class World:
         if not user_ids:
             return None
 
-        affinity = agent.genome.target_user_affinity
-        if affinity.size >= len(user_ids):
-            target_idx = int(np.argmax(affinity[: len(user_ids)]))
-        else:
-            target_idx = int(self.rng.integers(0, len(user_ids)))
+        target_idx = self._select_escalation_target(agent, user_ids)
 
         agent.state.reports_issued += 1
         agent.state.last_escalated = True
 
-        location = agent.state.last_inferred_location
-        if location is None:
-            location = infer_spatial_location(
-                agent,
-                combined,
-                n_blocks=self.config.n_spatial_blocks,
-                dim_to_location=self._dim_to_location,
-            )
-        if (
-            agent.genome.spatial_strategy == SpatialStrategy.GLOBAL
-            and self._location_inference is not None
-        ):
-            raw_data, raw_labels = gather_raw_stream_data(agent, self.streams)
-            if raw_data:
-                location = self._location_inference(raw_data, raw_labels)
+        location = self._resolve_report_location(agent, combined)
 
         return Report(
             agent_id=agent.id,

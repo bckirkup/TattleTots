@@ -2,10 +2,39 @@
 
 from __future__ import annotations
 
+import enum
 import uuid
+from dataclasses import dataclass
 
 import numpy as np
 from pydantic import BaseModel, Field
+
+
+class TrustOutcome(enum.StrEnum):
+    """Verified outcome category for asymmetric trust updates."""
+
+    CORRECT_ALARM = "correct_alarm"
+    FALSE_ALARM = "false_alarm"
+    MISSED_EVENT = "missed_event"
+    RESPONSE_NECESSARY = "response_necessary"
+    RESPONSE_UNNECESSARY = "response_unnecessary"
+    WHISTLEBLOWER_CORROBORATED = "whistleblower_corroborated"
+    WHISTLEBLOWER_REFUTED = "whistleblower_refuted"
+    ACCUSED_CORROBORATED = "accused_corroborated"
+
+
+@dataclass(frozen=True)
+class TrustUpdateDeltas:
+    """Magnitude of trust change per outcome type."""
+
+    pos: float = 0.05
+    neg: float = 0.2
+    miss: float = 0.1
+    response_necessary: float = 0.03
+    unnecessary_response: float = 0.15
+    whistleblower_corroborated: float = 0.04
+    whistleblower_refuted: float = 0.12
+    accused_corroborated: float = 0.25
 
 
 class User(BaseModel):
@@ -38,42 +67,29 @@ class User(BaseModel):
     def update_trust(
         self,
         agent_id: str,
+        outcome: TrustOutcome,
         *,
-        correct_alarm: bool = False,
-        false_alarm: bool = False,
-        missed_event: bool = False,
-        response_necessary: bool = False,
-        response_unnecessary: bool = False,
-        whistleblower_corroborated: bool = False,
-        whistleblower_refuted: bool = False,
-        accused_corroborated: bool = False,
-        delta_pos: float = 0.05,
-        delta_neg: float = 0.2,
-        delta_miss: float = 0.1,
-        delta_response_necessary: float = 0.03,
-        delta_unnecessary_response: float = 0.15,
-        delta_whistleblower_corroborated: float = 0.04,
-        delta_whistleblower_refuted: float = 0.12,
-        delta_accused_corroborated: float = 0.25,
+        deltas: TrustUpdateDeltas | None = None,
     ) -> None:
         """Update trust based on verified outcomes. Asymmetric: hard to build, easy to destroy."""
+        d = deltas or TrustUpdateDeltas()
         current = self.get_trust(agent_id)
-        if correct_alarm:
-            new_trust = min(1.0, current + delta_pos)
-        elif false_alarm:
-            new_trust = max(0.0, current - delta_neg)
-        elif missed_event:
-            new_trust = max(0.0, current - delta_miss)
-        elif response_necessary:
-            new_trust = min(1.0, current + delta_response_necessary)
-        elif response_unnecessary:
-            new_trust = max(0.0, current - delta_unnecessary_response)
-        elif whistleblower_corroborated:
-            new_trust = min(1.0, current + delta_whistleblower_corroborated)
-        elif whistleblower_refuted:
-            new_trust = max(0.0, current - delta_whistleblower_refuted)
-        elif accused_corroborated:
-            new_trust = max(0.0, current - delta_accused_corroborated)
+        if outcome == TrustOutcome.CORRECT_ALARM:
+            new_trust = min(1.0, current + d.pos)
+        elif outcome == TrustOutcome.FALSE_ALARM:
+            new_trust = max(0.0, current - d.neg)
+        elif outcome == TrustOutcome.MISSED_EVENT:
+            new_trust = max(0.0, current - d.miss)
+        elif outcome == TrustOutcome.RESPONSE_NECESSARY:
+            new_trust = min(1.0, current + d.response_necessary)
+        elif outcome == TrustOutcome.RESPONSE_UNNECESSARY:
+            new_trust = max(0.0, current - d.unnecessary_response)
+        elif outcome == TrustOutcome.WHISTLEBLOWER_CORROBORATED:
+            new_trust = min(1.0, current + d.whistleblower_corroborated)
+        elif outcome == TrustOutcome.WHISTLEBLOWER_REFUTED:
+            new_trust = max(0.0, current - d.whistleblower_refuted)
+        elif outcome == TrustOutcome.ACCUSED_CORROBORATED:
+            new_trust = max(0.0, current - d.accused_corroborated)
         else:
             new_trust = current
         self.trust[agent_id] = new_trust

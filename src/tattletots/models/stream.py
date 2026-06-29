@@ -10,7 +10,7 @@ import numpy as np
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
-    pass
+    pass  # Reserved for forward-ref types when stream metadata grows.
 
 
 class StreamType(enum.StrEnum):

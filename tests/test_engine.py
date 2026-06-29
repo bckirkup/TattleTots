@@ -33,7 +33,7 @@ class TestCompression:
         data = activations @ basis + rng.standard_normal((10, 5)) * 0.1
 
         model = PCACompression(n_components=2, efficiency=1.0)
-        residual, info_yield = model.fit_transform(data)
+        _, info_yield = model.fit_transform(data)
         assert info_yield > 0.5  # Should capture most variance
 
     def test_pca_residual_has_lower_variance(self) -> None:
@@ -53,9 +53,9 @@ class TestCompression:
 
     def test_threshold_detects_anomaly(self) -> None:
         model = ThresholdCompression(n_components=3)
-        # Train on normal data
+        rng = np.random.default_rng(0)
         for _ in range(20):
-            model.fit_transform(np.random.randn(5) * 0.1)
+            model.fit_transform(rng.standard_normal(5) * 0.1)
         # Inject anomaly
         score = model.anomaly_score(np.ones(5) * 10.0)
         assert score > 2.0  # Well above threshold

@@ -10,7 +10,7 @@ from tattletots.models.agent import Agent
 
 def compute_shaping_signal(
     downstream_agent: Agent,
-    upstream_agent: Agent,
+    _upstream_agent: Agent,
     useful_dimensions: NDArray[np.float64] | None = None,
 ) -> NDArray[np.float64]:
     """Compute a feedback signal from downstream to upstream agent.

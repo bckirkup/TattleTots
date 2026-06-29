@@ -6,7 +6,7 @@ from tattletots.engine.config import SimulationConfig
 from tattletots.models.location import EventLocation
 from tattletots.models.report import Report
 from tattletots.models.response_outcome import ResponseOutcome
-from tattletots.models.user import User
+from tattletots.models.user import TrustOutcome, TrustUpdateDeltas, User
 from tattletots.models.whistleblower_report import WhistleblowerReport
 
 
@@ -31,14 +31,14 @@ def verify_reports(
         if report.correct:
             user.update_trust(
                 report.agent_id,
-                correct_alarm=True,
-                delta_pos=config.trust_delta_pos,
+                TrustOutcome.CORRECT_ALARM,
+                deltas=TrustUpdateDeltas(pos=config.trust_delta_pos),
             )
         else:
             user.update_trust(
                 report.agent_id,
-                false_alarm=True,
-                delta_neg=config.trust_delta_neg,
+                TrustOutcome.FALSE_ALARM,
+                deltas=TrustUpdateDeltas(neg=config.trust_delta_neg),
             )
 
         verified.append(report)
@@ -57,8 +57,8 @@ def penalize_missed_events(
             if user.get_trust(agent_id) > 0:
                 user.update_trust(
                     agent_id,
-                    missed_event=True,
-                    delta_miss=config.trust_delta_miss,
+                    TrustOutcome.MISSED_EVENT,
+                    deltas=TrustUpdateDeltas(miss=config.trust_delta_miss),
                 )
 
 
@@ -82,14 +82,16 @@ def apply_response_outcome_trust(
         if outcome.response_necessary:
             user.update_trust(
                 outcome.agent_id,
-                response_necessary=True,
-                delta_response_necessary=config.trust_delta_response_necessary,
+                TrustOutcome.RESPONSE_NECESSARY,
+                deltas=TrustUpdateDeltas(response_necessary=config.trust_delta_response_necessary),
             )
         else:
             user.update_trust(
                 outcome.agent_id,
-                response_unnecessary=True,
-                delta_unnecessary_response=config.trust_delta_unnecessary_response,
+                TrustOutcome.RESPONSE_UNNECESSARY,
+                deltas=TrustUpdateDeltas(
+                    unnecessary_response=config.trust_delta_unnecessary_response
+                ),
             )
         updates += 1
     return updates
@@ -135,22 +137,28 @@ def apply_whistleblower_trust(
             if whistle_user:
                 whistle_user.update_trust(
                     wb.whistleblower_id,
-                    whistleblower_corroborated=True,
-                    delta_whistleblower_corroborated=config.trust_delta_whistleblower_corroborated,
+                    TrustOutcome.WHISTLEBLOWER_CORROBORATED,
+                    deltas=TrustUpdateDeltas(
+                        whistleblower_corroborated=config.trust_delta_whistleblower_corroborated
+                    ),
                 )
             if accused_user:
                 accused_user.update_trust(
                     wb.accused_agent_id,
-                    accused_corroborated=True,
-                    delta_accused_corroborated=config.trust_delta_accused_corroborated,
+                    TrustOutcome.ACCUSED_CORROBORATED,
+                    deltas=TrustUpdateDeltas(
+                        accused_corroborated=config.trust_delta_accused_corroborated
+                    ),
                 )
         elif refuted_flag:
             refuted += 1
             if whistle_user:
                 whistle_user.update_trust(
                     wb.whistleblower_id,
-                    whistleblower_refuted=True,
-                    delta_whistleblower_refuted=config.trust_delta_whistleblower_refuted,
+                    TrustOutcome.WHISTLEBLOWER_REFUTED,
+                    deltas=TrustUpdateDeltas(
+                        whistleblower_refuted=config.trust_delta_whistleblower_refuted
+                    ),
                 )
 
     return corroborated, refuted

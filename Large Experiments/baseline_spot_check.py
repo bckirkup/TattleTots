@@ -16,7 +16,6 @@ import argparse
 import datetime
 import importlib.util
 import json
-import random
 import sys
 import time
 from collections import defaultdict
@@ -27,6 +26,7 @@ from typing import Any, Callable
 import numpy as np
 
 from baseline_parallel import resolve_worker_count, resolve_workspace_root, run_process_pool
+from path_safety import KEY_JSON, safe_output_dir
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _WORKSPACE_ROOT = resolve_workspace_root(_SCRIPT_DIR)
@@ -105,27 +105,27 @@ def resolve_key_json(domain: str) -> Path:
     """Find archived key.json (handles nested output directories)."""
     candidates = {
         "fire_ecology": [
-            _WORKSPACE_ROOT / "fire_ecology_baselines_results" / "key.json",
+            _WORKSPACE_ROOT / "fire_ecology_baselines_results" / KEY_JSON,
         ],
         "grain_guard": [
-            _WORKSPACE_ROOT / "grain_guard_baselines_results" / "key.json",
+            _WORKSPACE_ROOT / "grain_guard_baselines_results" / KEY_JSON,
             _WORKSPACE_ROOT
             / "grain_guard_baselines_results"
             / "grain_guard_baselines_results"
-            / "key.json",
+            / KEY_JSON,
         ],
         "coral_key": [
-            _WORKSPACE_ROOT / "coral_key_baselines_results" / "key.json",
+            _WORKSPACE_ROOT / "coral_key_baselines_results" / KEY_JSON,
             _WORKSPACE_ROOT
             / "coral_key_baselines_results"
             / "coral_key_baselines_results"
-            / "key.json",
+            / KEY_JSON,
         ],
     }
     for path in candidates[domain]:
         if path.is_file():
             return path
-    raise FileNotFoundError(f"No key.json found for domain {domain}")
+    raise FileNotFoundError(f"No {KEY_JSON} found for domain {domain}")
 
 
 def load_domain_configs() -> dict[str, dict[str, Any]]:
@@ -170,7 +170,7 @@ def sample_factor_settings(
     *,
     domain: str,
     sample_n: int,
-    rng: random.Random,
+    rng: np.random.Generator,
 ) -> list[str]:
     """Return factor-setting keys to test, always including mandatory QV settings."""
     all_keys = list(groups.keys())
@@ -182,7 +182,11 @@ def sample_factor_settings(
 
     remaining = [k for k in all_keys if k not in mandatory_keys]
     n_extra = max(0, min(sample_n, len(all_keys)) - len(mandatory_keys))
-    sampled_extra = rng.sample(remaining, min(n_extra, len(remaining))) if remaining else []
+    sampled_extra: list[str] = []
+    if remaining and n_extra > 0:
+        n_pick = min(n_extra, len(remaining))
+        pick_idx = rng.choice(len(remaining), size=n_pick, replace=False)
+        sampled_extra = [remaining[int(i)] for i in np.atleast_1d(pick_idx)]
     selected = list(dict.fromkeys(mandatory_keys + sampled_extra))
     return selected[: min(sample_n, len(all_keys))]
 
@@ -451,7 +455,7 @@ def run_domain_spot_check(
     sample_n: int,
     ref_seeds: list[int],
     test_seed_offset: int,
-    rng: random.Random,
+    rng: np.random.Generator,
     workers: int | None,
     domain_cfgs: dict[str, dict[str, Any]],
 ) -> dict[str, Any]:
@@ -610,11 +614,12 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     ref_seeds = [int(s.strip()) for s in args.ref_seeds.split(",")]
-    rng = random.Random(args.seed)
+    rng = np.random.default_rng(args.seed)
     domain_cfgs = load_domain_configs()
 
     domains = list(DOMAIN_SPECS.keys()) if args.domain == "all" else [args.domain]
-    args.output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir = safe_output_dir(args.output_dir, default_base=_WORKSPACE_ROOT)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     report: dict[str, Any] = {
         "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
@@ -669,7 +674,7 @@ def main(argv: list[str] | None = None) -> int:
 
         report["domains"][domain] = result
 
-    report_path = args.output_dir / "spot_check_report.json"
+    report_path = output_dir / "spot_check_report.json"
     report_path.write_text(json.dumps(report, indent=2, default=str))
     print("=" * 60)
     print(f"[+] Report written to {report_path}")

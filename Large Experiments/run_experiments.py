@@ -30,6 +30,8 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from baseline_parallel import resolve_worker_count, resolve_workspace_root, run_process_pool
+from experiment_runs import collect_experiment_runs
+from path_safety import KEY_JSON, safe_config_path, safe_output_dir
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _WORKSPACE_ROOT = resolve_workspace_root(_SCRIPT_DIR)
@@ -337,137 +339,21 @@ def main() -> int:
     if not config_path.exists() or args.smoke_test:
         exp_config = generate_experiment_configs(args.smoke_test)
         if not args.smoke_test:
-            with open(config_path, "w") as f:
+            safe_config_path_obj = safe_config_path(config_path, base=_SCRIPT_DIR)
+            with open(safe_config_path_obj, "w") as f:
                 json.dump(exp_config, f, indent=2)
-            print(f"[+] Generated designed experiments configuration at: {config_path}")
+            print(f"[+] Generated designed experiments configuration at: {safe_config_path_obj}")
     else:
-        with open(config_path, "r") as f:
+        safe_config_path_obj = safe_config_path(config_path, base=_SCRIPT_DIR)
+        with open(safe_config_path_obj, "r") as f:
             exp_config = json.load(f)
-        print(f"[+] Loaded designed experiments configuration from: {config_path}")
+        print(f"[+] Loaded designed experiments configuration from: {safe_config_path_obj}")
 
-    # 2. Setup output directory
-    output_dir = Path(exp_config["output_directory"]).resolve()
+    output_dir = safe_output_dir(exp_config["output_directory"], default_base=_SCRIPT_DIR)
     output_dir.mkdir(parents=True, exist_ok=True)
     print(f"[*] Results will be saved to: {output_dir}")
 
-    # 3. Build the list of runs to execute
-    runs_to_execute = []
-    steps = exp_config["steps"]
-    seeds = exp_config["seeds"]
-    tattletots_levels = exp_config["tattletots_levels"]
-    domains_data = exp_config["domains"]
-
-    for domain_key, domain_data in domains_data.items():
-        if args.domain and domain_key != args.domain:
-            continue
-
-        factors = domain_data["factors"]
-
-        if domain_key == "coral_key":
-            # Generate combinatorial runs for Coral Key
-            for iuu in factors["iuu_vessel_count"]:
-                for adv in factors["adversary_level"]:
-                    for sar in factors["sar_revisit_interval"]:
-                        for stream_dim in factors["stream_dimension"]:
-                            for level_idx, tt_level in enumerate(tattletots_levels):
-                                for seed in seeds:
-                                    run_name = f"ck_iuu{iuu}_adv{adv}_sar{sar}_dim{stream_dim}_ttL{level_idx+1}_s{seed}"
-                                    
-                                    # Build configs
-                                    sim_cfg = tt_level.copy()
-                                    sim_cfg["max_steps"] = steps
-                                    sim_cfg["seed"] = seed
-
-                                    adv_params = domain_data["adversary_levels"][adv]
-                                    dom_cfg = {
-                                        "total_epochs": steps,
-                                        "seed": seed,
-                                        "fleet": {
-                                            "n_iuu_vessels": iuu,
-                                            "underreport_fraction": adv_params["underreport_fraction"],
-                                        },
-                                        "sensors": {
-                                            "sar_revisit_interval": sar,
-                                        },
-                                        "adversary": {
-                                            "ais_disable_probability": adv_params["ais_disable_probability"],
-                                            "spoof_probability": adv_params["spoof_probability"],
-                                            "platform_interference_rate": adv_params["platform_interference_rate"],
-                                        }
-                                    }
-                                    runs_to_execute.append({
-                                        "name": run_name,
-                                        "domain": domain_key,
-                                        "sim_config": sim_cfg,
-                                        "domain_config": dom_cfg,
-                                    })
-
-        elif domain_key == "fire_ecology":
-            # Generate combinatorial runs for Fire Ecology
-            for phase in factors["deployment_phase"]:
-                for dropout in factors["sensor_dropout"]:
-                    for stream_dim in factors["stream_dimension"]:
-                        for level_idx, tt_level in enumerate(tattletots_levels):
-                            for seed in seeds:
-                                run_name = f"fe_ph{phase}_drop{dropout.replace('%','')}_dim{stream_dim}_ttL{level_idx+1}_s{seed}"
-                                
-                                # Build configs
-                                sim_cfg = tt_level.copy()
-                                sim_cfg["max_steps"] = steps
-                                sim_cfg["seed"] = seed
-
-                                phase_params = domain_data["phases"][phase].copy()
-                                # Apply dropout reduction to sensors
-                                dropout_frac = float(dropout.replace("%", "")) / 100.0
-                                phase_params["n_cameras"] = max(0, int(phase_params["n_cameras"] * (1.0 - dropout_frac)))
-                                phase_params["n_weather_stations"] = max(0, int(phase_params["n_weather_stations"] * (1.0 - dropout_frac)))
-                                phase_params["n_fuel_sensors"] = max(0, int(phase_params["n_fuel_sensors"] * (1.0 - dropout_frac)))
-
-                                dom_cfg = {
-                                    "steps": steps,
-                                    "seed": seed,
-                                    "n_cameras": phase_params["n_cameras"],
-                                    "n_weather_stations": phase_params["n_weather_stations"],
-                                    "n_fuel_sensors": phase_params["n_fuel_sensors"],
-                                    "max_thermal_dim": stream_dim,
-                                }
-                                runs_to_execute.append({
-                                    "name": run_name,
-                                    "domain": domain_key,
-                                    "sim_config": sim_cfg,
-                                    "domain_config": dom_cfg,
-                                })
-
-        elif domain_key == "grain_guard":
-            # Generate combinatorial runs for Grain Guard
-            for landscape in factors["landscape"]:
-                for budget in factors["sensor_budget"]:
-                    for stream_dim in factors["stream_dimension"]:
-                        for level_idx, tt_level in enumerate(tattletots_levels):
-                            for seed in seeds:
-                                run_name = f"gg_ls{landscape}_bud{budget}_dim{stream_dim}_ttL{level_idx+1}_s{seed}"
-                                
-                                # Build configs
-                                sim_cfg = tt_level.copy()
-                                sim_cfg["max_steps"] = steps
-                                sim_cfg["seed"] = seed
-
-                                budget_params = domain_data["sensor_budgets"][budget]
-                                dom_cfg = {
-                                    "steps": steps,
-                                    "seed": seed,
-                                    "landscape": landscape,
-                                    "n_traps": budget_params["n_traps"],
-                                    "n_weather_stations": budget_params["n_weather_stations"],
-                                    "n_soil_sensors": budget_params["n_soil_sensors"],
-                                    "engine_max_dim": stream_dim,
-                                }
-                                runs_to_execute.append({
-                                    "name": run_name,
-                                    "domain": domain_key,
-                                    "sim_config": sim_cfg,
-                                    "domain_config": dom_cfg,
-                                })
+    runs_to_execute = collect_experiment_runs(exp_config, domain_filter=args.domain)
 
     n_jobs = len(runs_to_execute)
     worker_count = resolve_worker_count(args.workers, n_jobs)
@@ -542,7 +428,7 @@ def main() -> int:
     print(f"[+] All runs finished in {total_elapsed:.1f}s.")
 
     # 5. Save the summary key file
-    key_file_path = output_dir / "key.json"
+    key_file_path = output_dir / KEY_JSON
     with open(key_file_path, "w") as f:
         json.dump(results_key, f, indent=2)
 

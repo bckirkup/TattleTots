@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from tattletots.output_schema import TimeSeries
 from tattletots.telemetry.cost_accounting import CostAccumulator, StepCosts
 from tattletots.telemetry.recorder import StepRecord, TelemetryRecorder
@@ -47,7 +49,7 @@ class TestTelemetryRecorder:
         assert rec.total_births == 0
         assert rec.total_deaths == 0
         assert rec.total_reports == 0
-        assert rec.max_trophic_depth == 0.0
+        assert rec.max_trophic_depth == pytest.approx(0.0)
         assert not rec.is_stable()
         assert not rec.extinction_cascade_detected()
         assert rec.population_history() == []
@@ -106,7 +108,7 @@ class TestTelemetryRecorder:
         rec.record_step(_make_record(time_step=1, max_trophic_level=2.0))
         rec.record_step(_make_record(time_step=2, max_trophic_level=3.5))
         rec.record_step(_make_record(time_step=3, max_trophic_level=2.5))
-        assert rec.max_trophic_depth == 3.5
+        assert rec.max_trophic_depth == pytest.approx(3.5)
 
     def test_total_reports_and_precision(self) -> None:
         rec = TelemetryRecorder()
@@ -154,10 +156,10 @@ class TestTelemetryRecorder:
             )
         )
         h = rec.energy_flow_history()
-        assert h["info_yield"] == [5.0]
-        assert h["attn_income"] == [3.0]
-        assert h["compute_cost"] == [1.0]
-        assert h["maintenance_cost"] == [0.5]
+        assert h["info_yield"] == [pytest.approx(5.0)]
+        assert h["attn_income"] == [pytest.approx(3.0)]
+        assert h["compute_cost"] == [pytest.approx(1.0)]
+        assert h["maintenance_cost"] == [pytest.approx(0.5)]
 
     def test_demographic_history(self) -> None:
         rec = TelemetryRecorder()
@@ -171,10 +173,10 @@ class TestTelemetryRecorder:
             )
         )
         d = rec.demographic_history()
-        assert d["juveniles"] == [3.0]
-        assert d["adults"] == [7.0]
-        assert d["mean_generation"] == [2.5]
-        assert d["compression_types"] == [3.0]
+        assert d["juveniles"] == [pytest.approx(3.0)]
+        assert d["adults"] == [pytest.approx(7.0)]
+        assert d["mean_generation"] == [pytest.approx(2.5)]
+        assert d["compression_types"] == [pytest.approx(3.0)]
 
     def test_ecology_time_series(self) -> None:
         rec = TelemetryRecorder()
@@ -218,10 +220,10 @@ class TestTelemetryRecorder:
         assert ts["correct_reports"] == [4, 2]
         assert ts["false_alarms"] == [1, 0]
         assert ts["missed_events"] == [2, 0]
-        assert ts["mean_info_energy"] == [1.5, 1.6]
-        assert ts["mean_attn_energy"] == [0.8, 0.9]
+        assert ts["mean_info_energy"] == [pytest.approx(1.5), pytest.approx(1.6)]
+        assert ts["mean_attn_energy"] == [pytest.approx(0.8), pytest.approx(0.9)]
         assert ts["n_compression_types"] == [3, 4]
-        assert ts["max_trophic_level"] == [2.0, 2.5]
+        assert ts["max_trophic_level"] == [pytest.approx(2.0), pytest.approx(2.5)]
         assert ts["responses_dispatched"] == [0, 0]
         assert ts["responses_judged_necessary"] == [0, 0]
         assert ts["responses_judged_unnecessary"] == [0, 0]
@@ -237,28 +239,28 @@ class TestTelemetryRecorder:
         ts = TimeSeries.from_telemetry(rec, acc.cost_history())
         assert ts.population == [10, 9]
         assert ts.reports_issued == [3, 1]
-        assert ts.cost_per_step == [6.0, 15.0]
+        assert ts.cost_per_step == [pytest.approx(6.0), pytest.approx(15.0)]
 
 
 class TestCostAccumulator:
     def test_empty_accumulator(self) -> None:
         acc = CostAccumulator()
-        assert acc.total_surveillance == 0.0
-        assert acc.total_response == 0.0
-        assert acc.total_damage == 0.0
-        assert acc.total_cost == 0.0
-        assert acc.mean_cost_per_step() == 0.0
+        assert acc.total_surveillance == pytest.approx(0.0)
+        assert acc.total_response == pytest.approx(0.0)
+        assert acc.total_damage == pytest.approx(0.0)
+        assert acc.total_cost == pytest.approx(0.0)
+        assert acc.mean_cost_per_step() == pytest.approx(0.0)
         assert acc.cost_history() == []
 
     def test_record_and_totals(self) -> None:
         acc = CostAccumulator()
         acc.record(StepCosts(time_step=1, surveillance_cost=10, response_cost=5, damage_cost=2))
         acc.record(StepCosts(time_step=2, surveillance_cost=3, response_cost=1, damage_cost=0))
-        assert acc.total_surveillance == 13.0
-        assert acc.total_response == 6.0
-        assert acc.total_damage == 2.0
-        assert acc.total_cost == 21.0
-        assert acc.mean_cost_per_step() == 10.5
+        assert acc.total_surveillance == pytest.approx(13.0)
+        assert acc.total_response == pytest.approx(6.0)
+        assert acc.total_damage == pytest.approx(2.0)
+        assert acc.total_cost == pytest.approx(21.0)
+        assert acc.mean_cost_per_step() == pytest.approx(10.5)
 
     def test_record_from_dict(self) -> None:
         acc = CostAccumulator()
@@ -271,37 +273,37 @@ class TestCostAccumulator:
             },
         )
         assert len(acc.history) == 1
-        assert acc.history[0].surveillance_cost == 1.5
-        assert acc.history[0].response_cost == 2.5
-        assert acc.history[0].damage_cost == 3.5
+        assert acc.history[0].surveillance_cost == pytest.approx(1.5)
+        assert acc.history[0].response_cost == pytest.approx(2.5)
+        assert acc.history[0].damage_cost == pytest.approx(3.5)
 
     def test_record_from_dict_missing_keys(self) -> None:
         acc = CostAccumulator()
         acc.record_from_dict(time_step=1, cost_dict={})
-        assert acc.history[0].surveillance_cost == 0.0
-        assert acc.history[0].response_cost == 0.0
-        assert acc.history[0].damage_cost == 0.0
+        assert acc.history[0].surveillance_cost == pytest.approx(0.0)
+        assert acc.history[0].response_cost == pytest.approx(0.0)
+        assert acc.history[0].damage_cost == pytest.approx(0.0)
 
     def test_step_costs_total(self) -> None:
         c = StepCosts(time_step=1, surveillance_cost=1, response_cost=2, damage_cost=3)
-        assert c.total == 6.0
+        assert c.total == pytest.approx(6.0)
 
     def test_history_methods(self) -> None:
         acc = CostAccumulator()
         acc.record(StepCosts(time_step=1, surveillance_cost=10, response_cost=5, damage_cost=2))
         acc.record(StepCosts(time_step=2, surveillance_cost=3, response_cost=1, damage_cost=7))
-        assert acc.surveillance_history() == [10.0, 3.0]
-        assert acc.response_history() == [5.0, 1.0]
-        assert acc.damage_history() == [2.0, 7.0]
-        assert acc.cost_history() == [17.0, 11.0]
+        assert acc.surveillance_history() == [pytest.approx(10.0), pytest.approx(3.0)]
+        assert acc.response_history() == [pytest.approx(5.0), pytest.approx(1.0)]
+        assert acc.damage_history() == [pytest.approx(2.0), pytest.approx(7.0)]
+        assert acc.cost_history() == [pytest.approx(17.0), pytest.approx(11.0)]
 
     def test_summary(self) -> None:
         acc = CostAccumulator()
         acc.record(StepCosts(time_step=1, surveillance_cost=10, response_cost=5, damage_cost=2))
         s = acc.summary()
-        assert s["total_surveillance_cost"] == 10.0
-        assert s["total_response_cost"] == 5.0
-        assert s["total_damage_cost"] == 2.0
-        assert s["total_cost"] == 17.0
-        assert s["mean_cost_per_step"] == 17.0
-        assert s["steps_recorded"] == 1.0
+        assert s["total_surveillance_cost"] == pytest.approx(10.0)
+        assert s["total_response_cost"] == pytest.approx(5.0)
+        assert s["total_damage_cost"] == pytest.approx(2.0)
+        assert s["total_cost"] == pytest.approx(17.0)
+        assert s["mean_cost_per_step"] == pytest.approx(17.0)
+        assert s["steps_recorded"] == pytest.approx(1.0)

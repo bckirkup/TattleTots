@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from baseline_parallel import resolve_worker_count, resolve_workspace_root, run_process_pool
+from path_safety import KEY_JSON, safe_config_path, safe_output_dir
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _WORKSPACE_ROOT = resolve_workspace_root(_SCRIPT_DIR)
@@ -123,7 +124,7 @@ def run_single_simulation(
             log_file.flush()
 
             # Run subprocess
-            process = subprocess.run(
+            subprocess.run(
                 cmd,
                 stdout=log_file,
                 stderr=subprocess.STDOUT,
@@ -232,7 +233,8 @@ def main() -> int:
         return 1
 
     try:
-        with open(args.config, "r") as f:
+        config_path = safe_config_path(args.config, base=_SCRIPT_DIR)
+        with open(config_path, "r") as f:
             batch_config = json.load(f)
     except Exception as e:
         print(f"[-] Error: Failed to parse batch config file: {e}")
@@ -240,7 +242,7 @@ def main() -> int:
 
     # 2. Determine and create output directory
     output_dir_name = args.output_dir or batch_config.get("output_directory", "batch_results")
-    output_dir = Path(output_dir_name).resolve()
+    output_dir = safe_output_dir(output_dir_name, default_base=_SCRIPT_DIR)
     output_dir.mkdir(parents=True, exist_ok=True)
     print(f"[*] Results will be saved to: {output_dir}")
 
@@ -321,7 +323,7 @@ def main() -> int:
     print(f"[+] All runs finished in {total_elapsed:.1f}s.")
 
     # 4. Generate key file
-    key_file_path = output_dir / "key.json"
+    key_file_path = output_dir / KEY_JSON
     with open(key_file_path, "w") as f:
         json.dump(results_key, f, indent=2)
 

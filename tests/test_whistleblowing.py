@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from tattletots.engine.whistleblowing import (
     compute_dishonesty_score,
@@ -62,7 +63,7 @@ class TestComputeDishonestyScore:
     def test_identical_signals_score_zero(self) -> None:
         signal = np.array([1.0, 2.0, 3.0])
         score = compute_dishonesty_score(signal, signal.copy())
-        assert score == 0.0
+        assert score == pytest.approx(0.0)
 
     def test_different_signals_positive_score(self) -> None:
         claimed = np.array([1.0, 0.0, 0.0])
@@ -92,11 +93,11 @@ class TestComputeDishonestyScore:
         claimed = np.array([1.0, 2.0, 3.0])
         truth = np.array([1.0, 2.0])
         score = compute_dishonesty_score(claimed, truth)
-        assert score == 0.0  # first 2 dims match
+        assert score == pytest.approx(0.0)  # first 2 dims match
 
     def test_empty_inputs_return_zero(self) -> None:
-        assert compute_dishonesty_score(np.array([]), np.array([1.0])) == 0.0
-        assert compute_dishonesty_score(np.array([1.0]), np.array([])) == 0.0
+        assert compute_dishonesty_score(np.array([]), np.array([1.0])) == pytest.approx(0.0)
+        assert compute_dishonesty_score(np.array([1.0]), np.array([])) == pytest.approx(0.0)
 
 
 class TestCreateOutputStream:

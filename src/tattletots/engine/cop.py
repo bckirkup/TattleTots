@@ -42,6 +42,36 @@ def create_initial_cops(
     return cops
 
 
+def _report_relevance(
+    report: Report,
+    user: User,
+    adapter: DomainAdapter | None,
+) -> float:
+    if adapter is not None:
+        return max(adapter.score_relevance(report.signal_vector, user), 0.0)
+    return max(user.compute_relevance(report.signal_vector), 0.0)
+
+
+def _fuse_report_into_cop(
+    cop: UserCOP,
+    report: Report,
+    user_id: str,
+    user: User,
+    *,
+    adapter: DomainAdapter | None,
+    non_target_weight_scale: float,
+) -> None:
+    relevance = _report_relevance(report, user, adapter)
+    trust = user.get_trust(report.agent_id)
+    target_scale = 1.0 if report.target_user_id == user_id else non_target_weight_scale
+    weight = trust * relevance * report.confidence * target_scale
+    contribution = weight * report.anomaly_score
+    belief = cop.get_belief(report.location)
+    belief.threat_level += contribution
+    belief.supporting_reports += 1
+    belief.supporting_weight += weight
+
+
 def fuse_reports_into_cops(
     cops: dict[str, UserCOP],
     reports: list[Report],
@@ -63,18 +93,14 @@ def fuse_reports_into_cops(
             user = users.get(user_id)
             if user is None:
                 continue
-            if adapter is not None:
-                relevance = max(adapter.score_relevance(report.signal_vector, user), 0.0)
-            else:
-                relevance = max(user.compute_relevance(report.signal_vector), 0.0)
-            trust = user.get_trust(report.agent_id)
-            target_scale = 1.0 if report.target_user_id == user_id else non_target_weight_scale
-            weight = trust * relevance * report.confidence * target_scale
-            contribution = weight * report.anomaly_score
-            belief = cop.get_belief(report.location)
-            belief.threat_level += contribution
-            belief.supporting_reports += 1
-            belief.supporting_weight += weight
+            _fuse_report_into_cop(
+                cop,
+                report,
+                user_id,
+                user,
+                adapter=adapter,
+                non_target_weight_scale=non_target_weight_scale,
+            )
 
 
 def apply_outcomes_to_cops(
