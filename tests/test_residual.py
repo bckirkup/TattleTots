@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from tattletots.engine.compression import PCACompression
 from tattletots.engine.residual import apply_residual_policy
@@ -17,7 +18,7 @@ class TestResidual:
         out, yield_, dim = apply_residual_policy(agent, residual, 0.5, max_dim=8)
         assert dim == 8
         assert out.size == 8
-        assert yield_ == 0.5
+        assert yield_ == pytest.approx(0.5)
 
     def test_store_buffers_then_emits(self) -> None:
         agent = Agent(genome=Genome(residual_policy=ResidualPolicy.STORE, residual_storage_steps=2))

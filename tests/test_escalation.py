@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from tattletots.engine.compression import ThresholdCompression
 from tattletots.engine.escalation import (
@@ -17,12 +18,12 @@ from tattletots.models.genome import EscalationMode, Genome
 class TestEscalation:
     def test_fixed_threshold_unchanged(self) -> None:
         agent = Agent(genome=Genome(escalation_mode=EscalationMode.FIXED, escalation_threshold=0.7))
-        assert compute_effective_threshold(agent) == 0.7
+        assert compute_effective_threshold(agent) == pytest.approx(0.7)
 
     def test_insufficient_history_returns_zero_anomaly(self) -> None:
         agent = Agent()
         score = normalize_anomaly(agent, 1.0)
-        assert score == 0.0
+        assert score == pytest.approx(0.0)
 
     def test_adaptive_quantile_uses_history(self) -> None:
         agent = Agent(

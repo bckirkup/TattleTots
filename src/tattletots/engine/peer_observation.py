@@ -67,6 +67,56 @@ def observable_prestige(juvenile: Agent, candidate: Agent) -> float:
     return peer + reward + dispatch_signal
 
 
+def _living_adults(agents: dict[str, Agent]) -> list[Agent]:
+    return [a for a in agents.values() if a.is_alive and a.state.lifecycle == LifecycleStage.ADULT]
+
+
+def _observer_can_suspect(
+    observer: Agent,
+    report: Report,
+    accused: Agent,
+    config: SimulationConfig,
+) -> bool:
+    if observer.id == report.agent_id:
+        return False
+    overlap = compute_niche_overlap(observer, accused)
+    spatial = can_witness(
+        observer,
+        report.location,
+        min_anomaly=config.peer_witness_min_anomaly,
+    )
+    if not spatial and overlap < config.peer_overlap_threshold:
+        return False
+    score = max(0.5 + report.confidence, overlap)
+    return score >= config.whistleblower_suspicion_threshold
+
+
+def _append_whistleblower_suspicion(
+    observer: Agent,
+    report: Report,
+    user_ids: list[str],
+    config: SimulationConfig,
+    overlap: float,
+) -> WhistleblowerReport:
+    score = max(0.5 + report.confidence, overlap)
+    target_idx = hash(observer.id) % len(user_ids)
+    observer.update_peer_trust(
+        report.agent_id,
+        negative=True,
+        delta_neg=config.peer_trust_delta_neg,
+    )
+    observer.state.last_whistleblower_reports_issued += 1
+    return WhistleblowerReport(
+        whistleblower_id=observer.id,
+        accused_agent_id=report.agent_id,
+        target_user_id=user_ids[target_idx],
+        time_step=report.time_step,
+        location=report.location,
+        suspicion_score=score,
+        basis="unnecessary_response",
+    )
+
+
 def collect_whistleblower_suspicions(
     agents: dict[str, Agent],
     reports: list[Report],
@@ -76,9 +126,7 @@ def collect_whistleblower_suspicions(
 ) -> list[WhistleblowerReport]:
     """Collect false-report suspicions from observable dispatch outcomes only."""
     suspicions: list[WhistleblowerReport] = []
-    living = [
-        a for a in agents.values() if a.is_alive and a.state.lifecycle == LifecycleStage.ADULT
-    ]
+    living = _living_adults(agents)
     user_ids = list(users.keys())
     if not user_ids:
         return suspicions
@@ -92,42 +140,65 @@ def collect_whistleblower_suspicions(
         if outcome is None or not outcome.dispatched or outcome.response_necessary:
             continue
 
+        accused = agents[report.agent_id]
         for observer in living:
-            if observer.id == report.agent_id:
+            if not _observer_can_suspect(observer, report, accused, config):
                 continue
-            overlap = compute_niche_overlap(observer, agents[report.agent_id])
-            spatial = can_witness(
-                observer,
-                report.location,
-                min_anomaly=config.peer_witness_min_anomaly,
-            )
-            if not spatial and overlap < config.peer_overlap_threshold:
-                continue
-
-            score = max(0.5 + report.confidence, overlap)
-            if score < config.whistleblower_suspicion_threshold:
-                continue
-
-            target_idx = hash(observer.id) % len(user_ids)
+            overlap = compute_niche_overlap(observer, accused)
             suspicions.append(
-                WhistleblowerReport(
-                    whistleblower_id=observer.id,
-                    accused_agent_id=report.agent_id,
-                    target_user_id=user_ids[target_idx],
-                    time_step=report.time_step,
-                    location=report.location,
-                    suspicion_score=score,
-                    basis="unnecessary_response",
-                )
+                _append_whistleblower_suspicion(observer, report, user_ids, config, overlap)
             )
-            observer.update_peer_trust(
-                report.agent_id,
-                negative=True,
-                delta_neg=config.peer_trust_delta_neg,
-            )
-            observer.state.last_whistleblower_reports_issued += 1
 
     return suspicions
+
+
+def _apply_outcome_witness_updates(
+    observer: Agent,
+    subject: Agent,
+    outcome: ResponseOutcome,
+    config: SimulationConfig,
+) -> int:
+    updates = 0
+    if outcome.response_necessary:
+        observer.update_peer_trust(
+            outcome.agent_id, positive=True, delta_pos=config.peer_trust_delta_pos
+        )
+    else:
+        observer.update_peer_trust(
+            outcome.agent_id, negative=True, delta_neg=config.peer_trust_delta_neg
+        )
+    updates += 1
+
+    if subject.state.last_step_attention_income >= config.peer_witness_reward_threshold:
+        observer.update_peer_trust(
+            outcome.agent_id, positive=True, delta_pos=config.peer_trust_delta_pos * 0.5
+        )
+        updates += 1
+    return updates
+
+
+def _apply_missed_reporter_updates(
+    living: list[Agent],
+    reporters: set[str],
+    outcome: ResponseOutcome,
+    config: SimulationConfig,
+) -> int:
+    updates = 0
+    for observer in living:
+        if observer.id in reporters:
+            continue
+        if not can_witness(
+            observer,
+            outcome.location,
+            min_anomaly=config.peer_witness_min_anomaly,
+        ):
+            continue
+        for reporter_id in reporters:
+            observer.update_peer_trust(
+                reporter_id, positive=True, delta_pos=config.peer_trust_delta_pos * 0.5
+            )
+            updates += 1
+    return updates
 
 
 def apply_peer_witness_trust(
@@ -138,9 +209,7 @@ def apply_peer_witness_trust(
 ) -> int:
     """Update peer_trust from witnessed escalations, dispatches, outcomes, and rewards."""
     updates = 0
-    living = [
-        a for a in agents.values() if a.is_alive and a.state.lifecycle == LifecycleStage.ADULT
-    ]
+    living = _living_adults(agents)
     reports_by_location: dict[EventLocation, list[Report]] = {}
     for report in reports:
         if report.verified:
@@ -165,38 +234,10 @@ def apply_peer_witness_trust(
             overlap = compute_niche_overlap(observer, subject)
             if overlap < config.peer_overlap_threshold:
                 continue
-
-            if outcome.response_necessary:
-                observer.update_peer_trust(
-                    outcome.agent_id, positive=True, delta_pos=config.peer_trust_delta_pos
-                )
-            else:
-                observer.update_peer_trust(
-                    outcome.agent_id, negative=True, delta_neg=config.peer_trust_delta_neg
-                )
-            updates += 1
-
-            if subject.state.last_step_attention_income >= config.peer_witness_reward_threshold:
-                observer.update_peer_trust(
-                    outcome.agent_id, positive=True, delta_pos=config.peer_trust_delta_pos * 0.5
-                )
-                updates += 1
+            updates += _apply_outcome_witness_updates(observer, subject, outcome, config)
 
         if outcome.response_necessary:
             reporters = {r.agent_id for r in reports_by_location.get(outcome.location, [])}
-            for observer in living:
-                if observer.id in reporters:
-                    continue
-                if not can_witness(
-                    observer,
-                    outcome.location,
-                    min_anomaly=config.peer_witness_min_anomaly,
-                ):
-                    continue
-                for reporter_id in reporters:
-                    observer.update_peer_trust(
-                        reporter_id, positive=True, delta_pos=config.peer_trust_delta_pos * 0.5
-                    )
-                    updates += 1
+            updates += _apply_missed_reporter_updates(living, reporters, outcome, config)
 
     return updates

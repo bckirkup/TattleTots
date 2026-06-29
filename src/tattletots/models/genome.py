@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import enum
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Any, Self
 
 import numpy as np
 from pydantic import BaseModel, Field
@@ -91,6 +91,107 @@ class MimesisMode(enum.StrEnum):
     PARENTAL = "parental"
     NICHE = "niche"
     OPPORTUNISTIC = "opportunistic"
+
+
+_ARRAY_MUTATION_KEYS = (
+    "input_preference",
+    "target_user_affinity",
+    "fusion_weights",
+    "region_affinity",
+)
+
+
+def _mutate_enum_field(
+    data: dict[str, Any],
+    rng: np.random.Generator,
+    rate: float,
+    key: str,
+    enum_cls: type[enum.StrEnum],
+) -> None:
+    if rng.random() < rate:
+        values = list(enum_cls)
+        data[key] = values[int(rng.integers(0, len(values)))]
+
+
+def _mutate_scalar_fields(data: dict[str, Any], rng: np.random.Generator, rate: float) -> None:
+    if rng.random() < rate:
+        data["n_components"] = int(np.clip(data["n_components"] + rng.integers(-2, 3), 1, 50))
+    if rng.random() < rate:
+        data["escalation_threshold"] = float(
+            np.clip(float(data["escalation_threshold"]) + rng.normal(0, 0.05), 0.0, 1.0)
+        )
+    if rng.random() < rate:
+        data["metabolic_efficiency"] = float(
+            np.clip(float(data["metabolic_efficiency"]) + rng.normal(0, 0.1), 0.1, 5.0)
+        )
+    if rng.random() < rate:
+        data["compute_cost"] = float(
+            np.clip(float(data["compute_cost"]) + rng.normal(0, 0.02), 0.01, 1.0)
+        )
+    if rng.random() < rate:
+        data["maintenance_cost"] = float(
+            np.clip(float(data["maintenance_cost"]) + rng.normal(0, 0.01), 0.01, 0.5)
+        )
+    if rng.random() < rate:
+        data["reproduction_threshold"] = float(
+            np.clip(float(data["reproduction_threshold"]) + rng.normal(0, 0.2), 0.5, 10.0)
+        )
+    if rng.random() < rate:
+        data["domestication_sensitivity"] = float(
+            np.clip(float(data["domestication_sensitivity"]) + rng.normal(0, 0.05), 0.0, 1.0)
+        )
+    if rng.random() < rate:
+        data["parental_investment"] = float(
+            np.clip(float(data["parental_investment"]) + rng.normal(0, 0.05), 0.0, 1.0)
+        )
+    if rng.random() < rate:
+        data["lineage_signature"] = float(float(data["lineage_signature"]) + rng.normal(0, 0.1))
+    if rng.random() < rate:
+        data["working_dim"] = int(np.clip(int(data["working_dim"]) + rng.integers(-8, 9), 8, 256))
+    if rng.random() < rate:
+        data["dim_offset"] = int(np.clip(int(data["dim_offset"]) + rng.integers(-5, 6), 0, 1000))
+    if rng.random() < rate:
+        data["block_index"] = int(np.clip(int(data["block_index"]) + rng.integers(-2, 3), 0, 99))
+    if rng.random() < rate:
+        data["temporal_memory_depth"] = int(
+            np.clip(int(data["temporal_memory_depth"]) + rng.integers(-5, 6), 0, 100)
+        )
+    if rng.random() < rate:
+        row, col = data["spatial_region"]
+        data["spatial_region"] = (
+            int(np.clip(int(row) + rng.integers(-2, 3), 0, 99)),
+            int(np.clip(int(col) + rng.integers(-2, 3), 0, 99)),
+        )
+    if rng.random() < rate:
+        data["spatial_radius"] = int(
+            np.clip(int(data["spatial_radius"]) + rng.integers(-1, 2), 0, 20)
+        )
+    if rng.random() < rate:
+        data["residual_storage_steps"] = int(
+            np.clip(int(data["residual_storage_steps"]) + rng.integers(-2, 3), 0, 20)
+        )
+    if rng.random() < rate:
+        data["escalation_memory_depth"] = int(
+            np.clip(int(data["escalation_memory_depth"]) + rng.integers(-10, 11), 3, 200)
+        )
+    if rng.random() < rate:
+        data["threshold_adaptation_rate"] = float(
+            np.clip(float(data["threshold_adaptation_rate"]) + rng.normal(0, 0.05), 0.0, 1.0)
+        )
+
+
+def _mutate_array_preferences(data: dict[str, Any], rng: np.random.Generator, rate: float) -> None:
+    for key in _ARRAY_MUTATION_KEYS:
+        arr = np.array(data[key], dtype=np.float64)
+        if len(arr) == 0:
+            continue
+        mask = rng.random(len(arr)) < rate
+        arr[mask] += rng.normal(0, 0.1, size=int(mask.sum()))
+        arr = np.clip(arr, 0.0, None)
+        total = arr.sum()
+        if total > 0 and key != "region_affinity":
+            arr /= total
+        data[key] = arr
 
 
 class Genome(BaseModel):
@@ -266,138 +367,16 @@ class Genome(BaseModel):
     def mutate(self, rng: np.random.Generator, rate: float = 0.1) -> Self:
         """Return a mutated copy of this genome."""
         data = self.model_dump()
-
-        if rng.random() < rate:
-            types = list(CompressionType)
-            data["compression_type"] = types[int(rng.integers(0, len(types)))]
-
-        if rng.random() < rate:
-            data["n_components"] = int(np.clip(data["n_components"] + rng.integers(-2, 3), 1, 50))
-
-        if rng.random() < rate:
-            data["escalation_threshold"] = float(
-                np.clip(data["escalation_threshold"] + rng.normal(0, 0.05), 0.0, 1.0)
-            )
-
-        if rng.random() < rate:
-            data["metabolic_efficiency"] = float(
-                np.clip(data["metabolic_efficiency"] + rng.normal(0, 0.1), 0.1, 5.0)
-            )
-
-        if rng.random() < rate:
-            data["compute_cost"] = float(
-                np.clip(data["compute_cost"] + rng.normal(0, 0.02), 0.01, 1.0)
-            )
-
-        if rng.random() < rate:
-            data["maintenance_cost"] = float(
-                np.clip(data["maintenance_cost"] + rng.normal(0, 0.01), 0.01, 0.5)
-            )
-
-        if rng.random() < rate:
-            data["reproduction_threshold"] = float(
-                np.clip(data["reproduction_threshold"] + rng.normal(0, 0.2), 0.5, 10.0)
-            )
-
-        if rng.random() < rate:
-            data["domestication_sensitivity"] = float(
-                np.clip(data["domestication_sensitivity"] + rng.normal(0, 0.05), 0.0, 1.0)
-            )
-
-        if rng.random() < rate:
-            strategies = list(ParentalStrategy)
-            data["parental_strategy"] = strategies[int(rng.integers(0, len(strategies)))]
-
-        if rng.random() < rate:
-            data["parental_investment"] = float(
-                np.clip(data["parental_investment"] + rng.normal(0, 0.05), 0.0, 1.0)
-            )
-
-        if rng.random() < rate:
-            modes = list(MimesisMode)
-            data["mimesis_mode"] = modes[int(rng.integers(0, len(modes)))]
-
-        if rng.random() < rate:
-            data["lineage_signature"] = float(data["lineage_signature"] + rng.normal(0, 0.1))
-
-        if rng.random() < rate:
-            strategies = list(SensingStrategy)
-            data["sensing_strategy"] = strategies[int(rng.integers(0, len(strategies)))]
-
-        if rng.random() < rate:
-            data["working_dim"] = int(np.clip(data["working_dim"] + rng.integers(-8, 9), 8, 256))
-
-        if rng.random() < rate:
-            data["dim_offset"] = int(np.clip(data["dim_offset"] + rng.integers(-5, 6), 0, 1000))
-
-        if rng.random() < rate:
-            data["block_index"] = int(np.clip(data["block_index"] + rng.integers(-2, 3), 0, 99))
-
-        if rng.random() < rate:
-            data["temporal_memory_depth"] = int(
-                np.clip(data["temporal_memory_depth"] + rng.integers(-5, 6), 0, 100)
-            )
-
-        if rng.random() < rate:
-            modes = list(TemporalFusionMode)
-            data["temporal_fusion_mode"] = modes[int(rng.integers(0, len(modes)))]
-
-        if rng.random() < rate:
-            strategies = list(SpatialStrategy)
-            data["spatial_strategy"] = strategies[int(rng.integers(0, len(strategies)))]
-
-        if rng.random() < rate:
-            row, col = data["spatial_region"]
-            data["spatial_region"] = (
-                int(np.clip(row + rng.integers(-2, 3), 0, 99)),
-                int(np.clip(col + rng.integers(-2, 3), 0, 99)),
-            )
-
-        if rng.random() < rate:
-            data["spatial_radius"] = int(
-                np.clip(data["spatial_radius"] + rng.integers(-1, 2), 0, 20)
-            )
-
-        if rng.random() < rate:
-            policies = list(ResidualPolicy)
-            data["residual_policy"] = policies[int(rng.integers(0, len(policies)))]
-
-        if rng.random() < rate:
-            data["residual_storage_steps"] = int(
-                np.clip(data["residual_storage_steps"] + rng.integers(-2, 3), 0, 20)
-            )
-
-        if rng.random() < rate:
-            modes = list(EscalationMode)
-            data["escalation_mode"] = modes[int(rng.integers(0, len(modes)))]
-
-        if rng.random() < rate:
-            data["escalation_memory_depth"] = int(
-                np.clip(data["escalation_memory_depth"] + rng.integers(-10, 11), 3, 200)
-            )
-
-        if rng.random() < rate:
-            data["threshold_adaptation_rate"] = float(
-                np.clip(data["threshold_adaptation_rate"] + rng.normal(0, 0.05), 0.0, 1.0)
-            )
-
-        # Mutate array preferences
-        for key in (
-            "input_preference",
-            "target_user_affinity",
-            "fusion_weights",
-            "region_affinity",
-        ):
-            arr = np.array(data[key], dtype=np.float64)
-            if len(arr) > 0:
-                mask = rng.random(len(arr)) < rate
-                arr[mask] += rng.normal(0, 0.1, size=int(mask.sum()))
-                arr = np.clip(arr, 0.0, None)
-                total = arr.sum()
-                if total > 0 and key != "region_affinity":
-                    arr /= total
-                data[key] = arr
-
+        _mutate_enum_field(data, rng, rate, "compression_type", CompressionType)
+        _mutate_scalar_fields(data, rng, rate)
+        _mutate_enum_field(data, rng, rate, "parental_strategy", ParentalStrategy)
+        _mutate_enum_field(data, rng, rate, "mimesis_mode", MimesisMode)
+        _mutate_enum_field(data, rng, rate, "sensing_strategy", SensingStrategy)
+        _mutate_enum_field(data, rng, rate, "temporal_fusion_mode", TemporalFusionMode)
+        _mutate_enum_field(data, rng, rate, "spatial_strategy", SpatialStrategy)
+        _mutate_enum_field(data, rng, rate, "residual_policy", ResidualPolicy)
+        _mutate_enum_field(data, rng, rate, "escalation_mode", EscalationMode)
+        _mutate_array_preferences(data, rng, rate)
         return type(self).model_validate(data)
 
     @classmethod

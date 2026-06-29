@@ -9,6 +9,35 @@ from tattletots.models.agent import Agent
 from tattletots.models.genome import TemporalFusionMode
 
 
+def _fuse_ema(buffer: list[NDArray[np.float64]]) -> NDArray[np.float64]:
+    alpha = 2.0 / (len(buffer) + 1)
+    ema = buffer[0].copy()
+    for sample in buffer[1:]:
+        ema = (1 - alpha) * ema + alpha * sample
+    return ema
+
+
+def _fuse_window_stack(buffer: list[NDArray[np.float64]]) -> NDArray[np.float64]:
+    window = np.stack(buffer, axis=0)
+    result: NDArray[np.float64] = window.mean(axis=0)
+    return result
+
+
+def _fuse_ar_lag(
+    buffer: list[NDArray[np.float64]],
+    current: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    prev = buffer[-2]
+    if prev.shape != current.shape:
+        return current
+    denom = float(np.dot(prev, prev))
+    if denom < 1e-10:
+        return current
+    coeff = float(np.dot(current, prev)) / denom
+    predicted = coeff * prev
+    return 0.5 * current + 0.5 * (current - predicted)
+
+
 def apply_temporal_fusion(
     agent: Agent,
     current: NDArray[np.float64],
@@ -34,32 +63,16 @@ def apply_temporal_fusion(
         buffer = agent.state.temporal_buffer
 
     if mode == TemporalFusionMode.EMA:
-        alpha = 2.0 / (len(buffer) + 1)
-        ema = buffer[0].copy()
-        for sample in buffer[1:]:
-            ema = (1 - alpha) * ema + alpha * sample
-        return ema
+        return _fuse_ema(buffer)
 
     if mode == TemporalFusionMode.WINDOW_STACK:
         if len(buffer) < 2:
             return current
-        window = np.stack(buffer, axis=0)
-        # Lightweight projection: mean across time preserves dim, reduces noise
-        result: NDArray[np.float64] = window.mean(axis=0)
-        return result
+        return _fuse_window_stack(buffer)
 
     if mode == TemporalFusionMode.AR_LAG:
         if len(buffer) < 2:
             return current
-        prev = buffer[-2]
-        if prev.shape != current.shape:
-            return current
-        denom = float(np.dot(prev, prev))
-        if denom < 1e-10:
-            return current
-        coeff = float(np.dot(current, prev)) / denom
-        predicted = coeff * prev
-        # Return residual-like temporal signal fused with current
-        return 0.5 * current + 0.5 * (current - predicted)
+        return _fuse_ar_lag(buffer, current)
 
     return current

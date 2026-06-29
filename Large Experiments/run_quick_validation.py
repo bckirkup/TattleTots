@@ -20,6 +20,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from path_safety import safe_config_path, safe_output_dir
+
 _SCRIPT_DIR = Path(__file__).resolve().parent
 
 ADVERSARY_LEVELS: dict[str, dict[str, float]] = {
@@ -173,23 +175,21 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--verbose", action="store_true", help="Verbose simulation logs")
     args = parser.parse_args(argv)
 
-    if not args.config.exists():
-        print(f"[-] Config not found: {args.config}")
-        return 1
-
-    with open(args.config) as f:
+    config_path = safe_config_path(args.config, base=_SCRIPT_DIR)
+    with open(config_path) as f:
         validation_cfg = json.load(f)
 
     runs = expand_validation_runs(validation_cfg, probe=args.probe)
+    output_dir = safe_output_dir(args.output_dir, default_base=_SCRIPT_DIR)
     batch_cfg = {
-        "output_directory": str(args.output_dir),
+        "output_directory": str(output_dir),
         "source_config": str(args.config.resolve()),
         "probe_mode": args.probe,
         "runs": runs,
     }
 
-    args.output_dir.mkdir(parents=True, exist_ok=True)
-    batch_path = args.output_dir / "quick_validation_batch.json"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    batch_path = output_dir / "quick_validation_batch.json"
     with open(batch_path, "w") as f:
         json.dump(batch_cfg, f, indent=2)
 

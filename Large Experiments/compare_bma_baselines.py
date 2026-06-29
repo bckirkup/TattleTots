@@ -13,10 +13,12 @@ import json
 from pathlib import Path
 from typing import Any
 
+from baseline_parallel import resolve_workspace_root
 from baseline_spot_check import resolve_key_json
+from path_safety import KEY_JSON, safe_config_path, safe_output_dir
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
-_WORKSPACE = _SCRIPT_DIR.parent.parent
+_WORKSPACE = resolve_workspace_root(_SCRIPT_DIR)
 
 # Quick-validation scenario -> baseline run name template (seed substituted)
 SCENARIO_BASELINE_PATTERNS: dict[str, dict[str, str]] = {
@@ -263,7 +265,7 @@ def main() -> int:
     parser.add_argument(
         "--bma-key",
         type=Path,
-        default=_SCRIPT_DIR / "quick_validation_results" / "key.json",
+        default=_SCRIPT_DIR / "quick_validation_results" / KEY_JSON,
     )
     parser.add_argument(
         "--qv-config",
@@ -277,17 +279,21 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    if not args.bma_key.exists():
-        print(f"[-] BMA key not found: {args.bma_key}")
+    bma_key = safe_config_path(args.bma_key, base=_SCRIPT_DIR)
+    qv_config = safe_config_path(args.qv_config, base=_WORKSPACE)
+    output_path = safe_output_dir(args.output, default_base=_SCRIPT_DIR)
+
+    if not bma_key.exists():
+        print(f"[-] BMA key not found: {bma_key}")
         return 1
 
-    report = compare(args.bma_key, args.qv_config)
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(report, indent=2))
+    report = compare(bma_key, qv_config)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(report, indent=2))
     print(f"[+] Compared {report['successful']} BMA runs")
     print(f"    Beats best baseline: {report['beats_best_baseline_count']}/{report['successful']}")
     print(f"    Beats all targets:   {report['beats_all_targets_count']}/{report['successful']}")
-    print(f"[+] Report: {args.output}")
+    print(f"[+] Report: {output_path}")
 
     print("\n=== Per-run summary ===")
     for c in report["comparisons"]:

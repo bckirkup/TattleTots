@@ -7,7 +7,7 @@ from numpy.typing import NDArray
 
 from tattletots.engine.config import SimulationConfig
 from tattletots.models.agent import Agent
-from tattletots.models.genome import SensingStrategy
+from tattletots.models.genome import Genome, SensingStrategy
 from tattletots.models.stream import Stream
 
 
@@ -34,12 +34,78 @@ def _align_stream(
     return out
 
 
+def _pad_or_truncate(combined: NDArray[np.float64], working_dim: int) -> NDArray[np.float64]:
+    if combined.size > working_dim:
+        return combined[:working_dim]
+    if combined.size < working_dim:
+        padded = np.zeros(working_dim, dtype=np.float64)
+        padded[: combined.size] = combined
+        return padded
+    return combined
+
+
+def _fuse_concat(input_data: list[NDArray[np.float64]], working_dim: int) -> NDArray[np.float64]:
+    combined = np.concatenate(input_data)
+    return _pad_or_truncate(combined, working_dim)
+
+
+def _fuse_weighted(
+    agent: Agent,
+    genome: Genome,
+    input_data: list[NDArray[np.float64]],
+    working_dim: int,
+) -> NDArray[np.float64]:
+    weights = agent.state.fusion_weights_override
+    if weights.size == 0:
+        weights = genome.fusion_weights
+    if weights.size == 0:
+        weights = genome.input_preference
+    if weights.size < len(input_data):
+        weights = np.ones(len(input_data), dtype=np.float64)
+    weights = weights[: len(input_data)]
+    weights = weights / max(float(weights.sum()), 1e-10)
+
+    aligned = [_align_stream(d, working_dim) for d in input_data]
+    fused = np.zeros(working_dim, dtype=np.float64)
+    for w, arr in zip(weights, aligned, strict=True):
+        fused += w * arr
+    return fused
+
+
+def _fuse_subspace_sample(
+    agent: Agent,
+    genome: Genome,
+    input_data: list[NDArray[np.float64]],
+    working_dim: int,
+) -> NDArray[np.float64]:
+    combined = np.concatenate(input_data)
+    seed = hash(agent.id) % (2**31) + genome.dim_offset
+    indices = _stable_sample_indices(combined.size, working_dim, seed)
+    sampled = combined[indices]
+    return _pad_or_truncate(sampled, working_dim)
+
+
+def _fuse_block_specialize(
+    genome: Genome,
+    input_data: list[NDArray[np.float64]],
+    working_dim: int,
+    n_blocks: int,
+) -> NDArray[np.float64]:
+    combined = np.concatenate(input_data)
+    block_size = max(1, int(np.ceil(combined.size / n_blocks)))
+    block_idx = genome.block_index % n_blocks
+    start = block_idx * block_size
+    end = min(start + block_size, combined.size)
+    block = combined[start:end]
+    return _pad_or_truncate(block, working_dim)
+
+
 def prepare_agent_input(
     agent: Agent,
     streams: dict[str, Stream],
     config: SimulationConfig,
     *,
-    spatial_dim_map: dict[str, slice] | None = None,
+    _spatial_dim_map: dict[str, slice] | None = None,
 ) -> tuple[NDArray[np.float64], list[str]]:
     """Fuse selected input streams into a working-dimension vector.
 
@@ -62,58 +128,20 @@ def prepare_agent_input(
     strategy = genome.sensing_strategy
 
     if strategy == SensingStrategy.CONCAT:
-        combined = np.concatenate(input_data)
-        if combined.size > working_dim:
-            combined = combined[:working_dim]
-        elif combined.size < working_dim:
-            padded = np.zeros(working_dim, dtype=np.float64)
-            padded[: combined.size] = combined
-            combined = padded
-        return combined, input_labels
+        return _fuse_concat(input_data, working_dim), input_labels
 
     if strategy == SensingStrategy.WEIGHTED_FUSE:
-        weights = agent.state.fusion_weights_override
-        if weights.size == 0:
-            weights = genome.fusion_weights
-        if weights.size == 0:
-            weights = genome.input_preference
-        if weights.size < len(input_data):
-            weights = np.ones(len(input_data), dtype=np.float64)
-        weights = weights[: len(input_data)]
-        weights = weights / max(float(weights.sum()), 1e-10)
-
-        aligned = [_align_stream(d, working_dim) for d in input_data]
-        fused = np.zeros(working_dim, dtype=np.float64)
-        for w, arr in zip(weights, aligned, strict=True):
-            fused += w * arr
-        return fused, input_labels
+        return _fuse_weighted(agent, genome, input_data, working_dim), input_labels
 
     if strategy == SensingStrategy.SUBSPACE_SAMPLE:
-        combined = np.concatenate(input_data)
-        seed = hash(agent.id) % (2**31) + genome.dim_offset
-        indices = _stable_sample_indices(combined.size, working_dim, seed)
-        sampled = combined[indices]
-        if sampled.size < working_dim:
-            padded = np.zeros(working_dim, dtype=np.float64)
-            padded[: sampled.size] = sampled
-            return padded, input_labels
-        return sampled, input_labels
+        return _fuse_subspace_sample(agent, genome, input_data, working_dim), input_labels
 
     if strategy == SensingStrategy.BLOCK_SPECIALIZE:
-        combined = np.concatenate(input_data)
-        n_blocks = config.n_spatial_blocks
-        block_size = max(1, int(np.ceil(combined.size / n_blocks)))
-        block_idx = genome.block_index % n_blocks
-        start = block_idx * block_size
-        end = min(start + block_size, combined.size)
-        block = combined[start:end]
-        if block.size >= working_dim:
-            return block[:working_dim], input_labels
-        padded = np.zeros(working_dim, dtype=np.float64)
-        padded[: block.size] = block
-        return padded, input_labels
+        return (
+            _fuse_block_specialize(genome, input_data, working_dim, config.n_spatial_blocks),
+            input_labels,
+        )
 
-    # Fallback
     combined = np.concatenate(input_data)[:working_dim]
     return combined, input_labels
 

@@ -10,7 +10,7 @@ from tattletots.models.energy import EnergyReserves
 from tattletots.models.genome import CompressionType, Genome
 from tattletots.models.report import Report
 from tattletots.models.stream import Stream, StreamType
-from tattletots.models.user import User
+from tattletots.models.user import TrustOutcome, TrustUpdateDeltas, User
 
 
 class TestEnergyReserves:
@@ -47,7 +47,7 @@ class TestGenome:
         g = Genome()
         assert g.compression_type == CompressionType.PCA
         assert g.n_components == 3
-        assert g.escalation_threshold == 0.7
+        assert g.escalation_threshold == pytest.approx(0.7)
 
     def test_mutation_produces_different_genome(self) -> None:
         rng = np.random.default_rng(42)
@@ -98,28 +98,28 @@ class TestStream:
 class TestUser:
     def test_default_trust(self) -> None:
         u = User(name="test")
-        assert u.get_trust("unknown_agent") == 0.5
+        assert u.get_trust("unknown_agent") == pytest.approx(0.5)
 
     def test_trust_correct_alarm(self) -> None:
         u = User(name="test")
-        u.update_trust("a1", correct_alarm=True, delta_pos=0.1)
+        u.update_trust("a1", TrustOutcome.CORRECT_ALARM, deltas=TrustUpdateDeltas(pos=0.1))
         assert u.get_trust("a1") == pytest.approx(0.6)
 
     def test_trust_false_alarm_asymmetric(self) -> None:
         u = User(name="test")
-        u.update_trust("a1", correct_alarm=True, delta_pos=0.05)
-        u.update_trust("a1", false_alarm=True, delta_neg=0.2)
+        u.update_trust("a1", TrustOutcome.CORRECT_ALARM, deltas=TrustUpdateDeltas(pos=0.05))
+        u.update_trust("a1", TrustOutcome.FALSE_ALARM, deltas=TrustUpdateDeltas(neg=0.2))
         # Started at 0.5, went to 0.55, then dropped to 0.35
         assert u.get_trust("a1") == pytest.approx(0.35)
 
     def test_trust_bounded(self) -> None:
         u = User(name="test")
         for _ in range(100):
-            u.update_trust("a1", correct_alarm=True, delta_pos=0.1)
+            u.update_trust("a1", TrustOutcome.CORRECT_ALARM, deltas=TrustUpdateDeltas(pos=0.1))
         assert u.get_trust("a1") <= 1.0
 
         for _ in range(100):
-            u.update_trust("a1", false_alarm=True, delta_neg=0.5)
+            u.update_trust("a1", TrustOutcome.FALSE_ALARM, deltas=TrustUpdateDeltas(neg=0.5))
         assert u.get_trust("a1") >= 0.0
 
     def test_compute_relevance(self) -> None:

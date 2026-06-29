@@ -189,7 +189,7 @@ class TestCompress:
         world.agents[agent.id] = agent
         world._init_agent_model(agent)
         world._compress(agent)
-        assert agent.state.last_step_yield == 0.0
+        assert agent.state.last_step_yield == pytest.approx(0.0)
 
 
 class TestMaybeEscalate:
@@ -348,7 +348,6 @@ class TestApplyEnergy:
         )
         world.compression_models[agent.id] = PCACompression(n_components=2)
         world._apply_energy(agent, {}, [])
-        # info_delta = -0.1 + 0.2 = +0.1
         assert agent.state.energy.information == pytest.approx(1.1)
 
     def test_false_alarm_penalty_reduces_attention(self) -> None:
@@ -473,8 +472,8 @@ class TestBuildStepRecord:
         world = _minimal_world()
         record = world._build_step_record(reports=[], births=[], deaths=[], missed=[])
         assert record.population == 0
-        assert record.mean_info_energy == 0.0
-        assert record.mean_attn_energy == 0.0
+        assert record.mean_info_energy == pytest.approx(0.0)
+        assert record.mean_attn_energy == pytest.approx(0.0)
 
     def test_missed_events_propagated(self) -> None:
         world = _minimal_world()
@@ -566,7 +565,7 @@ class TestEventState:
         )
         world.agents[agent.id] = agent
         world._init_agent_model(agent)
-        agent.state.input_stream_ids = [list(world.streams.keys())[0]]
+        agent.state.input_stream_ids = [next(iter(world.streams.keys()))]
 
         world.set_location_inference(lambda _data, _labels: (9, 9))
         world.set_event_state([(1, 1)])

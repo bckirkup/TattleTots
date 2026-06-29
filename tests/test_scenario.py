@@ -116,7 +116,7 @@ class TestGaussianShiftScenario:
         restored = GaussianShiftScenario.from_config(config)
         assert restored.n_components == 8
         assert restored.dimensionality == 16
-        assert restored.noise_std == 0.3
+        assert restored.noise_std == pytest.approx(0.3)
         assert restored.shift_step == 150
         assert restored.total_steps == 300
 
@@ -124,7 +124,7 @@ class TestGaussianShiftScenario:
         scenario = GaussianShiftScenario.from_config({})
         assert scenario.n_components == 10
         assert scenario.dimensionality == 20
-        assert scenario.noise_std == 0.5
+        assert scenario.noise_std == pytest.approx(0.5)
 
     def test_deterministic_with_same_seed(self) -> None:
         s1 = GaussianShiftScenario(seed=123)

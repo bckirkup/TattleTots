@@ -9,9 +9,12 @@ from pathlib import Path
 
 from tattletots.engine.config import GenePoolConfig, SimulationConfig
 from tattletots.engine.world import World
+from tattletots.path_utils import safe_path_under_base
 from tattletots.scenarios.gaussian_shift import GaussianShiftScenario
 from tattletots.scenarios.high_dim_shift import HighDimShiftScenario
 from tattletots.telemetry.cost_accounting import CostAccumulator
+
+_CWD = Path.cwd()
 
 
 def _load_scenario(
@@ -22,6 +25,100 @@ def _load_scenario(
     if name == "high_dim_shift":
         return HighDimShiftScenario.from_config(scenario_config)
     raise ValueError(f"Unknown scenario: {name}")
+
+
+def _resolve_config_path(
+    raw: Path | None,
+) -> tuple[SimulationConfig, dict[str, int | float | str], str, GenePoolConfig | None]:
+    gene_pool: GenePoolConfig | None = None
+    if raw is not None:
+        config_path = safe_path_under_base(raw, _CWD)
+        with open(config_path) as f:
+            raw_config = json.load(f)
+        sim_config = SimulationConfig(**raw_config.get("simulation", {}))
+        scenario_config = raw_config.get("scenario", {})
+        if "gene_pool" in raw_config:
+            gene_pool = GenePoolConfig(**raw_config["gene_pool"])
+        scenario_name = str(scenario_config.get("scenario", "gaussian_shift"))
+        return sim_config, scenario_config, scenario_name, gene_pool
+    return SimulationConfig(), {}, "gaussian_shift", None
+
+
+def _build_world(
+    sim_config: SimulationConfig,
+    scenario: GaussianShiftScenario | HighDimShiftScenario,
+    gene_pool: GenePoolConfig | None,
+) -> World:
+    world = World(config=sim_config, gene_pool=gene_pool)
+    for stream in scenario.get_streams():
+        world.add_stream(stream)
+    for user in scenario.get_users():
+        world.add_user(user)
+    world.seed_population()
+    world.set_location_inference(scenario.infer_report_location)
+    world.set_dim_to_location(scenario.dim_index_to_location)
+    if hasattr(scenario, "get_ground_truth_vector"):
+        world.set_ground_truth_vector(scenario.get_ground_truth_vector(0))
+    return world
+
+
+def _run_steps(
+    world: World,
+    scenario: GaussianShiftScenario | HighDimShiftScenario,
+    steps: int,
+    *,
+    verbose: bool,
+    cost_accumulator: CostAccumulator,
+) -> None:
+    for step_num in range(steps):
+        scenario.step(step_num)
+        world.set_event_state(scenario.get_active_locations(step_num))
+        if hasattr(scenario, "get_ground_truth_vector"):
+            world.set_ground_truth_vector(scenario.get_ground_truth_vector(step_num))
+
+        record = world.step()
+
+        if verbose and step_num % 50 == 0:
+            print(
+                f"  Step {step_num:4d}: pop={record.population:3d} "
+                f"births={record.births} deaths={record.deaths} "
+                f"reports={record.reports_issued} "
+                f"trophic_depth={record.max_trophic_level:.1f} "
+                f"working_dim={record.mean_working_dim:.0f}"
+            )
+
+        cost_dict = scenario.compute_costs(
+            n_escalations=record.reports_issued,
+            n_correct=record.correct_reports,
+            n_false_alarms=record.false_alarms,
+            n_missed=record.missed_events,
+        )
+        cost_accumulator.record_from_dict(record.time_step, cost_dict)
+
+        if record.population == 0:
+            print("  ** Total extinction **")
+            break
+
+
+def _write_results(
+    output_path: Path,
+    *,
+    sim_config: SimulationConfig,
+    scenario: GaussianShiftScenario | HighDimShiftScenario,
+    world: World,
+    cost_summary: dict[str, float],
+) -> None:
+    summary = world.telemetry.summary()
+    output_data = {
+        "config": sim_config.model_dump(),
+        "scenario": scenario.to_config(),
+        "summary": summary,
+        "cost_summary": cost_summary,
+        "population_history": world.telemetry.population_history(),
+    }
+    with open(output_path, "w") as f:
+        json.dump(output_data, f, indent=2, default=str)
+    print(f"\n  Results written to: {output_path}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -72,15 +169,8 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
 
-    gene_pool: GenePoolConfig | None = None
     if args.config:
-        with open(args.config) as f:
-            raw_config = json.load(f)
-        sim_config = SimulationConfig(**raw_config.get("simulation", {}))
-        scenario_config = raw_config.get("scenario", {})
-        if "gene_pool" in raw_config:
-            gene_pool = GenePoolConfig(**raw_config["gene_pool"])
-        scenario_name = scenario_config.get("scenario", args.scenario)
+        sim_config, scenario_config, scenario_name, gene_pool = _resolve_config_path(args.config)
     else:
         sim_config = SimulationConfig(
             initial_population=args.population,
@@ -89,54 +179,17 @@ def main(argv: list[str] | None = None) -> int:
         )
         scenario_config = {}
         scenario_name = args.scenario
+        gene_pool = None
 
-    scenario = _load_scenario(str(scenario_name), scenario_config)
-
-    world = World(config=sim_config, gene_pool=gene_pool)
-    for stream in scenario.get_streams():
-        world.add_stream(stream)
-    for user in scenario.get_users():
-        world.add_user(user)
-    world.seed_population()
-    world.set_location_inference(scenario.infer_report_location)
-    world.set_dim_to_location(scenario.dim_index_to_location)
-    if hasattr(scenario, "get_ground_truth_vector"):
-        world.set_ground_truth_vector(scenario.get_ground_truth_vector(0))
-
+    scenario = _load_scenario(scenario_name, scenario_config)
+    world = _build_world(sim_config, scenario, gene_pool)
     cost_accumulator = CostAccumulator()
 
     print(f"TattleTots v0.1.0 — {scenario_name}")
     print(f"  Population: {sim_config.initial_population}, Steps: {args.steps}, Seed: {args.seed}")
     print()
 
-    for step_num in range(args.steps):
-        scenario.step(step_num)
-        world.set_event_state(scenario.get_active_locations(step_num))
-        if hasattr(scenario, "get_ground_truth_vector"):
-            world.set_ground_truth_vector(scenario.get_ground_truth_vector(step_num))
-
-        record = world.step()
-
-        if args.verbose and step_num % 50 == 0:
-            print(
-                f"  Step {step_num:4d}: pop={record.population:3d} "
-                f"births={record.births} deaths={record.deaths} "
-                f"reports={record.reports_issued} "
-                f"trophic_depth={record.max_trophic_level:.1f} "
-                f"working_dim={record.mean_working_dim:.0f}"
-            )
-
-        cost_dict = scenario.compute_costs(
-            n_escalations=record.reports_issued,
-            n_correct=record.correct_reports,
-            n_false_alarms=record.false_alarms,
-            n_missed=record.missed_events,
-        )
-        cost_accumulator.record_from_dict(record.time_step, cost_dict)
-
-        if record.population == 0:
-            print("  ** Total extinction **")
-            break
+    _run_steps(world, scenario, args.steps, verbose=args.verbose, cost_accumulator=cost_accumulator)
 
     summary = world.telemetry.summary()
     cost_summary = cost_accumulator.summary()
@@ -153,16 +206,14 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  Total cost:       {cost_summary['total_cost']:.2f}")
 
     if args.output:
-        output_data = {
-            "config": sim_config.model_dump(),
-            "scenario": scenario.to_config(),
-            "summary": summary,
-            "cost_summary": cost_summary,
-            "population_history": world.telemetry.population_history(),
-        }
-        with open(args.output, "w") as f:
-            json.dump(output_data, f, indent=2, default=str)
-        print(f"\n  Results written to: {args.output}")
+        output_path = safe_path_under_base(args.output, _CWD)
+        _write_results(
+            output_path,
+            sim_config=sim_config,
+            scenario=scenario,
+            world=world,
+            cost_summary=cost_summary,
+        )
 
     return 0
 

@@ -21,14 +21,19 @@ from tattletots.models.genome import CompressionType, Genome
 from tattletots.scenarios.gaussian_shift import GaussianShiftScenario
 
 
-def _run_scenario(steps: int = 200, seed: int = 42, population: int = 25) -> World:
-    """Helper: run the Gaussian shift scenario and return the world."""
+def _setup_gaussian_world(
+    *,
+    steps: int,
+    seed: int,
+    population: int,
+    mutation_rate: float = 0.15,
+) -> tuple[GaussianShiftScenario, World]:
     config = SimulationConfig(
         initial_population=population,
         max_population=80,
         max_steps=steps,
         seed=seed,
-        mutation_rate=0.15,
+        mutation_rate=mutation_rate,
     )
     scenario = GaussianShiftScenario(shift_step=steps // 2, total_steps=steps, seed=seed)
     world = World(config=config)
@@ -38,6 +43,41 @@ def _run_scenario(steps: int = 200, seed: int = 42, population: int = 25) -> Wor
         world.add_user(user)
     world.seed_population()
     world.set_location_inference(scenario.infer_report_location)
+    return scenario, world
+
+
+def _agent_output_variances(world: World) -> dict[str, float]:
+    agent_output_var: dict[str, float] = {}
+    for agent in world.agents.values():
+        if not agent.is_alive or not agent.state.output_stream_id:
+            continue
+        stream = world.streams.get(agent.state.output_stream_id)
+        if stream and stream.current_data.size > 0:
+            agent_output_var[agent.id] = float(np.var(stream.current_data))
+    return agent_output_var
+
+
+def _chain_variance_ratios(agent_output_var: dict[str, float], world: World) -> list[float]:
+    ratios: list[float] = []
+    for agent in world.agents.values():
+        if not agent.is_alive or agent.id not in agent_output_var:
+            continue
+        l2_var = agent_output_var[agent.id]
+        for input_sid in agent.state.input_stream_ids:
+            input_stream = world.streams.get(input_sid)
+            if input_stream is None or input_stream.source_agent_id is None:
+                continue
+            upstream_id = input_stream.source_agent_id
+            if upstream_id in agent_output_var:
+                l1_var = agent_output_var[upstream_id]
+                if l1_var > 1e-10:
+                    ratios.append(l2_var / l1_var)
+    return ratios
+
+
+def _run_scenario(steps: int = 200, seed: int = 42, population: int = 25) -> World:
+    """Helper: run the Gaussian shift scenario and return the world."""
+    scenario, world = _setup_gaussian_world(steps=steps, seed=seed, population=population)
 
     for step_num in range(steps):
         scenario.step(step_num)
@@ -208,23 +248,10 @@ class TestMathematicalProperties:
         L1 residuals (not mixed-input agents), and samples over multiple
         steps for statistical robustness.
         """
-        config = SimulationConfig(
-            initial_population=25,
-            max_population=80,
-            max_steps=200,
-            seed=42,
-            mutation_rate=0.15,
+        scenario, world = _setup_gaussian_world(
+            steps=200, seed=42, population=25, mutation_rate=0.15
         )
-        scenario = GaussianShiftScenario(shift_step=200, total_steps=200, seed=42)
-        world = World(config=config)
-        for stream in scenario.get_streams():
-            world.add_stream(stream)
-        for user in scenario.get_users():
-            world.add_user(user)
-        world.seed_population()
-        world.set_location_inference(scenario.infer_report_location)
 
-        # Track per-step variance ratios for actual chain pairs
         ratios: list[float] = []
 
         for step_num in range(100):
@@ -234,33 +261,11 @@ class TestMathematicalProperties:
             if world.living_population == 0:
                 break
 
-            # Only sample from step 50 onward (compression models need training)
             if step_num < 50:
                 continue
 
-            # Build map: output_stream_id -> agent variance
-            agent_output_var: dict[str, float] = {}
-            for agent in world.agents.values():
-                if not agent.is_alive or not agent.state.output_stream_id:
-                    continue
-                stream = world.streams.get(agent.state.output_stream_id)
-                if stream and stream.current_data.size > 0:
-                    agent_output_var[agent.id] = float(np.var(stream.current_data))
-
-            # Find chain pairs: L2 agent consumes L1 agent's output stream
-            for agent in world.agents.values():
-                if not agent.is_alive or agent.id not in agent_output_var:
-                    continue
-                l2_var = agent_output_var[agent.id]
-                for input_sid in agent.state.input_stream_ids:
-                    input_stream = world.streams.get(input_sid)
-                    if input_stream is None or input_stream.source_agent_id is None:
-                        continue
-                    upstream_id = input_stream.source_agent_id
-                    if upstream_id in agent_output_var:
-                        l1_var = agent_output_var[upstream_id]
-                        if l1_var > 1e-10:
-                            ratios.append(l2_var / l1_var)
+            agent_output_var = _agent_output_variances(world)
+            ratios.extend(_chain_variance_ratios(agent_output_var, world))
 
         if not ratios:
             pytest.skip("No direct chain pairs found with measurable variance")
@@ -281,17 +286,18 @@ class TestMathematicalProperties:
             attention_budget=1.0,
             priority_vector=np.array([1.0, 0.0, 0.0]),
         )
+        rng = np.random.default_rng(42)
         agents = [
             Agent(
                 state=AgentState(
                     lifecycle=LifecycleStage.ADULT,
-                    signal_vector=np.random.randn(3),
+                    signal_vector=rng.standard_normal(3),
                 )
             )
             for _ in range(10)
         ]
         for a in agents:
-            user.trust[a.id] = np.random.uniform(0.1, 1.0)
+            user.trust[a.id] = float(rng.uniform(0.1, 1.0))
 
         alloc = allocate_attention(user, agents)
         total = sum(alloc.values())
