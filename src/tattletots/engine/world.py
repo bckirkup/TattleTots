@@ -20,7 +20,6 @@ from tattletots.engine.development import (
 )
 from tattletots.engine.domestication import apply_shaping, compute_shaping_signal
 from tattletots.engine.escalation import should_escalate
-from tattletots.engine.identity import is_uuid_identifier, seeded_id
 from tattletots.engine.peer_observation import (
     apply_peer_witness_trust,
     collect_whistleblower_suspicions,
@@ -47,6 +46,7 @@ from tattletots.engine.whistleblowing import (
 from tattletots.models.agent import Agent, AgentState, LifecycleStage
 from tattletots.models.energy import EnergyReserves
 from tattletots.models.genome import Genome, ParentalStrategy, ResidualPolicy, SpatialStrategy
+from tattletots.models.identity import is_uuid_identifier, seeded_id
 from tattletots.models.location import EventLocation
 from tattletots.models.report import Report
 from tattletots.models.response_outcome import ResponseOutcome
@@ -99,13 +99,23 @@ class World:
         )
 
     def add_stream(self, stream: Stream) -> None:
-        """Register a data stream in the world."""
+        """Register a data stream, assigning a seeded ID when needed.
+
+        UUID-shaped IDs are replaced with a deterministic world-local ID.
+        Callers must read ``stream.id`` after registration and must not retain
+        the pre-registration ID for world lookups.
+        """
         if is_uuid_identifier(stream.id):
             stream.id = self._next_stream_id()
         self.streams[stream.id] = stream
 
     def add_user(self, user: User) -> None:
-        """Register a human user."""
+        """Register a human user, assigning a seeded ID when needed.
+
+        UUID-shaped IDs are replaced with a deterministic world-local ID.
+        Callers must read ``user.id`` after registration and must not retain
+        the pre-registration ID for world lookups.
+        """
         if is_uuid_identifier(user.id):
             user.id = self._next_user_id()
         self.users[user.id] = user

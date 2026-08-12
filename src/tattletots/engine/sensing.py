@@ -6,9 +6,9 @@ import numpy as np
 from numpy.typing import NDArray
 
 from tattletots.engine.config import SimulationConfig
-from tattletots.engine.identity import stable_id_digest
 from tattletots.models.agent import Agent
 from tattletots.models.genome import Genome, SensingStrategy
+from tattletots.models.identity import stable_id_digest
 from tattletots.models.stream import Stream
 
 

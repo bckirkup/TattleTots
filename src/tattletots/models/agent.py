@@ -8,9 +8,9 @@ import uuid
 import numpy as np
 from pydantic import BaseModel, Field
 
-from tattletots.engine.identity import seeded_id
 from tattletots.models.energy import EnergyReserves
 from tattletots.models.genome import Genome
+from tattletots.models.identity import seeded_id
 
 
 class LifecycleStage(enum.StrEnum):

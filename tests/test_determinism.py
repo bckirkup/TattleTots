@@ -14,8 +14,8 @@ import numpy as np
 
 from tattletots.cli import _load_scenario
 from tattletots.engine.config import SimulationConfig
-from tattletots.engine.identity import stable_id_digest
 from tattletots.engine.world import World
+from tattletots.models.identity import stable_id_digest
 from tattletots.scenarios.gaussian_shift import GaussianShiftScenario
 
 REPO_ROOT = Path(__file__).resolve().parents[1]

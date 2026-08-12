@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from tattletots.engine.attention import compute_niche_overlap
 from tattletots.engine.config import SimulationConfig
-from tattletots.engine.identity import stable_id_digest
 from tattletots.models.agent import Agent, LifecycleStage
+from tattletots.models.identity import stable_id_digest
 from tattletots.models.location import EventLocation
 from tattletots.models.report import Report
 from tattletots.models.response_outcome import ResponseOutcome

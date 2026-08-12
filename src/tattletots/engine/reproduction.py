@@ -5,10 +5,10 @@ from __future__ import annotations
 import numpy as np
 
 from tattletots.engine.config import SimulationConfig
-from tattletots.engine.identity import seeded_id
 from tattletots.models.agent import Agent, AgentState, LifecycleStage
 from tattletots.models.energy import EnergyReserves
 from tattletots.models.genome import Genome
+from tattletots.models.identity import seeded_id
 
 
 def attempt_reproduction(
