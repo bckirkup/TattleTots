@@ -60,6 +60,22 @@ class TestCompression:
         assert score_before > 1e-6
         assert observed_score == pytest.approx(score_before)
 
+    @pytest.mark.parametrize("compression_type", list(CompressionType))
+    def test_observe_contract_scores_before_update_generically(
+        self,
+        compression_type: CompressionType,
+    ) -> None:
+        baseline = np.array([0.1, -0.1, 0.05, -0.05])
+        change = np.array([5.0, -5.0, 5.0, -5.0])
+        model = create_compression_model(compression_type, n_components=2)
+        fresh_model = create_compression_model(compression_type, n_components=2)
+        for _ in range(12):
+            model.fit_transform(baseline)
+            fresh_model.fit_transform(baseline)
+
+        _residual, _yield, observed_score = model.observe(change)
+        assert observed_score == pytest.approx(fresh_model.anomaly_score(change))
+
     @pytest.mark.parametrize(
         "factory",
         [

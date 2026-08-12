@@ -272,13 +272,12 @@ class World:
         self._attach_trophic_inputs(living_agents)
         self._run_juvenile_mimesis(living_agents)
 
-        for agent in living_agents:
-            self._compress(agent)
+        anomaly_scores = {agent.id: self._compress(agent) for agent in living_agents}
 
         for agent in living_agents:
             if agent.state.lifecycle != LifecycleStage.ADULT:
                 continue
-            report = self._maybe_escalate(agent)
+            report = self._maybe_escalate(agent, anomaly_scores.get(agent.id, 0.0))
             if report is not None:
                 reports.append(report)
                 self._publish_output_stream(agent)
@@ -464,11 +463,11 @@ class World:
         agent.state.projected_input = spatial
         return spatial
 
-    def _compress(self, agent: Agent) -> None:
+    def _compress(self, agent: Agent) -> float:
         """Run full compression pipeline on agent inputs."""
         model = self.compression_models.get(agent.id)
         if model is None:
-            return
+            return 0.0
 
         combined = self._prepare_input_pipeline(agent)
         if combined.size == 0:
@@ -477,13 +476,13 @@ class World:
             agent.state.last_step_ungrounded_yield = 0.0
             agent.state.last_step_raw_grounded_yield = 0.0
             agent.state.last_step_raw_ungrounded_yield = 0.0
-            return
+            return 0.0
 
         max_dim = min(agent.genome.working_dim, self.config.max_stream_dim)
         if combined.size > max_dim:
             combined = combined[:max_dim]
 
-        residual, info_yield, _raw_anomaly = model.observe(combined)
+        residual, info_yield, raw_anomaly = model.observe(combined)
 
         refine_model = self.refine_models.get(agent.id)
         output, adjusted_yield, out_dim = apply_residual_policy(
@@ -532,6 +531,7 @@ class World:
                 if out_dim != out_stream.dimensionality:
                     out_stream.dimensionality = out_dim
                 out_stream.update(output)
+        return raw_anomaly
 
     def _select_escalation_target(self, agent: Agent, user_ids: list[str]) -> int:
         affinity = agent.genome.target_user_affinity
@@ -561,7 +561,11 @@ class World:
                 location = self._location_inference(raw_data, raw_labels)
         return location
 
-    def _maybe_escalate(self, agent: Agent) -> Report | None:
+    def _maybe_escalate(
+        self,
+        agent: Agent,
+        raw_anomaly: float | None = None,
+    ) -> Report | None:
         """Agent decides whether to escalate based on anomaly score vs threshold."""
         model = self.compression_models.get(agent.id)
         if model is None:
@@ -573,7 +577,12 @@ class World:
         if combined.size == 0:
             return None
 
-        anomaly, threshold, fire = should_escalate(agent, model, combined)
+        anomaly, threshold, fire = should_escalate(
+            agent,
+            model,
+            combined,
+            raw_anomaly=raw_anomaly,
+        )
         agent.state.last_anomaly_score = anomaly
         agent.state.last_inferred_location = infer_spatial_location(
             agent,
