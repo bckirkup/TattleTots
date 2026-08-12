@@ -72,7 +72,10 @@ def test_seeded_run_has_golden_fingerprint() -> None:
 
 
 def test_same_seed_reproduces_the_complete_run() -> None:
-    assert _run_fingerprint(42) == _run_fingerprint(42)
+    first = _run_fingerprint(42)
+    second = _run_fingerprint(42)
+
+    assert first == second
 
 
 def test_different_seed_changes_the_complete_run() -> None:
