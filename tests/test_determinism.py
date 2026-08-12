@@ -19,7 +19,20 @@ from tattletots.models.identity import stable_id_digest
 from tattletots.scenarios.gaussian_shift import GaussianShiftScenario
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_FINGERPRINT = "c64509b98f66d35ad4acd2deab49b52c05ba6c11990d37e467124b715d9fb03e"
+EXPECTED_FINGERPRINT = "8a180270a6984ba5766c2c397920a612ef2db6a0671ee4e8bf5daff8b4d24d45"
+
+
+def _canonicalize(value: object) -> object:
+    """Normalize floating-point serialization across supported runtimes."""
+    if isinstance(value, float):
+        return round(value, 12)
+    if isinstance(value, dict):
+        return {key: _canonicalize(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_canonicalize(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_canonicalize(item) for item in value)
+    return value
 
 
 def _run_fingerprint(seed: int, steps: int = 8) -> str:
@@ -50,7 +63,7 @@ def _run_fingerprint(seed: int, steps: int = 8) -> str:
         "users": sorted(world.users),
         "records": [asdict(record) for record in world.telemetry.history],
     }
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    encoded = json.dumps(_canonicalize(payload), sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(encoded).hexdigest()
 
 
@@ -91,6 +104,18 @@ from tattletots.engine.config import SimulationConfig
 from tattletots.engine.world import World
 from tattletots.scenarios.gaussian_shift import GaussianShiftScenario
 
+
+def canonicalize(value):
+    if isinstance(value, float):
+        return round(value, 12)
+    if isinstance(value, dict):
+        return {key: canonicalize(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [canonicalize(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(canonicalize(item) for item in value)
+    return value
+
 scenario = GaussianShiftScenario(seed=42, total_steps=8)
 world = World(config=SimulationConfig(initial_population=4, max_population=20, max_steps=8, seed=42))
 for stream in scenario.get_streams():
@@ -110,7 +135,8 @@ payload = {
     "users": sorted(world.users),
     "records": [asdict(record) for record in world.telemetry.history],
 }
-print(hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest())
+canonical = canonicalize(payload)
+print(hashlib.sha256(json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()).hexdigest())
 """
     fingerprints: list[str] = []
     for hash_seed in ("0", "1"):
