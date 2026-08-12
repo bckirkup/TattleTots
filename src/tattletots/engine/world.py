@@ -483,7 +483,7 @@ class World:
         if combined.size > max_dim:
             combined = combined[:max_dim]
 
-        residual, info_yield = model.fit_transform(combined)
+        residual, info_yield, _raw_anomaly = model.observe(combined)
 
         refine_model = self.refine_models.get(agent.id)
         output, adjusted_yield, out_dim = apply_residual_policy(

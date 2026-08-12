@@ -15,9 +15,25 @@ from tattletots.models.genome import CompressionType
 class CompressionModel(ABC):
     """Abstract base for compression models."""
 
+    def __init__(self) -> None:
+        self._last_anomaly_score = 0.0
+
     def set_array_module(self, xp: ModuleType) -> None:
         """Switch the array backend (numpy or cupy) used by this model."""
         self._xp = xp
+
+    @property
+    def last_anomaly_score(self) -> float:
+        """Return novelty scored before the latest sample was fitted."""
+        return self._last_anomaly_score
+
+    def observe(
+        self,
+        data: NDArray[np.float64],
+    ) -> tuple[NDArray[np.float64], float, float]:
+        """Score against prior state, then update the model atomically."""
+        residual, info_yield = self.fit_transform(data)
+        return residual, info_yield, self._last_anomaly_score
 
     @abstractmethod
     def fit_transform(self, data: NDArray[np.float64]) -> tuple[NDArray[np.float64], float]:
@@ -49,6 +65,7 @@ class PCACompression(CompressionModel):
         efficiency: float = 1.0,
         window_size: int = 20,
     ) -> None:
+        super().__init__()
         self.n_components = n_components
         self.efficiency = efficiency
         self._window_size = window_size
@@ -66,6 +83,7 @@ class PCACompression(CompressionModel):
         # Maintain sliding window; reset on dimensionality change
         if self._history and len(self._history[0]) != len(flat):
             self._history.clear()
+        self._last_anomaly_score = self._score_flat(flat)
         self._history.append(flat.copy())
         if len(self._history) > self._window_size:
             self._history = self._history[-self._window_size :]
@@ -103,12 +121,16 @@ class PCACompression(CompressionModel):
         return to_numpy(residual), info_yield
 
     def anomaly_score(self, data: NDArray[np.float64]) -> float:
-        if self._mean.size == 0 or self._components is None:
-            return 0.0
         xp = self._xp
         flat = xp.asarray(data.flatten(), dtype=xp.float64)
+        return self._score_flat(flat)
+
+    def _score_flat(self, flat: NDArray[np.float64]) -> float:
+        if self._mean.size == 0 or self._components is None:
+            return 0.0
         if flat.shape[0] != self._mean.shape[0]:
             return 0.0
+        xp = self._xp
         centered = (flat - self._mean).reshape(1, -1)
         projected = centered @ self._components.T
         reconstructed = projected @ self._components
@@ -123,6 +145,7 @@ class AR1Compression(CompressionModel):
     """AR(1) autoregressive compression: models temporal dependence."""
 
     def __init__(self, n_components: int, efficiency: float = 1.0) -> None:
+        super().__init__()
         self.n_components = n_components
         self.efficiency = efficiency
         self._xp: ModuleType = np
@@ -133,6 +156,7 @@ class AR1Compression(CompressionModel):
     def fit_transform(self, data: NDArray[np.float64]) -> tuple[NDArray[np.float64], float]:
         xp = self._xp
         flat = xp.asarray(data.flatten(), dtype=xp.float64)
+        self._last_anomaly_score = self._score_flat(flat)
         if self._prev is None or len(flat) != len(self._prev):
             self._prev = flat
             self._signal = to_numpy(flat[: self.n_components])
@@ -163,8 +187,12 @@ class AR1Compression(CompressionModel):
     def anomaly_score(self, data: NDArray[np.float64]) -> float:
         xp = self._xp
         flat = xp.asarray(data.flatten(), dtype=xp.float64)
+        return self._score_flat(flat)
+
+    def _score_flat(self, flat: NDArray[np.float64]) -> float:
         if self._prev is None or len(flat) != len(self._prev):
             return 0.0
+        xp = self._xp
         denom = float(xp.dot(self._prev, self._prev))
         if denom > 1e-10:
             coeff = float(xp.dot(flat, self._prev)) / denom
@@ -181,6 +209,7 @@ class ThresholdCompression(CompressionModel):
     """Simple threshold detector: flags dimensions exceeding running statistics."""
 
     def __init__(self, n_components: int, efficiency: float = 1.0) -> None:
+        super().__init__()
         self.n_components = n_components
         self.efficiency = efficiency
         self._xp: ModuleType = np
@@ -195,12 +224,14 @@ class ThresholdCompression(CompressionModel):
         flat = xp.asarray(data.flatten(), dtype=xp.float64)
 
         if self._running_mean is None or len(flat) != len(self._running_mean):
+            self._last_anomaly_score = 0.0
             self._running_mean = flat.copy()
             self._running_var = xp.ones_like(flat)
             self._count = 1
             self._signal = to_numpy(flat[: self.n_components])
             return to_numpy(flat), 0.0
 
+        self._last_anomaly_score = self._score_flat(flat)
         # Update running statistics
         self._count += 1
         self._running_mean = (1 - self._alpha) * self._running_mean + self._alpha * flat
@@ -221,8 +252,12 @@ class ThresholdCompression(CompressionModel):
     def anomaly_score(self, data: NDArray[np.float64]) -> float:
         xp = self._xp
         flat = xp.asarray(data.flatten(), dtype=xp.float64)
+        return self._score_flat(flat)
+
+    def _score_flat(self, flat: NDArray[np.float64]) -> float:
         if self._running_mean is None or len(flat) != len(self._running_mean):
             return 0.0
+        xp = self._xp
         diff = flat - self._running_mean
         assert self._running_var is not None
         std = xp.sqrt(xp.maximum(self._running_var, 1e-10))
@@ -237,6 +272,7 @@ class WaveletCompression(CompressionModel):
     """Haar wavelet compression using detail coefficients as residual."""
 
     def __init__(self, n_components: int, efficiency: float = 1.0) -> None:
+        super().__init__()
         self.n_components = n_components
         self.efficiency = efficiency
         self._xp: ModuleType = np
@@ -266,6 +302,7 @@ class WaveletCompression(CompressionModel):
         xp = self._xp
         flat = xp.asarray(data.flatten(), dtype=xp.float64)
         approx, residual = self._haar_decompose(flat)
+        self._last_anomaly_score = self._detail_energy(flat)
         self._approx = approx
         self._signal = to_numpy(approx[: self.n_components])
         input_var = float(xp.var(flat))
@@ -276,8 +313,16 @@ class WaveletCompression(CompressionModel):
     def anomaly_score(self, data: NDArray[np.float64]) -> float:
         xp = self._xp
         flat = xp.asarray(data.flatten(), dtype=xp.float64)
-        _, residual = self._haar_decompose(flat)
-        return float(xp.mean(residual**2))
+        return self._detail_energy(flat)
+
+    def _detail_energy(self, flat: NDArray[np.float64]) -> float:
+        xp = self._xp
+        if flat.size < 2:
+            return 0.0
+        if flat.size % 2 == 1:
+            flat = xp.concatenate([flat, flat[-1:]])
+        detail = (flat[0::2] - flat[1::2]) / xp.sqrt(xp.array(2.0))
+        return float(xp.mean(detail**2))
 
     def get_signal_vector(self) -> NDArray[np.float64]:
         return self._signal

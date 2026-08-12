@@ -71,13 +71,23 @@ class TestGaussianShiftScenario:
         assert not scenario.get_ground_truth(0)
         assert not scenario.get_ground_truth(50)
         assert not scenario.get_ground_truth(200)
-        # Within 5 steps of shift → True
-        assert scenario.get_ground_truth(95)
+        # Only post-shift samples carry the event
+        assert not scenario.get_ground_truth(99)
         assert scenario.get_ground_truth(100)
         assert scenario.get_ground_truth(105)
-        # Just outside → False
-        assert not scenario.get_ground_truth(94)
+        # Event window ends after six post-shift samples
         assert not scenario.get_ground_truth(106)
+
+    def test_default_run_contains_post_shift_event(self) -> None:
+        scenario = GaussianShiftScenario()
+        event_steps = [
+            step for step in range(scenario.total_steps) if scenario.get_ground_truth(step)
+        ]
+
+        assert event_steps
+        assert min(event_steps) >= scenario.shift_step
+        assert max(event_steps) < scenario.total_steps
+        assert len(event_steps) == 6
 
     def test_active_locations_empty_outside_shift_window(self) -> None:
         scenario = GaussianShiftScenario(shift_step=100)

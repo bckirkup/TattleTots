@@ -38,8 +38,8 @@ class GaussianShiftScenario(DomainAdapter):
         n_components: int = 10,
         dimensionality: int = 20,
         noise_std: float = 0.5,
-        shift_step: int = 200,
-        total_steps: int = 400,
+        shift_step: int = 100,
+        total_steps: int = 200,
         seed: int = 42,
     ) -> None:
         self.n_components = n_components
@@ -126,8 +126,8 @@ class GaussianShiftScenario(DomainAdapter):
             offset += stream.dimensionality
 
     def get_ground_truth(self, time_step: int) -> bool:
-        """The shift itself is the 'event' — active for a window around shift_step."""
-        return abs(time_step - self.shift_step) <= 5
+        """Report only samples generated from the post-shift distribution."""
+        return self.shift_step <= time_step < self.shift_step + 6
 
     def get_active_locations(self, time_step: int) -> list[EventLocation]:
         """During the shift window, the primary changed component is the event location."""
@@ -227,8 +227,8 @@ class GaussianShiftScenario(DomainAdapter):
             n_components=int(config.get("n_components", 10)),
             dimensionality=int(config.get("dimensionality", 20)),
             noise_std=float(config.get("noise_std", 0.5)),
-            shift_step=int(config.get("shift_step", 200)),
-            total_steps=int(config.get("total_steps", 400)),
+            shift_step=int(config.get("shift_step", 100)),
+            total_steps=int(config.get("total_steps", 200)),
             seed=int(config.get("seed", 42)),
         )
 
