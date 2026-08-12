@@ -108,13 +108,13 @@ class SimulationConfig(BaseModel):
         default=0.5,
         ge=0.0,
         le=1.0,
-        description="Minimum grounded information-yield share for initiation verdict",
+        description="Minimum grounded information-yield share before initiation is degenerate",
     )
     initiation_attention_insolvency_steps_fraction: float = Field(
         default=0.8,
         ge=0.0,
         le=1.0,
-        description="Fraction of steps that must be majority-insolvent for the initiation verdict",
+        description="Fraction of steps that must be majority-insolvent for initiation degeneracy",
     )
     initiation_min_solvent_fraction: float = Field(
         default=0.5,

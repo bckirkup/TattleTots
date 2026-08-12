@@ -90,7 +90,7 @@ class TelemetryRecorder:
         min_solvent_fraction: float = 0.5,
         population_capacity_overshoot_factor: float = 1.0,
     ) -> None:
-        """Set run-level initiation-verdict thresholds from simulation config."""
+        """Set run-level initiation-degeneracy thresholds from simulation config."""
         self.initiation_min_grounded_yield_share = min_grounded_yield_share
         self.initiation_attention_insolvency_steps_fraction = attention_insolvency_steps_fraction
         self.initiation_min_solvent_fraction = min_solvent_fraction
