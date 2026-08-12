@@ -91,6 +91,10 @@ class World:
             attention_insolvency_steps_fraction=(
                 self.config.initiation_attention_insolvency_steps_fraction
             ),
+            min_solvent_fraction=self.config.initiation_min_solvent_fraction,
+            population_capacity_overshoot_factor=(
+                self.config.initiation_population_capacity_overshoot_factor
+            ),
         )
 
     def add_stream(self, stream: Stream) -> None:
@@ -681,6 +685,8 @@ class World:
         grounded_yield = sum(a.state.last_step_grounded_yield for a in living)
         ungrounded_yield = sum(a.state.last_step_ungrounded_yield for a in living)
         total_yield = grounded_yield + ungrounded_yield
+        attention_delta_ids = set(self._attention_deltas)
+        eligible_agents = [a for a in living if a.id in attention_delta_ids]
         return StepRecord(
             time_step=self.time_step,
             population=len(living),
@@ -704,8 +710,9 @@ class World:
             total_compute_cost=sum(a.state.last_compute_cost_paid for a in living),
             total_maintenance_cost=sum(juvenile_maintenance_cost(a, self.config) for a in living),
             n_attention_solvent_agents=sum(
-                self._attention_deltas.get(a.id, -np.inf) >= 0 for a in living
+                self._attention_deltas[a.id] >= 0 for a in eligible_agents
             ),
+            n_attention_eligible_agents=len(eligible_agents),
             attention_carrying_capacity=attention_capacity,
             grounded_info_yield=grounded_yield,
             ungrounded_info_yield=ungrounded_yield,

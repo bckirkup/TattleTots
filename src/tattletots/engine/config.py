@@ -114,7 +114,18 @@ class SimulationConfig(BaseModel):
         default=0.8,
         ge=0.0,
         le=1.0,
-        description="Fraction of steps that must be insolvent for the initiation verdict",
+        description="Fraction of steps that must be majority-insolvent for the initiation verdict",
+    )
+    initiation_min_solvent_fraction: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="Per-step solvent fraction below which a step is insolvent",
+    )
+    initiation_population_capacity_overshoot_factor: float = Field(
+        default=1.0,
+        ge=1.0,
+        description="Peak-population multiple above mean attention capacity considered overshoot",
     )
     # Common Operating Picture
     cop_dispatch_threshold: float = Field(default=1.0, ge=0.0)

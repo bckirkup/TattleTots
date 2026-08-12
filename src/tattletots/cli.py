@@ -209,8 +209,10 @@ def main(argv: list[str] | None = None) -> int:
         f"(peak population: {summary['peak_population']})"
     )
     print(f"  Grounded yield:   {summary['grounded_yield_share']:.2%}")
-    print(f"  Initiation verdict:{summary['initiation_verdict']}")
-    print(f"  Verdict reasons:  {', '.join(summary['initiation_verdict_reasons']) or 'none'}")
+    print(f"  Initiation degenerate: {summary['initiation_is_degenerate']}")
+    print(
+        f"  Degeneracy reasons:   {', '.join(summary['initiation_degeneracy_reasons']) or 'none'}"
+    )
     print(f"  Max trophic depth:{summary['max_trophic_depth']:.1f}")
     print(f"  Equilibrium:      {summary['reached_equilibrium']}")
     print(f"  Total cost:       {cost_summary['total_cost']:.2f}")
