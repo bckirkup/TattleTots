@@ -8,6 +8,7 @@ import uuid
 import numpy as np
 from pydantic import BaseModel, Field
 
+from tattletots.engine.identity import seeded_id
 from tattletots.models.energy import EnergyReserves
 from tattletots.models.genome import Genome
 
@@ -207,6 +208,7 @@ class Agent(BaseModel):
         self.state.energy.attention -= cost / 2
 
         return Agent(
+            id=seeded_id(rng),
             genome=child_genome,
             state=AgentState(
                 energy=EnergyReserves(information=cost / 2, attention=cost / 2),

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -20,6 +20,7 @@ from tattletots.engine.development import (
 )
 from tattletots.engine.domestication import apply_shaping, compute_shaping_signal
 from tattletots.engine.escalation import should_escalate
+from tattletots.engine.identity import is_uuid_identifier, seeded_id
 from tattletots.engine.peer_observation import (
     apply_peer_witness_trust,
     collect_whistleblower_suspicions,
@@ -99,10 +100,14 @@ class World:
 
     def add_stream(self, stream: Stream) -> None:
         """Register a data stream in the world."""
+        if is_uuid_identifier(stream.id):
+            stream.id = self._next_stream_id()
         self.streams[stream.id] = stream
 
     def add_user(self, user: User) -> None:
         """Register a human user."""
+        if is_uuid_identifier(user.id):
+            user.id = self._next_user_id()
         self.users[user.id] = user
 
     def seed_population(self, genomes: list[Genome] | None = None) -> None:
@@ -114,6 +119,7 @@ class World:
 
         for genome in genomes[:n]:
             agent = Agent(
+                id=self._next_agent_id(),
                 genome=genome,
                 state=AgentState(
                     energy=EnergyReserves(
@@ -131,6 +137,24 @@ class World:
         """Set active event locations for report verification this step."""
         self._active_locations = frozenset(active_locations)
         self._ground_truth_active = len(self._active_locations) > 0
+
+    def _next_agent_id(self) -> str:
+        """Return a unique seeded identifier for an agent in this world."""
+        return self._next_unique_id(self.agents)
+
+    def _next_stream_id(self) -> str:
+        """Return a unique seeded identifier for a stream in this world."""
+        return self._next_unique_id(self.streams)
+
+    def _next_user_id(self) -> str:
+        """Return a unique seeded identifier for a user in this world."""
+        return self._next_unique_id(self.users)
+
+    def _next_unique_id(self, existing: Mapping[str, object]) -> str:
+        identifier = seeded_id(self.rng)
+        while identifier in existing:
+            identifier = seeded_id(self.rng)
+        return identifier
 
     def set_ground_truth(self, active: bool) -> None:
         """Legacy wrapper: active event with unknown location uses empty location set."""
@@ -406,6 +430,7 @@ class World:
             source_agent_id=agent.id,
             label=f"residual_{agent.id[:8]}",
         )
+        residual_stream.id = self._next_stream_id()
         self.streams[residual_stream.id] = residual_stream
         agent.state.output_stream_id = residual_stream.id
 
@@ -564,6 +589,7 @@ class World:
             return
         if agent.state.output_claim_stream_id is None:
             out = create_output_stream(agent, signal, signal.size)
+            out.id = self._next_stream_id()
             self.streams[out.id] = out
             agent.state.output_claim_stream_id = out.id
         else:
@@ -600,6 +626,7 @@ class World:
             label=f"curated_{child.id[:8]}",
             current_data=parent_residual.current_data[:dim].copy(),
         )
+        curated.id = self._next_stream_id()
         self.streams[curated.id] = curated
         child.state.curated_stream_id = curated.id
         if child.state.lifecycle == LifecycleStage.JUVENILE:

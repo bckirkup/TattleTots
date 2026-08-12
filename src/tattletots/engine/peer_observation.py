@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from tattletots.engine.attention import compute_niche_overlap
 from tattletots.engine.config import SimulationConfig
+from tattletots.engine.identity import stable_id_digest
 from tattletots.models.agent import Agent, LifecycleStage
 from tattletots.models.location import EventLocation
 from tattletots.models.report import Report
@@ -99,7 +100,7 @@ def _append_whistleblower_suspicion(
     overlap: float,
 ) -> WhistleblowerReport:
     score = max(0.5 + report.confidence, overlap)
-    target_idx = hash(observer.id) % len(user_ids)
+    target_idx = stable_id_digest(observer.id) % len(user_ids)
     observer.update_peer_trust(
         report.agent_id,
         negative=True,
