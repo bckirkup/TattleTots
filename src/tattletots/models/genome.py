@@ -113,7 +113,11 @@ def _mutate_enum_field(
         data[key] = values[int(rng.integers(0, len(values)))]
 
 
-def _mutate_scalar_fields(data: dict[str, Any], rng: np.random.Generator, rate: float) -> None:
+def _mutate_scalar_fields(
+    data: dict[str, Any],
+    rng: np.random.Generator,
+    rate: float,
+) -> None:
     if rng.random() < rate:
         data["n_components"] = int(np.clip(data["n_components"] + rng.integers(-2, 3), 1, 50))
     if rng.random() < rate:
@@ -135,6 +139,14 @@ def _mutate_scalar_fields(data: dict[str, Any], rng: np.random.Generator, rate: 
     if rng.random() < rate:
         data["reproduction_threshold"] = float(
             np.clip(float(data["reproduction_threshold"]) + rng.normal(0, 0.2), 0.5, 10.0)
+        )
+    if rng.random() < rate:
+        data["information_requirement"] = float(
+            np.clip(float(data["information_requirement"]) + rng.normal(0, 0.1), 0.25, 4.0)
+        )
+    if rng.random() < rate:
+        data["attention_requirement"] = float(
+            np.clip(float(data["attention_requirement"]) + rng.normal(0, 0.1), 0.25, 4.0)
         )
     if rng.random() < rate:
         data["domestication_sensitivity"] = float(
@@ -239,6 +251,16 @@ class Genome(BaseModel):
         default=2.0,
         gt=0.0,
         description="Minimum combined energy to reproduce",
+    )
+    information_requirement: float = Field(
+        default=1.0,
+        gt=0.0,
+        description="Heritable information-currency requirement stoichiometry",
+    )
+    attention_requirement: float = Field(
+        default=1.0,
+        gt=0.0,
+        description="Heritable attention-currency requirement stoichiometry",
     )
     domestication_sensitivity: float = Field(
         default=0.1,
@@ -364,7 +386,11 @@ class Genome(BaseModel):
             cost += self.escalation_memory_depth * config.escalation_cost_rate
         return cost
 
-    def mutate(self, rng: np.random.Generator, rate: float = 0.1) -> Self:
+    def mutate(
+        self,
+        rng: np.random.Generator,
+        rate: float = 0.1,
+    ) -> Self:
         """Return a mutated copy of this genome."""
         data = self.model_dump()
         _mutate_enum_field(data, rng, rate, "compression_type", CompressionType)
@@ -380,7 +406,12 @@ class Genome(BaseModel):
         return type(self).model_validate(data)
 
     @classmethod
-    def recombine(cls, parent_a: Genome, parent_b: Genome, rng: np.random.Generator) -> Self:
+    def recombine(
+        cls,
+        parent_a: Genome,
+        parent_b: Genome,
+        rng: np.random.Generator,
+    ) -> Self:
         """Sexual recombination: crossover of two parent genomes."""
         data_a = parent_a.model_dump()
         data_b = parent_b.model_dump()
@@ -444,6 +475,8 @@ class Genome(BaseModel):
             compute_cost=float(rng.uniform(0.05, 0.2)),
             maintenance_cost=float(rng.uniform(0.02, 0.1)),
             reproduction_threshold=float(rng.uniform(1.5, 3.0)),
+            information_requirement=float(rng.uniform(0.7, 1.3)),
+            attention_requirement=float(rng.uniform(0.7, 1.3)),
             domestication_sensitivity=float(rng.uniform(0.0, 0.3)),
             development_duration=int(rng.integers(dd_lo, dd_hi + 1)),
             sensing_strategy=SensingStrategy(

@@ -475,6 +475,8 @@ class World:
             agent.state.last_step_yield = 0.0
             agent.state.last_step_grounded_yield = 0.0
             agent.state.last_step_ungrounded_yield = 0.0
+            agent.state.last_step_raw_grounded_yield = 0.0
+            agent.state.last_step_raw_ungrounded_yield = 0.0
             return
 
         max_dim = min(agent.genome.working_dim, self.config.max_stream_dim)
@@ -493,17 +495,29 @@ class World:
         )
 
         agent.state.signal_vector = model.get_signal_vector()
-        agent.state.last_step_yield = adjusted_yield
         grounded_mass, ungrounded_mass = self._last_input_attribution.get(agent.id, (0.0, 0.0))
         total_mass = grounded_mass + ungrounded_mass
         if total_mass > 0:
             grounded_fraction = grounded_mass / total_mass
-            agent.state.last_step_grounded_yield = adjusted_yield * grounded_fraction
-            agent.state.last_step_ungrounded_yield = adjusted_yield * (1.0 - grounded_fraction)
+            quality_factor = 1.0 - self.config.grounding_quality_strength * (
+                1.0 - grounded_fraction
+            )
+            grounded_yield = adjusted_yield * grounded_fraction
+            raw_ungrounded_yield = adjusted_yield * (1.0 - grounded_fraction)
+            ungrounded_yield = raw_ungrounded_yield * quality_factor
+            effective_yield = grounded_yield + ungrounded_yield
+            agent.state.last_step_raw_grounded_yield = grounded_yield
+            agent.state.last_step_raw_ungrounded_yield = raw_ungrounded_yield
+            agent.state.last_step_grounded_yield = grounded_yield
+            agent.state.last_step_ungrounded_yield = ungrounded_yield
         else:
+            effective_yield = adjusted_yield
+            agent.state.last_step_raw_grounded_yield = 0.0
+            agent.state.last_step_raw_ungrounded_yield = 0.0
             agent.state.last_step_grounded_yield = 0.0
             agent.state.last_step_ungrounded_yield = 0.0
-        agent.state.cumulative_yield += adjusted_yield
+        agent.state.last_step_yield = effective_yield
+        agent.state.cumulative_yield += effective_yield
 
         compute_cost = agent.genome.total_compute_cost(
             self.config,
@@ -721,6 +735,9 @@ class World:
         )
         grounded_yield = sum(a.state.last_step_grounded_yield for a in living)
         ungrounded_yield = sum(a.state.last_step_ungrounded_yield for a in living)
+        raw_grounded_yield = sum(a.state.last_step_raw_grounded_yield for a in living)
+        raw_ungrounded_yield = sum(a.state.last_step_raw_ungrounded_yield for a in living)
+        raw_total_yield = raw_grounded_yield + raw_ungrounded_yield
         total_yield = grounded_yield + ungrounded_yield
         attention_delta_ids = set(self._attention_deltas)
         eligible_agents = [a for a in living if a.id in attention_delta_ids]
@@ -753,9 +770,16 @@ class World:
             ),
             n_attention_eligible_agents=len(eligible_agents),
             attention_carrying_capacity=attention_capacity,
-            grounded_info_yield=grounded_yield,
-            ungrounded_info_yield=ungrounded_yield,
-            grounded_yield_share=grounded_yield / total_yield if total_yield > 0 else 0.0,
+            grounded_info_yield=raw_grounded_yield,
+            ungrounded_info_yield=raw_ungrounded_yield,
+            grounded_yield_share=(
+                raw_grounded_yield / raw_total_yield if raw_total_yield > 0 else 0.0
+            ),
+            effective_grounded_info_yield=grounded_yield,
+            effective_ungrounded_info_yield=ungrounded_yield,
+            effective_grounded_yield_share=(
+                grounded_yield / total_yield if total_yield > 0 else 0.0
+            ),
             n_juveniles=len(juveniles),
             n_adults=len(adults),
             mean_generation=(

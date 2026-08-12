@@ -33,6 +33,14 @@ def attempt_reproduction(
         if current_pop + len(offspring) >= config.max_population:
             break
 
+        limiting_factor = parent.reproduction_limiting_factor(
+            config.reproduction_coupling_strength,
+            config.reproduction_information_scale,
+            config.reproduction_attention_scale,
+        )
+        if limiting_factor < 1.0 and rng.random() >= limiting_factor:
+            continue
+
         if rng.random() < config.recombination_probability and len(eligible) >= 2:
             # Sexual: pick a partner
             partners = [a for a in eligible if a.id != parent.id]

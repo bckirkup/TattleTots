@@ -19,7 +19,8 @@ from tattletots.models.identity import stable_id_digest
 from tattletots.scenarios.gaussian_shift import GaussianShiftScenario
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_FINGERPRINT = "8a180270a6984ba5766c2c397920a612ef2db6a0671ee4e8bf5daff8b4d24d45"
+EXPECTED_FINGERPRINT = "2b995b1cdbe06d0ddf6c011c4944c42b577e9e75e61147c01eeecf5ec67136e3"
+EXPECTED_LEGACY_FINGERPRINT = "de192bf7ae2b756626a1cea1f5b4ee181640859dae77e451ae115a114be045e3"
 
 
 def _canonicalize(value: object) -> object:
@@ -35,13 +36,25 @@ def _canonicalize(value: object) -> object:
     return value
 
 
-def _run_fingerprint(seed: int, steps: int = 8) -> str:
+def _run_fingerprint(
+    seed: int,
+    steps: int = 8,
+    *,
+    reproduction_coupling_strength: float = 1.0,
+    reproduction_information_scale: float = 1.0,
+    reproduction_attention_scale: float = 1.0,
+    grounding_quality_strength: float = 0.5,
+) -> str:
     scenario = GaussianShiftScenario(seed=seed, total_steps=steps)
     config = SimulationConfig(
         initial_population=4,
         max_population=20,
         max_steps=steps,
         seed=seed,
+        reproduction_coupling_strength=reproduction_coupling_strength,
+        reproduction_information_scale=reproduction_information_scale,
+        reproduction_attention_scale=reproduction_attention_scale,
+        grounding_quality_strength=grounding_quality_strength,
     )
     world = World(config=config)
     for stream in scenario.get_streams():
@@ -69,6 +82,44 @@ def _run_fingerprint(seed: int, steps: int = 8) -> str:
 
 def test_seeded_run_has_golden_fingerprint() -> None:
     assert _run_fingerprint(42) == EXPECTED_FINGERPRINT
+
+
+def test_legacy_setting_has_branch_golden_fingerprint() -> None:
+    legacy = _run_fingerprint(
+        42,
+        reproduction_coupling_strength=0.0,
+        grounding_quality_strength=0.0,
+    )
+
+    assert legacy == EXPECTED_LEGACY_FINGERPRINT
+
+
+def test_reproduction_coupling_config_changes_run_fingerprint() -> None:
+    legacy = _run_fingerprint(42, reproduction_coupling_strength=0.0)
+    coupled = _run_fingerprint(42, reproduction_coupling_strength=1.0)
+
+    assert legacy != coupled
+
+
+def test_grounding_quality_config_changes_run_fingerprint() -> None:
+    legacy = _run_fingerprint(42, grounding_quality_strength=0.0)
+    coupled = _run_fingerprint(42, grounding_quality_strength=0.5)
+
+    assert legacy != coupled
+
+
+def test_information_requirement_scale_changes_run_fingerprint() -> None:
+    baseline = _run_fingerprint(42, steps=40)
+    scaled = _run_fingerprint(42, steps=40, reproduction_information_scale=2.0)
+
+    assert baseline != scaled
+
+
+def test_attention_requirement_scale_changes_run_fingerprint() -> None:
+    baseline = _run_fingerprint(42, steps=40)
+    scaled = _run_fingerprint(42, steps=40, reproduction_attention_scale=2.0)
+
+    assert baseline != scaled
 
 
 def test_same_seed_reproduces_the_complete_run() -> None:

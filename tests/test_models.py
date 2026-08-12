@@ -160,6 +160,29 @@ class TestAgent:
         )
         assert a.can_reproduce
 
+    def test_reproduction_limiting_factor_uses_heritable_stoichiometry(self) -> None:
+        g = Genome(
+            reproduction_threshold=2.0,
+            information_requirement=2.0,
+            attention_requirement=0.5,
+        )
+        agent = Agent(
+            genome=g,
+            state=AgentState(
+                lifecycle=LifecycleStage.ADULT,
+                energy=EnergyReserves(information=2.0, attention=0.5),
+            ),
+        )
+
+        assert agent.reproduction_limiting_factor(coupling_strength=0.0) == pytest.approx(1.0)
+        assert agent.reproduction_limiting_factor() == pytest.approx(0.5)
+
+        mutated = g.mutate(np.random.default_rng(7), rate=1.0)
+        assert (
+            mutated.information_requirement != g.information_requirement
+            or mutated.attention_requirement != g.attention_requirement
+        )
+
     def test_cannot_reproduce_as_juvenile(self) -> None:
         g = Genome(reproduction_threshold=2.0)
         a = Agent(
@@ -187,6 +210,7 @@ class TestAgent:
         assert child.state.generation == 1
         # Parent paid energy cost
         assert parent.state.energy.information < 3.0
+        assert parent.state.energy.attention < 3.0
 
     def test_kill(self) -> None:
         a = Agent()
