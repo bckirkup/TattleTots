@@ -20,8 +20,8 @@
     "n_components": 10,
     "dimensionality": 20,
     "noise_std": 0.5,
-    "shift_step": 200,
-    "total_steps": 400
+    "shift_step": 100,
+    "total_steps": 200
   },
   "gene_pool": {
     "available_compression_types": ["pca", "ar1", "threshold"],

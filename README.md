@@ -61,7 +61,8 @@ Simulations are parameterized via JSON:
   "scenario": {
     "n_components": 10,
     "dimensionality": 20,
-    "shift_step": 200
+    "shift_step": 100,
+    "total_steps": 200
   },
   "gene_pool": {
     "available_compression_types": ["pca", "ar1", "threshold"]

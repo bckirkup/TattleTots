@@ -62,12 +62,14 @@ def should_escalate(
     agent: Agent,
     model: CompressionModel,
     combined_input: np.ndarray,
+    *,
+    raw_anomaly: float | None = None,
 ) -> tuple[float, float, bool]:
     """Score anomaly and decide escalation.
 
     Returns (normalized_anomaly, effective_threshold, should_fire).
     """
-    raw = model.anomaly_score(combined_input)
+    raw = model.anomaly_score(combined_input) if raw_anomaly is None else raw_anomaly
     anomaly = normalize_anomaly(agent, raw)
     threshold = compute_effective_threshold(agent)
     agent.state.effective_escalation_threshold = threshold

@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import numpy as np
 import pytest
 
 from tattletots.engine.attention import allocate_attention, compute_niche_overlap
 from tattletots.engine.compression import (
     AR1Compression,
+    CompressionModel,
     PCACompression,
     ThresholdCompression,
+    WaveletCompression,
     create_compression_model,
 )
 from tattletots.engine.config import SimulationConfig
@@ -25,6 +29,72 @@ from tattletots.models.user import User
 
 
 class TestCompression:
+    @pytest.mark.parametrize(
+        ("factory", "change"),
+        [
+            (lambda: PCACompression(n_components=2), np.array([5.0, -5.0, 5.0, -5.0])),
+            (lambda: AR1Compression(n_components=2), np.array([5.0, -5.0, 5.0, -5.0])),
+            (
+                lambda: ThresholdCompression(n_components=2),
+                np.array([5.0, -5.0, 5.0, -5.0]),
+            ),
+            (
+                lambda: WaveletCompression(n_components=2),
+                np.array([5.0, -5.0, 5.0, -5.0]),
+            ),
+        ],
+    )
+    def test_every_compressor_scores_pre_update_distribution_change(
+        self,
+        factory: Callable[[], CompressionModel],
+        change: np.ndarray,
+    ) -> None:
+        model = factory()
+        baseline = np.array([0.1, -0.1, 0.05, -0.05])
+        for _ in range(12):
+            model.fit_transform(baseline)
+
+        score_before = model.anomaly_score(change)
+        _residual, _yield, observed_score = model.observe(change)
+
+        assert score_before > 1e-6
+        assert observed_score == pytest.approx(score_before)
+
+    @pytest.mark.parametrize("compression_type", list(CompressionType))
+    def test_observe_contract_scores_before_update_generically(
+        self,
+        compression_type: CompressionType,
+    ) -> None:
+        baseline = np.array([0.1, -0.1, 0.05, -0.05])
+        change = np.array([5.0, -5.0, 5.0, -5.0])
+        model = create_compression_model(compression_type, n_components=2)
+        fresh_model = create_compression_model(compression_type, n_components=2)
+        for _ in range(12):
+            model.fit_transform(baseline)
+            fresh_model.fit_transform(baseline)
+
+        _residual, _yield, observed_score = model.observe(change)
+        assert observed_score == pytest.approx(fresh_model.anomaly_score(change))
+
+    @pytest.mark.parametrize(
+        "factory",
+        [
+            lambda: PCACompression(n_components=2),
+            lambda: AR1Compression(n_components=2),
+            lambda: ThresholdCompression(n_components=2),
+            lambda: WaveletCompression(n_components=2),
+        ],
+    )
+    def test_compressor_dimension_change_resets_pre_update_state(
+        self,
+        factory: Callable[[], CompressionModel],
+    ) -> None:
+        model = factory()
+        model.fit_transform(np.zeros(4))
+        _residual, _yield, score = model.observe(np.ones(5))
+
+        assert score == pytest.approx(0.0)
+
     def test_pca_extracts_structure(self) -> None:
         rng = np.random.default_rng(42)
         # Data with clear structure: 2 components in 5D space
