@@ -134,6 +134,12 @@ class TestTelemetryRecorder:
             "total_deaths",
             "total_reports",
             "precision",
+            "event_prevalence",
+            "grounded_yield_share",
+            "attention_solvent_fraction",
+            "mean_attention_carrying_capacity",
+            "initiation_verdict",
+            "initiation_verdict_reasons",
             "max_trophic_depth",
             "reached_equilibrium",
             "total_responses_dispatched",
@@ -227,6 +233,11 @@ class TestTelemetryRecorder:
         assert ts["responses_dispatched"] == [0, 0]
         assert ts["responses_judged_necessary"] == [0, 0]
         assert ts["responses_judged_unnecessary"] == [0, 0]
+        assert ts["n_attention_solvent_agents"] == [0, 0]
+        assert ts["attention_carrying_capacity"] == [pytest.approx(0.0), pytest.approx(0.0)]
+        assert ts["grounded_info_yield"] == [pytest.approx(0.0), pytest.approx(0.0)]
+        assert ts["ungrounded_info_yield"] == [pytest.approx(0.0), pytest.approx(0.0)]
+        assert ts["grounded_yield_share"] == [pytest.approx(0.0), pytest.approx(0.0)]
 
     def test_time_series_from_telemetry(self) -> None:
         rec = TelemetryRecorder()
@@ -240,6 +251,89 @@ class TestTelemetryRecorder:
         assert ts.population == [10, 9]
         assert ts.reports_issued == [3, 1]
         assert ts.cost_per_step == [pytest.approx(6.0), pytest.approx(15.0)]
+
+    def test_initiation_verdict_names_each_degeneracy(self) -> None:
+        cases = (
+            (
+                "precision_not_above_event_prevalence",
+                _make_record(
+                    ground_truth_active=True,
+                    reports_issued=1,
+                    correct_reports=0,
+                    population=1,
+                    n_attention_solvent_agents=1,
+                    grounded_info_yield=1.0,
+                ),
+            ),
+            (
+                "grounded_yield_share_below_minimum",
+                _make_record(
+                    reports_issued=1,
+                    correct_reports=1,
+                    population=1,
+                    n_attention_solvent_agents=1,
+                    ungrounded_info_yield=1.0,
+                ),
+            ),
+            (
+                "attention_insolvency_with_continued_births",
+                _make_record(
+                    births=1,
+                    reports_issued=1,
+                    correct_reports=1,
+                    population=1,
+                    n_attention_solvent_agents=0,
+                    grounded_info_yield=1.0,
+                ),
+            ),
+        )
+        for reason, record in cases:
+            rec = TelemetryRecorder()
+            rec.record_step(record)
+            verdict, reasons = rec.initiation_verdict()
+            assert not verdict
+            assert reason in reasons
+
+    def test_initiation_threshold_sensitivity(self) -> None:
+        record = _make_record(
+            reports_issued=1,
+            correct_reports=1,
+            population=1,
+            n_attention_solvent_agents=1,
+            grounded_info_yield=1.0,
+            ungrounded_info_yield=1.0,
+        )
+        permissive = TelemetryRecorder()
+        permissive.record_step(record)
+        strict = TelemetryRecorder()
+        strict.configure_initiation_thresholds(
+            min_grounded_yield_share=0.75,
+            attention_insolvency_steps_fraction=0.8,
+        )
+        strict.record_step(record)
+        assert permissive.initiation_verdict()[0]
+        assert not strict.initiation_verdict()[0]
+        assert strict.summary()["grounded_yield_share"] == pytest.approx(0.5)
+
+    def test_seeded_telemetry_golden_values(self) -> None:
+        record = _make_record(
+            population=4,
+            reports_issued=4,
+            correct_reports=2,
+            ground_truth_active=True,
+            n_attention_solvent_agents=2,
+            attention_carrying_capacity=8.0,
+            grounded_info_yield=3.0,
+            ungrounded_info_yield=1.0,
+        )
+        rec = TelemetryRecorder()
+        rec.record_step(record)
+        summary = rec.summary()
+        assert summary["precision"] == pytest.approx(0.5)
+        assert summary["event_prevalence"] == pytest.approx(1.0)
+        assert summary["grounded_yield_share"] == pytest.approx(0.75)
+        assert summary["attention_solvent_fraction"] == pytest.approx(0.5)
+        assert summary["mean_attention_carrying_capacity"] == pytest.approx(8.0)
 
 
 class TestCostAccumulator:

@@ -27,7 +27,10 @@ from tattletots.engine.peer_observation import (
 )
 from tattletots.engine.reproduction import attempt_reproduction
 from tattletots.engine.residual import apply_residual_policy
-from tattletots.engine.sensing import gather_raw_stream_data, prepare_agent_input
+from tattletots.engine.sensing import (
+    gather_raw_stream_data,
+    prepare_agent_input_with_attribution,
+)
 from tattletots.engine.spatial import apply_spatial_mask, infer_spatial_location
 from tattletots.engine.temporal import apply_temporal_fusion
 from tattletots.engine.trophic import compute_trophic_level, select_input_streams
@@ -77,10 +80,18 @@ class World:
     _ground_truth_vector: NDArray[np.float64] | None = None
     last_reports: list[Report] = field(default_factory=list)
     last_whistleblower_reports: list[WhistleblowerReport] = field(default_factory=list)
+    _last_input_attribution: dict[str, tuple[float, float]] = field(default_factory=dict)
+    _attention_deltas: dict[str, float] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         seed = self.config.seed if self.config.seed is not None else 0
         self.rng = np.random.default_rng(seed)
+        self.telemetry.configure_initiation_thresholds(
+            min_grounded_yield_share=self.config.initiation_min_grounded_yield_share,
+            attention_insolvency_steps_fraction=(
+                self.config.initiation_attention_insolvency_steps_fraction
+            ),
+        )
 
     def add_stream(self, stream: Stream) -> None:
         """Register a data stream in the world."""
@@ -145,6 +156,8 @@ class World:
             agent.state.last_whistleblower_reports_issued = 0
             agent.state.last_step_attention_income = 0.0
             agent.state.last_step_info_subsidy = 0.0
+            agent.state.last_step_grounded_yield = 0.0
+            agent.state.last_step_ungrounded_yield = 0.0
             agent.state.last_observed_dispatch = False
             agent.state.last_observed_outcome_necessary = None
 
@@ -213,6 +226,8 @@ class World:
         reports: list[Report] = []
         births: list[str] = []
         deaths: list[str] = []
+        self._last_input_attribution.clear()
+        self._attention_deltas.clear()
 
         living_agents = [a for a in self.agents.values() if a.is_alive]
         self._reset_agent_step_state(living_agents)
@@ -392,7 +407,12 @@ class World:
 
     def _prepare_input_pipeline(self, agent: Agent) -> NDArray[np.float64]:
         """Run sensing → temporal → spatial pipeline."""
-        sensed, _ = prepare_agent_input(agent, self.streams, self.config)
+        sensed, _, grounded_mass, ungrounded_mass = prepare_agent_input_with_attribution(
+            agent,
+            self.streams,
+            self.config,
+        )
+        self._last_input_attribution[agent.id] = (grounded_mass, ungrounded_mass)
         if sensed.size == 0:
             return sensed
         temporal = apply_temporal_fusion(agent, sensed)
@@ -414,6 +434,8 @@ class World:
         combined = self._prepare_input_pipeline(agent)
         if combined.size == 0:
             agent.state.last_step_yield = 0.0
+            agent.state.last_step_grounded_yield = 0.0
+            agent.state.last_step_ungrounded_yield = 0.0
             return
 
         max_dim = min(agent.genome.working_dim, self.config.max_stream_dim)
@@ -433,6 +455,15 @@ class World:
 
         agent.state.signal_vector = model.get_signal_vector()
         agent.state.last_step_yield = adjusted_yield
+        grounded_mass, ungrounded_mass = self._last_input_attribution.get(agent.id, (0.0, 0.0))
+        total_mass = grounded_mass + ungrounded_mass
+        if total_mass > 0:
+            grounded_fraction = grounded_mass / total_mass
+            agent.state.last_step_grounded_yield = adjusted_yield * grounded_fraction
+            agent.state.last_step_ungrounded_yield = adjusted_yield * (1.0 - grounded_fraction)
+        else:
+            agent.state.last_step_grounded_yield = 0.0
+            agent.state.last_step_ungrounded_yield = 0.0
         agent.state.cumulative_yield += adjusted_yield
 
         compute_cost = agent.genome.total_compute_cost(
@@ -610,6 +641,7 @@ class World:
         agent.state.correct_reports += sum(1 for r in agent_reports if r.verified and r.correct)
 
         agent.state.energy.apply_attention_delta(attn_delta)
+        self._attention_deltas[agent.id] = attn_delta
 
     def _apply_domestication(self, living_agents: list[Agent]) -> None:
         for downstream in living_agents:
@@ -637,6 +669,18 @@ class World:
         living = [a for a in self.agents.values() if a.is_alive]
         juveniles = [a for a in living if a.state.lifecycle == LifecycleStage.JUVENILE]
         adults = [a for a in living if a.state.lifecycle == LifecycleStage.ADULT]
+        mean_maintenance = (
+            float(np.mean([juvenile_maintenance_cost(a, self.config) for a in living]))
+            if living
+            else 0.0
+        )
+        total_attention_budget = sum(user.attention_budget for user in self.users.values())
+        attention_capacity = (
+            total_attention_budget / mean_maintenance if mean_maintenance > 0 else 0.0
+        )
+        grounded_yield = sum(a.state.last_step_grounded_yield for a in living)
+        ungrounded_yield = sum(a.state.last_step_ungrounded_yield for a in living)
+        total_yield = grounded_yield + ungrounded_yield
         return StepRecord(
             time_step=self.time_step,
             population=len(living),
@@ -659,6 +703,13 @@ class World:
             total_attn_income=sum(a.state.energy.attention for a in living),
             total_compute_cost=sum(a.state.last_compute_cost_paid for a in living),
             total_maintenance_cost=sum(juvenile_maintenance_cost(a, self.config) for a in living),
+            n_attention_solvent_agents=sum(
+                self._attention_deltas.get(a.id, -np.inf) >= 0 for a in living
+            ),
+            attention_carrying_capacity=attention_capacity,
+            grounded_info_yield=grounded_yield,
+            ungrounded_info_yield=ungrounded_yield,
+            grounded_yield_share=grounded_yield / total_yield if total_yield > 0 else 0.0,
             n_juveniles=len(juveniles),
             n_adults=len(adults),
             mean_generation=(

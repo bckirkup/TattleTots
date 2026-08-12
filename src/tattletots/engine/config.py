@@ -104,6 +104,18 @@ class SimulationConfig(BaseModel):
     n_spatial_blocks: int = Field(
         default=10, ge=1, description="Uniform blocks for high-dim streams"
     )
+    initiation_min_grounded_yield_share: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="Minimum grounded information-yield share for initiation verdict",
+    )
+    initiation_attention_insolvency_steps_fraction: float = Field(
+        default=0.8,
+        ge=0.0,
+        le=1.0,
+        description="Fraction of steps that must be insolvent for the initiation verdict",
+    )
     # Common Operating Picture
     cop_dispatch_threshold: float = Field(default=1.0, ge=0.0)
     cop_min_supporting_reports: int = Field(default=1, ge=1)

@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 
 from tattletots.engine.config import SimulationConfig
-from tattletots.engine.sensing import prepare_agent_input
+from tattletots.engine.sensing import prepare_agent_input, prepare_agent_input_with_attribution
 from tattletots.models.agent import Agent, AgentState
 from tattletots.models.genome import Genome, SensingStrategy
 from tattletots.models.stream import Stream, StreamType
@@ -64,3 +64,28 @@ class TestSensing:
         )
         out, _ = prepare_agent_input(agent, streams, SimulationConfig())
         assert float(np.var(out)) <= float(np.var(combined)) + 1e-6
+
+    def test_raw_and_residual_dimension_attribution(self) -> None:
+        raw = Stream(
+            stream_type=StreamType.RAW,
+            dimensionality=4,
+            label="raw",
+            current_data=np.ones(4),
+        )
+        residual = Stream(
+            stream_type=StreamType.RESIDUAL,
+            dimensionality=6,
+            label="residual",
+            current_data=np.ones(6),
+        )
+        agent = Agent(
+            genome=Genome(sensing_strategy=SensingStrategy.CONCAT, working_dim=8),
+            state=AgentState(input_stream_ids=[raw.id, residual.id]),
+        )
+        _, _, grounded, ungrounded = prepare_agent_input_with_attribution(
+            agent,
+            {raw.id: raw, residual.id: residual},
+            SimulationConfig(),
+        )
+        assert grounded == 4.0
+        assert ungrounded == 4.0

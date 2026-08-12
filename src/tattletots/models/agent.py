@@ -116,6 +116,16 @@ class AgentState(BaseModel):
         ge=0.0,
         description="Downstream information subsidy received this step (observable)",
     )
+    last_step_grounded_yield: float = Field(
+        default=0.0,
+        ge=0.0,
+        description="Information yield attributed to raw domain inputs this step",
+    )
+    last_step_ungrounded_yield: float = Field(
+        default=0.0,
+        ge=0.0,
+        description="Information yield attributed to non-raw inputs this step",
+    )
     last_observed_dispatch: bool = Field(
         default=False,
         description="Whether this agent's escalation was linked to a dispatch this cycle",
