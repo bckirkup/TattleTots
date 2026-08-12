@@ -4,6 +4,13 @@ Status: analysis, no code changes. Re-baselined on reproducible `main` after
 TattleTots #22. Measured across TattleTots, Coral Key, Scrapiron (fire), Xylella
 (grain), and domain-runner.
 
+The subsequent ceiling/oracle measurement is recorded in
+[`docs/ceiling-test.md`](ceiling-test.md). It separates two reality failures
+from viability: competence is not expressible in the current genome space, and
+the marginal income from correctness is too small to detect against compression
+noise. A deliberately cheating oracle can nevertheless survive, so the ecology
+can carry competence once supplied.
+
 ## The dilemma as posed
 
 Every evolutionary mechanism has a start-up problem: you need enough function for
@@ -14,7 +21,7 @@ per domain, rather than what it is in general.
 
 ## What it actually is here
 
-It is not a cold-start deficit. A cold-started random population is immediately
+It is not only a cold-start deficit. A cold-started random population is immediately
 self-sustaining: in 60 reproducible runs (`gaussian_shift`, 200 steps,
 `initial_population=20`, `max_population=60`, mutation 0.1, recombination 0.3,
 false-alarm penalty 0.4, subsidy 0.1) the first birth happened at step **1** in
@@ -53,6 +60,19 @@ Precision is not absent: some cohorts beat chance, especially with the environme
 fixed in Arm C. The sharper finding is that reproduction is funded by compressing
 other agents' exhaust rather than by being grounded in the world. Selection is
 running; it is running on almost nothing that matters.
+
+The ceiling/oracle test makes that diagnosis stronger. A 432-point grid over
+sensing strategy, compression, working dimension, escalation threshold, and
+spatial strategy found no reporter above the approximately 2.5% chance baseline
+in either the coupling-off or coupled configuration. This is not merely a
+population failing to find a good strategy: competence is not expressible in
+the tested genome space. At the same time, a ground-truth oracle that paid the
+ordinary costs sustained a near-cap monoculture at 100% precision. Invasion
+outcomes ranged from oracle extinction to a 95% final share, crossing 50% at
+step 25, depending on seed. The ecology can carry competence; ordinary genomes cannot currently
+produce it, and the correctness reward is too small to make that missing
+competence easy to discover. See [`docs/ceiling-test.md`](ceiling-test.md) for
+the payment arithmetic, grid, oracle trajectories, and reproducibility record.
 
 Two hypotheses that this measurement **refutes**, both of which we would otherwise
 have carried forward:
@@ -120,9 +140,11 @@ satisfy all three of: **(a)** mean near break-even, so the population is neither
 extinct nor free; **(b)** heritable variance, so differences compound; **(c)**
 coupling to the function you want, so the gradient points at it. Here, the
 information channel has (b) but not (a) or (c); the attention channel has (a)
-approximately and neither (b) nor (c). Hand-tuning is what currently substitutes
-for all three, which is exactly the trap in the question: the tuned parameters are
-not helping evolution start, they are standing in for it.
+approximately, but the correctness-dependent increment is too small to provide
+a detectable (c). More basically, the tested genome space has no high-precision
+reporter for selection to discover. Hand-tuning is what currently substitutes
+for all three, which is exactly the trap in the question: the tuned parameters
+are not helping evolution start, they are standing in for it.
 
 The corollary is that scaffolding (subsidies, grace periods, juvenile discounts,
 minimum-population floors) is the *last* lever, not the first. Scaffolding a
@@ -130,8 +152,11 @@ gradient that points the wrong way just gets you there faster.
 
 ## The trees (each domain's version is different)
 
-* **TattleTots** — as above: initiation succeeds trivially and means nothing. The
-  binding failure is currency design, not cold start.
+* **TattleTots** — as above: initiation succeeds trivially and means nothing.
+  The binding failures are now separated: competence is not expressible in the
+  tested genome space, and the correctness-to-income increment is too small to
+  detect against compression noise. A cheating oracle remains viable, so this
+  is not a viability failure.
 * **Coral Key** — the observed side cannot evolve at all. The fleet is a
   hand-counted 15 legal / 4 gaming / 3 IUU set with no reproduction, mutation, or
   death (`fleet/behavior.py`), departing with fixed probability 0.15/epoch. So
@@ -154,7 +179,11 @@ gradient that points the wrong way just gets you there faster.
 
 ## What to do, in order
 
-1. **Measure initiation before engineering it.** A run must not be able to report
+1. **Make competence expressible before rewarding it.** The ceiling test comes
+   first: raising correctness income is worthless while no genome can achieve
+   useful precision. Expand or redesign the sensing/reporting genome space and
+   rerun the ceiling measurement.
+2. **Measure initiation before engineering it.** A run must not be able to report
    success while being wrong roughly 99% of the time or while its yield is
    ungrounded. Precision above chance is achievable in some cohorts, so the
    question is now the gradient and its persistence, not whether any cohort can
@@ -162,15 +191,15 @@ gradient that points the wrong way just gets you there faster.
    per-capita attention solvency, and share of yield traceable to ground-truth
    streams, per run; for fire, agent-only detections with OPIR ablated. Without
    this, every later change is unfalsifiable.
-2. **Couple the currencies.** Either fund the scarce currency from being right
+3. **Couple the currencies.** Either fund the scarce currency from being right
    (attention income earned by verified-correct reports rather than
    trust×relevance on unverified signal vectors), or make information yield
    discountable by downstream verification so that compressing noise does not pay.
    The design invariant to hold: whatever gates reproduction must be capped by the
    same carrying capacity that gates survival.
-3. **Price reproduction against function**, so precocity is not the dominant
+4. **Price reproduction against function**, so precocity is not the dominant
    gradient — pay for offspring in the scarce currency.
-4. **Only then** consider innate calibration (adaptive escalation thresholds as the
+5. **Only then** consider innate calibration (adaptive escalation thresholds as the
    initiation default, with fixed thresholds allowed to win later) and an annealed
    subsidy — each with an ablation that shows how much of the final performance it
    is carrying.
