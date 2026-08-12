@@ -134,6 +134,12 @@ class TestTelemetryRecorder:
             "total_deaths",
             "total_reports",
             "precision",
+            "event_prevalence",
+            "grounded_yield_share",
+            "attention_solvent_fraction",
+            "mean_attention_carrying_capacity",
+            "initiation_is_degenerate",
+            "initiation_degeneracy_reasons",
             "max_trophic_depth",
             "reached_equilibrium",
             "total_responses_dispatched",
@@ -227,6 +233,12 @@ class TestTelemetryRecorder:
         assert ts["responses_dispatched"] == [0, 0]
         assert ts["responses_judged_necessary"] == [0, 0]
         assert ts["responses_judged_unnecessary"] == [0, 0]
+        assert ts["n_attention_solvent_agents"] == [0, 0]
+        assert ts["n_attention_eligible_agents"] == [0, 0]
+        assert ts["attention_carrying_capacity"] == [pytest.approx(0.0), pytest.approx(0.0)]
+        assert ts["grounded_info_yield"] == [pytest.approx(0.0), pytest.approx(0.0)]
+        assert ts["ungrounded_info_yield"] == [pytest.approx(0.0), pytest.approx(0.0)]
+        assert ts["grounded_yield_share"] == [pytest.approx(0.0), pytest.approx(0.0)]
 
     def test_time_series_from_telemetry(self) -> None:
         rec = TelemetryRecorder()
@@ -240,6 +252,134 @@ class TestTelemetryRecorder:
         assert ts.population == [10, 9]
         assert ts.reports_issued == [3, 1]
         assert ts.cost_per_step == [pytest.approx(6.0), pytest.approx(15.0)]
+
+    def test_initiation_degeneracy_names_each_reason(self) -> None:
+        cases = (
+            (
+                "precision_not_above_event_prevalence",
+                _make_record(
+                    ground_truth_active=True,
+                    reports_issued=1,
+                    correct_reports=0,
+                    population=1,
+                    n_attention_solvent_agents=1,
+                    n_attention_eligible_agents=1,
+                    grounded_info_yield=1.0,
+                ),
+            ),
+            (
+                "grounded_yield_share_below_minimum",
+                _make_record(
+                    reports_issued=1,
+                    correct_reports=1,
+                    population=1,
+                    n_attention_solvent_agents=1,
+                    ungrounded_info_yield=1.0,
+                ),
+            ),
+            (
+                "attention_insolvency_with_capacity_overshoot",
+                _make_record(
+                    births=1,
+                    reports_issued=1,
+                    correct_reports=1,
+                    population=1,
+                    n_attention_solvent_agents=0,
+                    n_attention_eligible_agents=1,
+                    attention_carrying_capacity=0.5,
+                    grounded_info_yield=1.0,
+                ),
+            ),
+        )
+        for reason, record in cases:
+            rec = TelemetryRecorder()
+            rec.record_step(record)
+            degenerate, reasons = rec.initiation_degeneracy()
+            assert degenerate
+            assert reason in reasons
+
+    def test_initiation_threshold_sensitivity(self) -> None:
+        record = _make_record(
+            reports_issued=1,
+            correct_reports=1,
+            population=1,
+            n_attention_solvent_agents=1,
+            grounded_info_yield=1.0,
+            ungrounded_info_yield=1.0,
+        )
+        permissive = TelemetryRecorder()
+        permissive.record_step(record)
+        strict = TelemetryRecorder()
+        strict.configure_initiation_thresholds(
+            min_grounded_yield_share=0.75,
+            attention_insolvency_steps_fraction=0.8,
+        )
+        strict.record_step(record)
+        assert not permissive.initiation_degeneracy()[0]
+        assert strict.initiation_degeneracy()[0]
+        assert strict.summary()["grounded_yield_share"] == pytest.approx(0.5)
+
+    def test_attention_degeneracy_threshold_and_capacity_sensitivity(self) -> None:
+        record = _make_record(
+            population=2,
+            births=1,
+            reports_issued=1,
+            correct_reports=1,
+            n_attention_solvent_agents=1,
+            n_attention_eligible_agents=2,
+            attention_carrying_capacity=1.0,
+            grounded_info_yield=1.0,
+        )
+        baseline = TelemetryRecorder()
+        baseline.record_step(record)
+        stricter_solvent = TelemetryRecorder(initiation_min_solvent_fraction=0.75)
+        stricter_solvent.record_step(record)
+        stricter_capacity = TelemetryRecorder(initiation_population_capacity_overshoot_factor=3.0)
+        stricter_capacity.record_step(record)
+        assert not baseline.initiation_degeneracy()[0]
+        assert stricter_solvent.initiation_degeneracy()[0]
+        assert not stricter_capacity.initiation_degeneracy()[0]
+
+    def test_seeded_telemetry_golden_values(self) -> None:
+        record = _make_record(
+            population=4,
+            reports_issued=4,
+            correct_reports=2,
+            ground_truth_active=True,
+            n_attention_solvent_agents=2,
+            n_attention_eligible_agents=4,
+            attention_carrying_capacity=8.0,
+            grounded_info_yield=3.0,
+            ungrounded_info_yield=1.0,
+        )
+        rec = TelemetryRecorder()
+        rec.record_step(record)
+        summary = rec.summary()
+        assert summary["precision"] == pytest.approx(0.5)
+        assert summary["event_prevalence"] == pytest.approx(1.0)
+        assert summary["grounded_yield_share"] == pytest.approx(0.75)
+        assert summary["attention_solvent_fraction"] == pytest.approx(0.5)
+        assert summary["mean_attention_carrying_capacity"] == pytest.approx(8.0)
+
+    def test_agents_without_attention_delta_are_excluded(self) -> None:
+        rec = TelemetryRecorder()
+        rec.record_step(
+            _make_record(
+                population=2,
+                births=1,
+                reports_issued=1,
+                correct_reports=1,
+                n_attention_solvent_agents=1,
+                n_attention_eligible_agents=1,
+                attention_carrying_capacity=10.0,
+                grounded_info_yield=1.0,
+            )
+        )
+        assert rec.summary()["attention_solvent_fraction"] == pytest.approx(1.0)
+        assert (
+            "attention_insolvency_with_capacity_overshoot"
+            not in (rec.summary()["initiation_degeneracy_reasons"])
+        )
 
 
 class TestCostAccumulator:

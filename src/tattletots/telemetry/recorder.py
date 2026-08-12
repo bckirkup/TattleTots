@@ -3,6 +3,30 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TypedDict
+
+
+class TelemetrySummary(TypedDict):
+    total_steps: int
+    peak_population: int
+    final_population: int
+    total_births: int
+    total_deaths: int
+    total_reports: int
+    precision: float
+    event_prevalence: float
+    grounded_yield_share: float
+    attention_solvent_fraction: float
+    mean_attention_carrying_capacity: float
+    initiation_is_degenerate: bool
+    initiation_degeneracy_reasons: list[str]
+    max_trophic_depth: float
+    reached_equilibrium: bool
+    total_responses_dispatched: int
+    total_responses_judged_necessary: int
+    total_responses_judged_unnecessary: int
+    responder_necessity_rate: float
+    unnecessary_dispatch_rate: float
 
 
 @dataclass
@@ -40,6 +64,12 @@ class StepRecord:
     responses_dispatched: int = 0
     responses_judged_necessary: int = 0
     responses_judged_unnecessary: int = 0
+    n_attention_solvent_agents: int = 0
+    n_attention_eligible_agents: int = 0
+    attention_carrying_capacity: float = 0.0
+    grounded_info_yield: float = 0.0
+    ungrounded_info_yield: float = 0.0
+    grounded_yield_share: float = 0.0
 
 
 @dataclass
@@ -47,6 +77,24 @@ class TelemetryRecorder:
     """Accumulates step records and provides summary analytics."""
 
     history: list[StepRecord] = field(default_factory=list)
+    initiation_min_grounded_yield_share: float = 0.5
+    initiation_attention_insolvency_steps_fraction: float = 0.8
+    initiation_min_solvent_fraction: float = 0.5
+    initiation_population_capacity_overshoot_factor: float = 1.0
+
+    def configure_initiation_thresholds(
+        self,
+        *,
+        min_grounded_yield_share: float,
+        attention_insolvency_steps_fraction: float,
+        min_solvent_fraction: float = 0.5,
+        population_capacity_overshoot_factor: float = 1.0,
+    ) -> None:
+        """Set run-level initiation-degeneracy thresholds from simulation config."""
+        self.initiation_min_grounded_yield_share = min_grounded_yield_share
+        self.initiation_attention_insolvency_steps_fraction = attention_insolvency_steps_fraction
+        self.initiation_min_solvent_fraction = min_solvent_fraction
+        self.initiation_population_capacity_overshoot_factor = population_capacity_overshoot_factor
 
     def record_step(self, record: StepRecord) -> None:
         """Append a step record."""
@@ -83,6 +131,14 @@ class TelemetryRecorder:
         return sum(r.false_alarms for r in self.history)
 
     @property
+    def total_grounded_info_yield(self) -> float:
+        return sum(r.grounded_info_yield for r in self.history)
+
+    @property
+    def total_ungrounded_info_yield(self) -> float:
+        return sum(r.ungrounded_info_yield for r in self.history)
+
+    @property
     def total_responses_dispatched(self) -> int:
         return sum(r.responses_dispatched for r in self.history)
 
@@ -117,6 +173,12 @@ class TelemetryRecorder:
             "responses_judged_unnecessary": [r.responses_judged_unnecessary for r in self.history],
             "mean_info_energy": [r.mean_info_energy for r in self.history],
             "mean_attn_energy": [r.mean_attn_energy for r in self.history],
+            "n_attention_solvent_agents": [r.n_attention_solvent_agents for r in self.history],
+            "n_attention_eligible_agents": [r.n_attention_eligible_agents for r in self.history],
+            "attention_carrying_capacity": [r.attention_carrying_capacity for r in self.history],
+            "grounded_info_yield": [r.grounded_info_yield for r in self.history],
+            "ungrounded_info_yield": [r.ungrounded_info_yield for r in self.history],
+            "grounded_yield_share": [r.grounded_yield_share for r in self.history],
             "births": [r.births for r in self.history],
             "deaths": [r.deaths for r in self.history],
             "n_compression_types": [r.n_compression_types for r in self.history],
@@ -153,6 +215,8 @@ class TelemetryRecorder:
         """Energy flow metrics over time."""
         return {
             "info_yield": [r.total_info_yield for r in self.history],
+            "grounded_info_yield": [r.grounded_info_yield for r in self.history],
+            "ungrounded_info_yield": [r.ungrounded_info_yield for r in self.history],
             "attn_income": [r.total_attn_income for r in self.history],
             "compute_cost": [r.total_compute_cost for r in self.history],
             "maintenance_cost": [r.total_maintenance_cost for r in self.history],
@@ -167,8 +231,66 @@ class TelemetryRecorder:
             "compression_types": [float(r.n_compression_types) for r in self.history],
         }
 
-    def summary(self) -> dict[str, int | float | bool]:
+    def _event_prevalence(self) -> float:
+        if not self.history:
+            return 0.0
+        return sum(r.ground_truth_active for r in self.history) / len(self.history)
+
+    def _grounded_yield_share(self) -> float:
+        total = self.total_grounded_info_yield + self.total_ungrounded_info_yield
+        return self.total_grounded_info_yield / total if total > 0 else 0.0
+
+    def _attention_solvent_fraction(self) -> float:
+        fractions = [
+            r.n_attention_solvent_agents / r.n_attention_eligible_agents
+            for r in self.history
+            if r.n_attention_eligible_agents > 0
+        ]
+        return sum(fractions) / len(fractions) if fractions else 0.0
+
+    def _mean_attention_carrying_capacity(self) -> float:
+        capacities = [r.attention_carrying_capacity for r in self.history if r.population > 0]
+        return sum(capacities) / len(capacities) if capacities else 0.0
+
+    def initiation_degeneracy(self) -> tuple[bool, list[str]]:
+        """Return whether configured initiation degeneracies occurred."""
+        if not self.history:
+            return True, ["no_telemetry"]
+
+        reasons: list[str] = []
+        precision = self.total_correct_reports / max(self.total_reports, 1)
+        if precision <= self._event_prevalence():
+            reasons.append("precision_not_above_event_prevalence")
+        if self._grounded_yield_share() < self.initiation_min_grounded_yield_share:
+            reasons.append("grounded_yield_share_below_minimum")
+
+        insolvent_steps = sum(
+            r.n_attention_eligible_agents > 0
+            and (
+                r.n_attention_solvent_agents / r.n_attention_eligible_agents
+                < self.initiation_min_solvent_fraction
+            )
+            for r in self.history
+        )
+        capacity = self._mean_attention_carrying_capacity()
+        capacity_overshoot = (
+            capacity > 0
+            and self.peak_population
+            > capacity * self.initiation_population_capacity_overshoot_factor
+        )
+        if (
+            self.total_births > 0
+            and insolvent_steps / len(self.history)
+            >= self.initiation_attention_insolvency_steps_fraction
+            and capacity_overshoot
+        ):
+            reasons.append("attention_insolvency_with_capacity_overshoot")
+
+        return bool(reasons), reasons
+
+    def summary(self) -> TelemetrySummary:
         """Summary statistics for the entire run."""
+        degenerate, reasons = self.initiation_degeneracy()
         return {
             "total_steps": self.total_steps,
             "peak_population": self.peak_population,
@@ -177,6 +299,12 @@ class TelemetryRecorder:
             "total_deaths": self.total_deaths,
             "total_reports": self.total_reports,
             "precision": (self.total_correct_reports / max(self.total_reports, 1)),
+            "event_prevalence": self._event_prevalence(),
+            "grounded_yield_share": self._grounded_yield_share(),
+            "attention_solvent_fraction": self._attention_solvent_fraction(),
+            "mean_attention_carrying_capacity": self._mean_attention_carrying_capacity(),
+            "initiation_is_degenerate": degenerate,
+            "initiation_degeneracy_reasons": reasons,
             "max_trophic_depth": self.max_trophic_depth,
             "reached_equilibrium": self.is_stable(),
             "total_responses_dispatched": self.total_responses_dispatched,

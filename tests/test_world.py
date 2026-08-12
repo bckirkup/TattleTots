@@ -485,6 +485,57 @@ class TestBuildStepRecord:
         )
         assert record.missed_events == 3
 
+    def test_raw_only_inputs_are_fully_grounded(self) -> None:
+        world = _minimal_world()
+        raw = _add_raw_stream(world, dim=5)
+        user = User(name="test_user", attention_budget=1.0)
+        world.add_user(user)
+        world.seed_population(
+            genomes=[
+                Genome(
+                    n_components=1,
+                    working_dim=8,
+                    input_preference=np.array([1.0]),
+                ),
+                Genome(
+                    n_components=1,
+                    working_dim=8,
+                    input_preference=np.array([1.0]),
+                ),
+            ]
+        )
+        for agent in world.agents.values():
+            if agent.state.output_stream_id is not None:
+                world.streams.pop(agent.state.output_stream_id, None)
+                agent.state.output_stream_id = None
+            agent.state.input_stream_ids = [raw.id]
+        record = world.step()
+        assert record.grounded_yield_share == pytest.approx(1.0)
+        assert record.ungrounded_info_yield == pytest.approx(0.0)
+        assert record.grounded_info_yield == pytest.approx(record.total_info_yield)
+
+    def test_maintenance_fraction_changes_attention_capacity(self) -> None:
+        capacities: list[float] = []
+        for maintenance_fraction in (0.5, 0.25):
+            world = _minimal_world(juvenile_maintenance_fraction=maintenance_fraction)
+            world.add_user(User(name="test_user", attention_budget=1.0))
+            juvenile = Agent(
+                state=AgentState(
+                    lifecycle=LifecycleStage.JUVENILE,
+                    energy=EnergyReserves(information=1.0, attention=1.0),
+                )
+            )
+            world.agents[juvenile.id] = juvenile
+            capacities.append(
+                world._build_step_record(
+                    reports=[],
+                    births=[],
+                    deaths=[],
+                    missed=[],
+                ).attention_carrying_capacity
+            )
+        assert capacities[0] != capacities[1]
+
 
 class TestWorldStep:
     def test_single_step_produces_telemetry(self) -> None:

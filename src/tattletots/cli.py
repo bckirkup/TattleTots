@@ -83,6 +83,7 @@ def _run_steps(
                 f"  Step {step_num:4d}: pop={record.population:3d} "
                 f"births={record.births} deaths={record.deaths} "
                 f"reports={record.reports_issued} "
+                f"solvent={record.n_attention_solvent_agents}/{record.population} "
                 f"trophic_depth={record.max_trophic_level:.1f} "
                 f"working_dim={record.mean_working_dim:.0f}"
             )
@@ -201,6 +202,17 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  Total deaths:     {summary['total_deaths']}")
     print(f"  Reports issued:   {summary['total_reports']}")
     print(f"  Precision:        {summary['precision']:.2%}")
+    print(f"  Event prevalence: {summary['event_prevalence']:.2%}")
+    print(f"  Solvent fraction:  {summary['attention_solvent_fraction']:.2%}")
+    print(
+        f"  Carrying capacity: {summary['mean_attention_carrying_capacity']:.2f} "
+        f"(peak population: {summary['peak_population']})"
+    )
+    print(f"  Grounded yield:   {summary['grounded_yield_share']:.2%}")
+    print(f"  Initiation degenerate: {summary['initiation_is_degenerate']}")
+    print(
+        f"  Degeneracy reasons:   {', '.join(summary['initiation_degeneracy_reasons']) or 'none'}"
+    )
     print(f"  Max trophic depth:{summary['max_trophic_depth']:.1f}")
     print(f"  Equilibrium:      {summary['reached_equilibrium']}")
     print(f"  Total cost:       {cost_summary['total_cost']:.2f}")
