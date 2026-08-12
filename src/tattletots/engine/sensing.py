@@ -8,6 +8,7 @@ from numpy.typing import NDArray
 from tattletots.engine.config import SimulationConfig
 from tattletots.models.agent import Agent
 from tattletots.models.genome import Genome, SensingStrategy
+from tattletots.models.identity import stable_id_digest
 from tattletots.models.stream import Stream
 
 
@@ -79,7 +80,7 @@ def _fuse_subspace_sample(
     working_dim: int,
 ) -> NDArray[np.float64]:
     combined = np.concatenate(input_data)
-    seed = hash(agent.id) % (2**31) + genome.dim_offset
+    seed = stable_id_digest(agent.id) % (2**31) + genome.dim_offset
     indices = _stable_sample_indices(combined.size, working_dim, seed)
     sampled = combined[indices]
     return _pad_or_truncate(sampled, working_dim)
@@ -251,7 +252,7 @@ def _mass_for_subspace(
     source_is_grounded = _source_for_dimensions(streams)
     total_dim = len(source_is_grounded)
     n = min(working_dim, total_dim)
-    seed = hash(agent.id) % (2**31) + genome.dim_offset
+    seed = stable_id_digest(agent.id) % (2**31) + genome.dim_offset
     indices = _stable_sample_indices(total_dim, working_dim, seed)
     grounded = sum(source_is_grounded[int(index)] for index in indices[:n])
     return float(grounded), float(n - grounded)

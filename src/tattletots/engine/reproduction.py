@@ -8,6 +8,7 @@ from tattletots.engine.config import SimulationConfig
 from tattletots.models.agent import Agent, AgentState, LifecycleStage
 from tattletots.models.energy import EnergyReserves
 from tattletots.models.genome import Genome
+from tattletots.models.identity import seeded_id
 
 
 def attempt_reproduction(
@@ -68,6 +69,7 @@ def _sexual_reproduction(
     parent_b.state.energy.attention -= cost_per_parent
 
     return Agent(
+        id=seeded_id(rng),
         genome=child_genome,
         state=AgentState(
             energy=EnergyReserves(

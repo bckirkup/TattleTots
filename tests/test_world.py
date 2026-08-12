@@ -42,6 +42,72 @@ def _add_raw_stream(world: World, dim: int = 5, data: np.ndarray | None = None) 
     return s
 
 
+def test_add_stream_rewrites_uuid_id_and_updates_world_key() -> None:
+    world = _minimal_world()
+    stream = Stream(stream_type=StreamType.RAW, dimensionality=5)
+    original_id = stream.id
+
+    world.add_stream(stream)
+
+    assert stream.id != original_id
+    assert stream.id in world.streams
+    assert world.streams[stream.id] is stream
+    assert original_id not in world.streams
+
+
+def test_add_user_rewrites_uuid_id_and_updates_world_key() -> None:
+    world = _minimal_world()
+    user = User(name="test_user")
+    original_id = user.id
+
+    world.add_user(user)
+
+    assert user.id != original_id
+    assert user.id in world.users
+    assert world.users[user.id] is user
+    assert original_id not in world.users
+
+
+def test_add_stream_preserves_non_uuid_domain_id() -> None:
+    world = _minimal_world()
+    stream = Stream(id="thermal_0", stream_type=StreamType.RAW, dimensionality=5)
+
+    world.add_stream(stream)
+
+    assert stream.id == "thermal_0"
+    assert world.streams["thermal_0"] is stream
+
+
+def test_add_user_preserves_non_uuid_domain_id() -> None:
+    world = _minimal_world()
+    user = User(id="operations", name="test_user")
+
+    world.add_user(user)
+
+    assert user.id == "operations"
+    assert world.users["operations"] is user
+
+
+def test_non_uuid_domain_ids_are_stable_across_seeded_worlds() -> None:
+    stream_ids: list[str] = []
+    user_ids: list[str] = []
+    for _ in range(2):
+        world = _minimal_world(seed=42)
+        stream = Stream(
+            id="thermal_0",
+            stream_type=StreamType.RAW,
+            dimensionality=5,
+        )
+        user = User(id="operations", name="test_user")
+        world.add_stream(stream)
+        world.add_user(user)
+        stream_ids.append(stream.id)
+        user_ids.append(user.id)
+
+    assert stream_ids == ["thermal_0", "thermal_0"]
+    assert user_ids == ["operations", "operations"]
+
+
 class TestSeedPopulation:
     def test_creates_correct_number_of_agents(self) -> None:
         world = _minimal_world()

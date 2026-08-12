@@ -6,6 +6,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from tattletots.models.agent import Agent
+from tattletots.models.identity import stable_id_digest
 from tattletots.models.stream import Stream
 
 
@@ -22,8 +23,7 @@ def compute_stream_attractiveness(agent: Agent, stream: Stream, rng: np.random.G
     if pref.size == 0:
         pref = agent.genome.input_preference
     if pref.size > 0:
-        # Use a hash of stream id to get a stable index
-        idx = hash(stream.id) % len(pref)
+        idx = stable_id_digest(stream.id) % len(pref)
         weight = float(pref[idx])
     else:
         weight = 1.0 + rng.normal(0, 0.1)

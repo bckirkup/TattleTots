@@ -47,6 +47,7 @@ class GaussianShiftScenario(DomainAdapter):
         self.noise_std = noise_std
         self.shift_step = shift_step
         self.total_steps = total_steps
+        self.seed = seed
         self.rng = np.random.default_rng(seed)
 
         # Generate structured components (fixed basis vectors)
@@ -216,6 +217,7 @@ class GaussianShiftScenario(DomainAdapter):
             "noise_std": self.noise_std,
             "shift_step": self.shift_step,
             "total_steps": self.total_steps,
+            "seed": self.seed,
         }
 
     @classmethod
@@ -227,6 +229,7 @@ class GaussianShiftScenario(DomainAdapter):
             noise_std=float(config.get("noise_std", 0.5)),
             shift_step=int(config.get("shift_step", 200)),
             total_steps=int(config.get("total_steps", 400)),
+            seed=int(config.get("seed", 42)),
         )
 
     @classmethod

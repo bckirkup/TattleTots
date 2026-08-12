@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from tattletots.models.energy import EnergyReserves
 from tattletots.models.genome import Genome
+from tattletots.models.identity import seeded_id
 
 
 class LifecycleStage(enum.StrEnum):
@@ -207,6 +208,7 @@ class Agent(BaseModel):
         self.state.energy.attention -= cost / 2
 
         return Agent(
+            id=seeded_id(rng),
             genome=child_genome,
             state=AgentState(
                 energy=EnergyReserves(information=cost / 2, attention=cost / 2),
