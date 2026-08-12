@@ -468,6 +468,32 @@ class TestBuildStepRecord:
         assert record.births == 2
         assert record.deaths == 1
 
+    def test_record_captures_event_and_verified_report_locations(self) -> None:
+        world = _minimal_world()
+        world.set_event_state([(1, 2)])
+        report = Report(
+            agent_id="agent",
+            target_user_id="user",
+            time_step=1,
+            signal_vector=np.array([1.0]),
+            confidence=1.0,
+            anomaly_score=1.0,
+            location=(2, 3),
+            verified=True,
+            correct=False,
+        )
+
+        record = world._build_step_record(
+            reports=[report],
+            births=[],
+            deaths=[],
+            missed=[],
+        )
+
+        assert record.active_location_count == 1
+        assert record.ground_truth_locations == ((1, 2),)
+        assert record.verified_report_locations == ((2, 3),)
+
     def test_record_handles_no_living_agents(self) -> None:
         world = _minimal_world()
         record = world._build_step_record(reports=[], births=[], deaths=[], missed=[])

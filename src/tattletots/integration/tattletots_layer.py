@@ -114,6 +114,8 @@ class TattleTotsLayer:
                 total_reports=int(summary["total_reports"]),
                 precision=float(summary["precision"]),
                 event_prevalence=float(summary["event_prevalence"]),
+                chance_precision=float(summary["chance_precision"]),
+                location_support_size=int(summary["location_support_size"]),
                 grounded_yield_share=float(summary["grounded_yield_share"]),
                 attention_solvent_fraction=float(summary["attention_solvent_fraction"]),
                 mean_attention_carrying_capacity=float(summary["mean_attention_carrying_capacity"]),

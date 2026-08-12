@@ -705,6 +705,8 @@ class World:
             n_streams=len(self.streams),
             ground_truth_active=self._ground_truth_active,
             active_location_count=len(self._active_locations),
+            ground_truth_locations=tuple(sorted(self._active_locations)),
+            verified_report_locations=tuple(r.location for r in reports if r.verified),
             total_info_yield=sum(a.state.last_step_yield for a in living),
             total_attn_income=sum(a.state.energy.attention for a in living),
             total_compute_cost=sum(a.state.last_compute_cost_paid for a in living),

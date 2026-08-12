@@ -203,6 +203,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  Reports issued:   {summary['total_reports']}")
     print(f"  Precision:        {summary['precision']:.2%}")
     print(f"  Event prevalence: {summary['event_prevalence']:.2%}")
+    print(f"  Chance precision: {summary['chance_precision']:.2%}")
+    print(f"  Location support: {summary['location_support_size']}")
     print(f"  Solvent fraction:  {summary['attention_solvent_fraction']:.2%}")
     print(
         f"  Carrying capacity: {summary['mean_attention_carrying_capacity']:.2f} "

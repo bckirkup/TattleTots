@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TypedDict
 
+from tattletots.models.location import EventLocation
+
 
 class TelemetrySummary(TypedDict):
     total_steps: int
@@ -15,6 +17,8 @@ class TelemetrySummary(TypedDict):
     total_reports: int
     precision: float
     event_prevalence: float
+    chance_precision: float
+    location_support_size: int
     grounded_yield_share: float
     attention_solvent_fraction: float
     mean_attention_carrying_capacity: float
@@ -46,6 +50,8 @@ class StepRecord:
     n_streams: int
     ground_truth_active: bool
     active_location_count: int = 0
+    ground_truth_locations: tuple[EventLocation, ...] = ()
+    verified_report_locations: tuple[EventLocation, ...] = ()
     # Energy flow tracking
     total_info_yield: float = 0.0
     total_attn_income: float = 0.0
@@ -236,6 +242,24 @@ class TelemetryRecorder:
             return 0.0
         return sum(r.ground_truth_active for r in self.history) / len(self.history)
 
+    def _location_support(self) -> set[EventLocation]:
+        support: set[EventLocation] = set()
+        for record in self.history:
+            support.update(record.ground_truth_locations)
+            support.update(record.verified_report_locations)
+        return support
+
+    def _chance_precision(self) -> float:
+        if not self.history:
+            return 0.0
+        support_size = len(self._location_support())
+        if support_size == 0:
+            return 0.0
+        mean_active_locations = sum(r.active_location_count for r in self.history) / len(
+            self.history
+        )
+        return mean_active_locations / support_size
+
     def _grounded_yield_share(self) -> float:
         total = self.total_grounded_info_yield + self.total_ungrounded_info_yield
         return self.total_grounded_info_yield / total if total > 0 else 0.0
@@ -258,9 +282,16 @@ class TelemetryRecorder:
             return True, ["no_telemetry"]
 
         reasons: list[str] = []
-        precision = self.total_correct_reports / max(self.total_reports, 1)
-        if precision <= self._event_prevalence():
-            reasons.append("precision_not_above_event_prevalence")
+        event_steps = sum(r.active_location_count > 0 for r in self.history)
+        if event_steps == 0:
+            reasons.append("no_ground_truth_events")
+        support_size = len(self._location_support())
+        if support_size < 2:
+            reasons.append("insufficient_location_support")
+        if event_steps > 0 and support_size >= 2:
+            precision = self.total_correct_reports / max(self.total_reports, 1)
+            if precision <= self._chance_precision():
+                reasons.append("precision_not_above_chance")
         if self._grounded_yield_share() < self.initiation_min_grounded_yield_share:
             reasons.append("grounded_yield_share_below_minimum")
 
@@ -300,6 +331,8 @@ class TelemetryRecorder:
             "total_reports": self.total_reports,
             "precision": (self.total_correct_reports / max(self.total_reports, 1)),
             "event_prevalence": self._event_prevalence(),
+            "chance_precision": self._chance_precision(),
+            "location_support_size": len(self._location_support()),
             "grounded_yield_share": self._grounded_yield_share(),
             "attention_solvent_fraction": self._attention_solvent_fraction(),
             "mean_attention_carrying_capacity": self._mean_attention_carrying_capacity(),
