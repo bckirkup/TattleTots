@@ -127,6 +127,16 @@ class AgentState(BaseModel):
         ge=0.0,
         description="Information yield attributed to non-raw inputs this step",
     )
+    last_step_raw_grounded_yield: float = Field(
+        default=0.0,
+        ge=0.0,
+        description="Pre-discount information yield attributed to raw inputs this step",
+    )
+    last_step_raw_ungrounded_yield: float = Field(
+        default=0.0,
+        ge=0.0,
+        description="Pre-discount information yield attributed to non-raw inputs this step",
+    )
     last_observed_dispatch: bool = Field(
         default=False,
         description="Whether this agent's escalation was linked to a dispatch this cycle",
@@ -164,6 +174,25 @@ class Agent(BaseModel):
             and self.state.energy.total >= self.genome.reproduction_threshold
         )
 
+    def reproduction_limiting_factor(
+        self,
+        coupling_strength: float = 1.0,
+        information_scale: float = 1.0,
+        attention_scale: float = 1.0,
+    ) -> float:
+        """Return the continuous information/attention reproduction factor."""
+        if coupling_strength <= 0.0:
+            return 1.0
+        threshold = self.genome.reproduction_threshold
+        if threshold <= 0.0:
+            return 1.0
+        information_required = threshold * self.genome.information_requirement * information_scale
+        attention_required = threshold * self.genome.attention_requirement * attention_scale
+        information_sufficiency = min(1.0, self.state.energy.information / information_required)
+        attention_sufficiency = min(1.0, self.state.energy.attention / attention_required)
+        limiting_factor = min(information_sufficiency, attention_sufficiency)
+        return (1.0 - coupling_strength) + coupling_strength * limiting_factor
+
     def advance_age(self) -> None:
         """Advance agent age by one step; transition juvenile → adult if mature."""
         self.state.age += 1
@@ -199,7 +228,11 @@ class Agent(BaseModel):
         elif missed:
             self.state.peer_trust[agent_id] = max(0.0, current - delta_miss)
 
-    def spawn_offspring(self, rng: np.random.Generator, mutation_rate: float = 0.1) -> Agent:
+    def spawn_offspring(
+        self,
+        rng: np.random.Generator,
+        mutation_rate: float = 0.1,
+    ) -> Agent:
         """Asexual reproduction: create a mutated offspring."""
         child_genome = self.genome.mutate(rng, rate=mutation_rate)
         # Parent pays energy cost

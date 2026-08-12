@@ -214,6 +214,7 @@ def main(argv: list[str] | None = None) -> int:
         f"(peak population: {summary['peak_population']})"
     )
     print(f"  Grounded yield:   {summary['grounded_yield_share']:.2%}")
+    print(f"  Effective grounded yield: {summary['effective_grounded_yield_share']:.2%}")
     print(f"  Initiation degenerate: {summary['initiation_is_degenerate']}")
     print(
         f"  Degeneracy reasons:   {', '.join(summary['initiation_degeneracy_reasons']) or 'none'}"

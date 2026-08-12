@@ -603,8 +603,48 @@ class TestBuildStepRecord:
             agent.state.input_stream_ids = [raw.id]
         record = world.step()
         assert record.grounded_yield_share == pytest.approx(1.0)
+        assert record.effective_grounded_yield_share == pytest.approx(1.0)
         assert record.ungrounded_info_yield == pytest.approx(0.0)
         assert record.grounded_info_yield == pytest.approx(record.total_info_yield)
+
+    def test_ungrounded_yield_is_discounted_but_nonzero(self) -> None:
+        yields: list[float] = []
+        raw_yields: list[float] = []
+        raw_shares: list[float] = []
+        effective_shares: list[float] = []
+        for strength in (0.0, 0.5):
+            world = _minimal_world(grounding_quality_strength=strength)
+            raw = _add_raw_stream(world, dim=5)
+            residual = Stream(
+                stream_type=StreamType.RESIDUAL,
+                dimensionality=5,
+                current_data=np.arange(5, dtype=np.float64),
+            )
+            world.add_stream(residual)
+            agent = Agent(
+                genome=Genome(n_components=1, working_dim=8),
+                state=AgentState(
+                    lifecycle=LifecycleStage.ADULT,
+                    input_stream_ids=[raw.id, residual.id],
+                ),
+            )
+            world.agents[agent.id] = agent
+            world._init_agent_model(agent)
+            world._compress(agent)
+            yields.append(agent.state.last_step_yield)
+            raw_yields.append(
+                agent.state.last_step_raw_grounded_yield
+                + agent.state.last_step_raw_ungrounded_yield
+            )
+            raw_shares.append(agent.state.last_step_raw_grounded_yield / raw_yields[-1])
+            effective_shares.append(
+                agent.state.last_step_grounded_yield / agent.state.last_step_yield
+            )
+
+        assert yields[0] > yields[1] > 0.0
+        assert raw_yields[0] == pytest.approx(raw_yields[1])
+        assert raw_shares[0] == pytest.approx(raw_shares[1])
+        assert effective_shares[1] > effective_shares[0]
 
     def test_maintenance_fraction_changes_attention_capacity(self) -> None:
         capacities: list[float] = []

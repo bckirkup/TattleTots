@@ -139,6 +139,7 @@ class TestTelemetryRecorder:
             "chance_precision",
             "location_support_size",
             "grounded_yield_share",
+            "effective_grounded_yield_share",
             "attention_solvent_fraction",
             "mean_attention_carrying_capacity",
             "initiation_is_degenerate",

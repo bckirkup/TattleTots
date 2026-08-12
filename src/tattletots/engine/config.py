@@ -40,6 +40,35 @@ class SimulationConfig(BaseModel):
         le=1.0,
         description="Fraction of threshold energy passed to offspring",
     )
+    reproduction_coupling_strength: float = Field(
+        default=1.0,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Strength of Liebig co-limitation by information and attention. "
+            "Set to 0.0 for the legacy total-energy reproduction behavior. "
+            "The legacy-equivalence setting uses both requirement scales at 1.0."
+        ),
+    )
+    reproduction_information_scale: float = Field(
+        default=1.0,
+        gt=0.0,
+        description="Global scale for genome information requirement stoichiometry",
+    )
+    reproduction_attention_scale: float = Field(
+        default=1.0,
+        gt=0.0,
+        description="Global scale for genome attention requirement stoichiometry",
+    )
+    grounding_quality_strength: float = Field(
+        default=0.5,
+        ge=0.0,
+        lt=1.0,
+        description=(
+            "Discount applied to ungrounded information yield. "
+            "Set to 0.0 for the legacy yield behavior."
+        ),
+    )
     subsidy_rate: float = Field(
         default=0.1,
         ge=0.0,

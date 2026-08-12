@@ -20,6 +20,7 @@ class TelemetrySummary(TypedDict):
     chance_precision: float
     location_support_size: int
     grounded_yield_share: float
+    effective_grounded_yield_share: float
     attention_solvent_fraction: float
     mean_attention_carrying_capacity: float
     initiation_is_degenerate: bool
@@ -76,6 +77,9 @@ class StepRecord:
     grounded_info_yield: float = 0.0
     ungrounded_info_yield: float = 0.0
     grounded_yield_share: float = 0.0
+    effective_grounded_info_yield: float = 0.0
+    effective_ungrounded_info_yield: float = 0.0
+    effective_grounded_yield_share: float = 0.0
 
 
 @dataclass
@@ -145,6 +149,14 @@ class TelemetryRecorder:
         return sum(r.ungrounded_info_yield for r in self.history)
 
     @property
+    def total_effective_grounded_info_yield(self) -> float:
+        return sum(r.effective_grounded_info_yield for r in self.history)
+
+    @property
+    def total_effective_ungrounded_info_yield(self) -> float:
+        return sum(r.effective_ungrounded_info_yield for r in self.history)
+
+    @property
     def total_responses_dispatched(self) -> int:
         return sum(r.responses_dispatched for r in self.history)
 
@@ -185,6 +197,15 @@ class TelemetryRecorder:
             "grounded_info_yield": [r.grounded_info_yield for r in self.history],
             "ungrounded_info_yield": [r.ungrounded_info_yield for r in self.history],
             "grounded_yield_share": [r.grounded_yield_share for r in self.history],
+            "effective_grounded_info_yield": [
+                r.effective_grounded_info_yield for r in self.history
+            ],
+            "effective_ungrounded_info_yield": [
+                r.effective_ungrounded_info_yield for r in self.history
+            ],
+            "effective_grounded_yield_share": [
+                r.effective_grounded_yield_share for r in self.history
+            ],
             "births": [r.births for r in self.history],
             "deaths": [r.deaths for r in self.history],
             "n_compression_types": [r.n_compression_types for r in self.history],
@@ -264,6 +285,12 @@ class TelemetryRecorder:
         total = self.total_grounded_info_yield + self.total_ungrounded_info_yield
         return self.total_grounded_info_yield / total if total > 0 else 0.0
 
+    def _effective_grounded_yield_share(self) -> float:
+        total = (
+            self.total_effective_grounded_info_yield + self.total_effective_ungrounded_info_yield
+        )
+        return self.total_effective_grounded_info_yield / total if total > 0 else 0.0
+
     def _attention_solvent_fraction(self) -> float:
         fractions = [
             r.n_attention_solvent_agents / r.n_attention_eligible_agents
@@ -334,6 +361,7 @@ class TelemetryRecorder:
             "chance_precision": self._chance_precision(),
             "location_support_size": len(self._location_support()),
             "grounded_yield_share": self._grounded_yield_share(),
+            "effective_grounded_yield_share": self._effective_grounded_yield_share(),
             "attention_solvent_fraction": self._attention_solvent_fraction(),
             "mean_attention_carrying_capacity": self._mean_attention_carrying_capacity(),
             "initiation_is_degenerate": degenerate,
