@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from tattletots.models.location import EventLocation
 from tattletots.output_schema import TimeSeries
 from tattletots.telemetry.cost_accounting import CostAccumulator, StepCosts
 from tattletots.telemetry.recorder import StepRecord, TelemetryRecorder
@@ -22,7 +23,7 @@ def _make_record(
     max_trophic_level: float = 1.0,
     n_streams: int = 3,
     ground_truth_active: bool = False,
-    **kwargs: float | int,
+    **kwargs: float | int | bool | tuple[EventLocation, ...],
 ) -> StepRecord:
     return StepRecord(
         time_step=time_step,
@@ -135,6 +136,8 @@ class TestTelemetryRecorder:
             "total_reports",
             "precision",
             "event_prevalence",
+            "chance_precision",
+            "location_support_size",
             "grounded_yield_share",
             "attention_solvent_fraction",
             "mean_attention_carrying_capacity",
@@ -256,9 +259,12 @@ class TestTelemetryRecorder:
     def test_initiation_degeneracy_names_each_reason(self) -> None:
         cases = (
             (
-                "precision_not_above_event_prevalence",
+                "precision_not_above_chance",
                 _make_record(
                     ground_truth_active=True,
+                    active_location_count=1,
+                    ground_truth_locations=((0, 0), (1, 1)),
+                    verified_report_locations=((1, 1),),
                     reports_issued=1,
                     correct_reports=0,
                     population=1,
@@ -300,6 +306,9 @@ class TestTelemetryRecorder:
 
     def test_initiation_threshold_sensitivity(self) -> None:
         record = _make_record(
+            active_location_count=1,
+            ground_truth_locations=((0, 0), (1, 1)),
+            verified_report_locations=((0, 0),),
             reports_issued=1,
             correct_reports=1,
             population=1,
@@ -321,6 +330,9 @@ class TestTelemetryRecorder:
 
     def test_attention_degeneracy_threshold_and_capacity_sensitivity(self) -> None:
         record = _make_record(
+            active_location_count=1,
+            ground_truth_locations=((0, 0), (1, 1)),
+            verified_report_locations=((0, 0),),
             population=2,
             births=1,
             reports_issued=1,
@@ -346,6 +358,9 @@ class TestTelemetryRecorder:
             reports_issued=4,
             correct_reports=2,
             ground_truth_active=True,
+            active_location_count=1,
+            ground_truth_locations=((0, 0), (1, 1)),
+            verified_report_locations=((0, 0),),
             n_attention_solvent_agents=2,
             n_attention_eligible_agents=4,
             attention_carrying_capacity=8.0,
@@ -357,6 +372,8 @@ class TestTelemetryRecorder:
         summary = rec.summary()
         assert summary["precision"] == pytest.approx(0.5)
         assert summary["event_prevalence"] == pytest.approx(1.0)
+        assert summary["chance_precision"] == pytest.approx(0.5)
+        assert summary["location_support_size"] == 2
         assert summary["grounded_yield_share"] == pytest.approx(0.75)
         assert summary["attention_solvent_fraction"] == pytest.approx(0.5)
         assert summary["mean_attention_carrying_capacity"] == pytest.approx(8.0)
@@ -380,6 +397,72 @@ class TestTelemetryRecorder:
             "attention_insolvency_with_capacity_overshoot"
             not in (rec.summary()["initiation_degeneracy_reasons"])
         )
+
+    def test_chance_baseline_does_not_flag_good_prevalence_one_reporting(self) -> None:
+        rec = TelemetryRecorder()
+        for step, location in enumerate(((0, 0), (1, 1))):
+            rec.record_step(
+                _make_record(
+                    time_step=step,
+                    population=2,
+                    reports_issued=1,
+                    correct_reports=1,
+                    active_location_count=1,
+                    ground_truth_active=True,
+                    ground_truth_locations=(location, (2, 2)),
+                    verified_report_locations=(location,),
+                    n_attention_solvent_agents=2,
+                    n_attention_eligible_agents=2,
+                    grounded_info_yield=1.0,
+                    attention_carrying_capacity=10.0,
+                )
+            )
+
+        degenerate, reasons = rec.initiation_degeneracy()
+
+        assert not degenerate
+        assert "precision_not_above_chance" not in reasons
+        assert rec.summary()["event_prevalence"] == pytest.approx(1.0)
+        assert rec.summary()["chance_precision"] == pytest.approx(1 / 3)
+        assert rec.summary()["location_support_size"] == 3
+
+    def test_zero_event_window_has_distinct_reason(self) -> None:
+        rec = TelemetryRecorder()
+        rec.record_step(
+            _make_record(
+                reports_issued=2,
+                correct_reports=0,
+                verified_report_locations=((0, 0), (1, 1)),
+                grounded_info_yield=1.0,
+            )
+        )
+
+        degenerate, reasons = rec.initiation_degeneracy()
+
+        assert degenerate
+        assert "no_ground_truth_events" in reasons
+        assert "precision_not_above_chance" not in reasons
+        assert rec.summary()["event_prevalence"] == pytest.approx(0.0)
+
+    def test_trivial_location_support_has_distinct_reason(self) -> None:
+        rec = TelemetryRecorder()
+        rec.record_step(
+            _make_record(
+                active_location_count=1,
+                ground_truth_active=True,
+                ground_truth_locations=((0, 0),),
+                verified_report_locations=((0, 0),),
+                reports_issued=1,
+                correct_reports=1,
+                grounded_info_yield=1.0,
+            )
+        )
+
+        degenerate, reasons = rec.initiation_degeneracy()
+
+        assert degenerate
+        assert "insufficient_location_support" in reasons
+        assert "precision_not_above_chance" not in reasons
 
 
 class TestCostAccumulator:

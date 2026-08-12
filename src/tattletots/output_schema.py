@@ -39,6 +39,8 @@ class EcologyMetrics(BaseModel):
     total_reports: int = Field(default=0, ge=0)
     precision: float = Field(default=0.0, ge=0.0, le=1.0)
     event_prevalence: float = Field(default=0.0, ge=0.0, le=1.0)
+    chance_precision: float = Field(default=0.0, ge=0.0, le=1.0)
+    location_support_size: int = Field(default=0, ge=0)
     grounded_yield_share: float = Field(default=0.0, ge=0.0, le=1.0)
     attention_solvent_fraction: float = Field(default=0.0, ge=0.0, le=1.0)
     mean_attention_carrying_capacity: float = Field(default=0.0, ge=0.0)
