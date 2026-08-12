@@ -69,9 +69,9 @@ population failing to find a good strategy: competence is not expressible in
 the tested genome space. At the same time, a ground-truth oracle that paid the
 ordinary costs sustained a near-cap monoculture at 100% precision. Invasion
 outcomes ranged from oracle extinction to a 95% final share, crossing 50% at
-step 25, depending on seed. The ecology can carry competence; ordinary genomes cannot currently
-produce it, and the correctness reward is too small to make that missing
-competence easy to discover. See [`docs/ceiling-test.md`](ceiling-test.md) for
+step 25, depending on seed. The ecology can carry competence; ordinary genomes
+cannot currently produce it, and the correctness reward is too small to make
+that missing competence easy to discover. See [`docs/ceiling-test.md`](ceiling-test.md) for
 the payment arithmetic, grid, oracle trajectories, and reproducibility record.
 
 Two hypotheses that this measurement **refutes**, both of which we would otherwise
@@ -196,7 +196,9 @@ gradient that points the wrong way just gets you there faster.
    trust×relevance on unverified signal vectors), or make information yield
    discountable by downstream verification so that compressing noise does not pay.
    The design invariant to hold: whatever gates reproduction must be capped by the
-   same carrying capacity that gates survival.
+   same carrying capacity that gates survival. Partly done: co-limited
+   reproduction landed in #25 and removed the overshoot, but did not improve
+   grounding or precision, which is what the ceiling test explains.
 4. **Price reproduction against function**, so precocity is not the dominant
    gradient — pay for offspring in the scarce currency.
 5. **Only then** consider innate calibration (adaptive escalation thresholds as the
