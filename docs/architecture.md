@@ -52,6 +52,9 @@ The `DomainAdapter` ABC defines the contract between TattleTots and domain simul
 
 `GaussianShiftScenario` — K=10 structured Gaussian with midpoint regime change. Self-contained smoke test requiring no external domain.
 
+`SparseSensorScenario` — seeded, noisy point sensors with published coordinates,
+intermittent missingness, and an exactly graded latent source location.
+
 ### telemetry/ — Recording & Cost Accounting
 
 | Module | Responsibility |

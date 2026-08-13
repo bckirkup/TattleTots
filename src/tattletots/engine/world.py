@@ -31,7 +31,11 @@ from tattletots.engine.sensing import (
     gather_raw_stream_data,
     prepare_agent_observation,
 )
-from tattletots.engine.spatial import apply_spatial_observation, infer_spatial_location
+from tattletots.engine.spatial import (
+    apply_spatial_observation,
+    infer_geometry_location,
+    infer_spatial_location,
+)
 from tattletots.engine.temporal import apply_temporal_observation
 from tattletots.engine.trophic import compute_trophic_level, select_input_streams
 from tattletots.engine.trust import (
@@ -461,6 +465,7 @@ class World:
             n_blocks=self.config.n_spatial_blocks,
             dim_to_location=self._dim_to_location,
         )
+        agent.state.last_geometry_location = infer_geometry_location(agent, spatial)
         agent.state.projected_input = spatial.data
         return spatial
 
@@ -546,6 +551,8 @@ class World:
         agent: Agent,
         combined: NDArray[np.float64],
     ) -> EventLocation:
+        if agent.state.last_geometry_location is not None:
+            return agent.state.last_geometry_location
         location = agent.state.last_inferred_location
         if location is None:
             location = infer_spatial_location(

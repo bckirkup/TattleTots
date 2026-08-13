@@ -12,6 +12,7 @@ from tattletots.engine.world import World
 from tattletots.path_utils import safe_path_under_base
 from tattletots.scenarios.gaussian_shift import GaussianShiftScenario
 from tattletots.scenarios.high_dim_shift import HighDimShiftScenario
+from tattletots.scenarios.sparse_sensor import SparseSensorScenario
 from tattletots.telemetry.cost_accounting import CostAccumulator
 
 _CWD = Path.cwd()
@@ -19,7 +20,7 @@ _CWD = Path.cwd()
 
 def _load_scenario(
     name: str, scenario_config: dict[str, int | float | str], seed: int | None = None
-) -> GaussianShiftScenario | HighDimShiftScenario:
+) -> GaussianShiftScenario | HighDimShiftScenario | SparseSensorScenario:
     effective_config = dict(scenario_config)
     if seed is not None and "seed" not in effective_config:
         effective_config["seed"] = seed
@@ -27,6 +28,8 @@ def _load_scenario(
         return GaussianShiftScenario.from_config(effective_config)
     if name == "high_dim_shift":
         return HighDimShiftScenario.from_config(effective_config)
+    if name == "sparse_sensor":
+        return SparseSensorScenario.from_config(effective_config)
     raise ValueError(f"Unknown scenario: {name}")
 
 
@@ -49,7 +52,7 @@ def _resolve_config_path(
 
 def _build_world(
     sim_config: SimulationConfig,
-    scenario: GaussianShiftScenario | HighDimShiftScenario,
+    scenario: GaussianShiftScenario | HighDimShiftScenario | SparseSensorScenario,
     gene_pool: GenePoolConfig | None,
 ) -> World:
     world = World(config=sim_config, gene_pool=gene_pool)
@@ -67,7 +70,7 @@ def _build_world(
 
 def _run_steps(
     world: World,
-    scenario: GaussianShiftScenario | HighDimShiftScenario,
+    scenario: GaussianShiftScenario | HighDimShiftScenario | SparseSensorScenario,
     steps: int,
     *,
     verbose: bool,
@@ -108,7 +111,7 @@ def _write_results(
     output_path: Path,
     *,
     sim_config: SimulationConfig,
-    scenario: GaussianShiftScenario | HighDimShiftScenario,
+    scenario: GaussianShiftScenario | HighDimShiftScenario | SparseSensorScenario,
     world: World,
     cost_summary: dict[str, float],
 ) -> None:
@@ -138,7 +141,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--scenario",
-        choices=["gaussian_shift", "high_dim_shift"],
+        choices=["gaussian_shift", "high_dim_shift", "sparse_sensor"],
         default="gaussian_shift",
         help="Built-in scenario to run (default: gaussian_shift)",
     )
