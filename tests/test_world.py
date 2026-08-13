@@ -42,6 +42,28 @@ def _add_raw_stream(world: World, dim: int = 5, data: np.ndarray | None = None) 
     return s
 
 
+def _trained_threshold_agent(world: World) -> tuple[Stream, Agent]:
+    """Create an adult threshold agent with an established anomaly baseline."""
+    stream = _add_raw_stream(world, dim=5, data=np.zeros(5))
+    world.add_user(User(name="u1"))
+    agent = Agent(
+        genome=Genome(
+            compression_type=CompressionType.THRESHOLD,
+            escalation_threshold=0.01,
+        ),
+        state=AgentState(
+            lifecycle=LifecycleStage.ADULT,
+            input_stream_ids=[stream.id],
+        ),
+    )
+    world.agents[agent.id] = agent
+    world._init_agent_model(agent)
+    for _ in range(10):
+        world._compress(agent)
+        world._maybe_escalate(agent)
+    return stream, agent
+
+
 def test_add_stream_rewrites_uuid_id_and_updates_world_key() -> None:
     world = _minimal_world()
     stream = Stream(stream_type=StreamType.RAW, dimensionality=5)
@@ -310,25 +332,7 @@ class TestMaybeEscalate:
 
     def test_escalation_on_anomaly(self) -> None:
         world = _minimal_world()
-        s = _add_raw_stream(world, dim=5, data=np.zeros(5))
-        user = User(name="u1")
-        world.add_user(user)
-        agent = Agent(
-            genome=Genome(
-                compression_type=CompressionType.THRESHOLD,
-                escalation_threshold=0.01,  # very low threshold
-            ),
-            state=AgentState(
-                lifecycle=LifecycleStage.ADULT,
-                input_stream_ids=[s.id],
-            ),
-        )
-        world.agents[agent.id] = agent
-        world._init_agent_model(agent)
-        # Build baseline on zero data
-        for _ in range(10):
-            world._compress(agent)
-            world._maybe_escalate(agent)  # accumulate anomaly history
+        s, agent = _trained_threshold_agent(world)
         # Inject a large anomaly — z-score will be very high
         s.current_data = np.ones(5) * 100.0
         world._compress(agent)
@@ -338,24 +342,7 @@ class TestMaybeEscalate:
 
     def test_grounded_report_requirement_suppresses_metadata_free_report(self) -> None:
         world = _minimal_world(require_grounded_report_locations=True)
-        s = _add_raw_stream(world, dim=5, data=np.zeros(5))
-        user = User(name="u1")
-        world.add_user(user)
-        agent = Agent(
-            genome=Genome(
-                compression_type=CompressionType.THRESHOLD,
-                escalation_threshold=0.01,
-            ),
-            state=AgentState(
-                lifecycle=LifecycleStage.ADULT,
-                input_stream_ids=[s.id],
-            ),
-        )
-        world.agents[agent.id] = agent
-        world._init_agent_model(agent)
-        for _ in range(10):
-            world._compress(agent)
-            world._maybe_escalate(agent)
+        s, agent = _trained_threshold_agent(world)
 
         s.current_data = np.ones(5) * 100.0
         world._compress(agent)
@@ -364,24 +351,7 @@ class TestMaybeEscalate:
 
     def test_default_report_location_requirement_preserves_existing_fallback(self) -> None:
         world = _minimal_world()
-        s = _add_raw_stream(world, dim=5, data=np.zeros(5))
-        user = User(name="u1")
-        world.add_user(user)
-        agent = Agent(
-            genome=Genome(
-                compression_type=CompressionType.THRESHOLD,
-                escalation_threshold=0.01,
-            ),
-            state=AgentState(
-                lifecycle=LifecycleStage.ADULT,
-                input_stream_ids=[s.id],
-            ),
-        )
-        world.agents[agent.id] = agent
-        world._init_agent_model(agent)
-        for _ in range(10):
-            world._compress(agent)
-            world._maybe_escalate(agent)
+        s, agent = _trained_threshold_agent(world)
 
         s.current_data = np.ones(5) * 100.0
         world._compress(agent)
@@ -389,24 +359,7 @@ class TestMaybeEscalate:
 
     def test_grounded_report_requirement_allows_coordinate_bearing_report(self) -> None:
         world = _minimal_world(require_grounded_report_locations=True)
-        s = _add_raw_stream(world, dim=5, data=np.zeros(5))
-        user = User(name="u1")
-        world.add_user(user)
-        agent = Agent(
-            genome=Genome(
-                compression_type=CompressionType.THRESHOLD,
-                escalation_threshold=0.01,
-            ),
-            state=AgentState(
-                lifecycle=LifecycleStage.ADULT,
-                input_stream_ids=[s.id],
-            ),
-        )
-        world.agents[agent.id] = agent
-        world._init_agent_model(agent)
-        for _ in range(10):
-            world._compress(agent)
-            world._maybe_escalate(agent)
+        s, agent = _trained_threshold_agent(world)
 
         s.current_data = np.ones(5) * 100.0
         world._compress(agent)
