@@ -137,6 +137,7 @@ class TestTelemetryRecorder:
             "precision",
             "event_prevalence",
             "chance_precision",
+            "static_prior_precision",
             "location_support_size",
             "grounded_yield_share",
             "effective_grounded_yield_share",
@@ -260,7 +261,7 @@ class TestTelemetryRecorder:
     def test_initiation_degeneracy_names_each_reason(self) -> None:
         cases = (
             (
-                "precision_not_above_chance",
+                "precision_not_above_static_prior",
                 _make_record(
                     ground_truth_active=True,
                     active_location_count=1,
@@ -306,49 +307,62 @@ class TestTelemetryRecorder:
             assert reason in reasons
 
     def test_initiation_threshold_sensitivity(self) -> None:
-        record = _make_record(
-            active_location_count=1,
-            ground_truth_locations=((0, 0), (1, 1)),
-            verified_report_locations=((0, 0),),
-            reports_issued=1,
-            correct_reports=1,
-            population=1,
-            n_attention_solvent_agents=1,
-            grounded_info_yield=1.0,
-            ungrounded_info_yield=1.0,
-        )
+        records = [
+            _make_record(
+                time_step=step,
+                active_location_count=1,
+                ground_truth_locations=(location,),
+                verified_report_locations=(location,),
+                reports_issued=1,
+                correct_reports=1,
+                population=1,
+                n_attention_solvent_agents=1,
+                grounded_info_yield=1.0,
+                ungrounded_info_yield=1.0,
+            )
+            for step, location in enumerate(((0, 0), (1, 1)))
+        ]
         permissive = TelemetryRecorder()
-        permissive.record_step(record)
+        for record in records:
+            permissive.record_step(record)
         strict = TelemetryRecorder()
         strict.configure_initiation_thresholds(
             min_grounded_yield_share=0.75,
             attention_insolvency_steps_fraction=0.8,
         )
-        strict.record_step(record)
+        for record in records:
+            strict.record_step(record)
         assert not permissive.initiation_degeneracy()[0]
         assert strict.initiation_degeneracy()[0]
         assert strict.summary()["grounded_yield_share"] == pytest.approx(0.5)
 
     def test_attention_degeneracy_threshold_and_capacity_sensitivity(self) -> None:
-        record = _make_record(
-            active_location_count=1,
-            ground_truth_locations=((0, 0), (1, 1)),
-            verified_report_locations=((0, 0),),
-            population=2,
-            births=1,
-            reports_issued=1,
-            correct_reports=1,
-            n_attention_solvent_agents=1,
-            n_attention_eligible_agents=2,
-            attention_carrying_capacity=1.0,
-            grounded_info_yield=1.0,
-        )
+        records = [
+            _make_record(
+                time_step=step,
+                active_location_count=1,
+                ground_truth_locations=(location,),
+                verified_report_locations=(location,),
+                population=2,
+                births=1,
+                reports_issued=1,
+                correct_reports=1,
+                n_attention_solvent_agents=1,
+                n_attention_eligible_agents=2,
+                attention_carrying_capacity=1.0,
+                grounded_info_yield=1.0,
+            )
+            for step, location in enumerate(((0, 0), (1, 1)))
+        ]
         baseline = TelemetryRecorder()
-        baseline.record_step(record)
+        for record in records:
+            baseline.record_step(record)
         stricter_solvent = TelemetryRecorder(initiation_min_solvent_fraction=0.75)
-        stricter_solvent.record_step(record)
+        for record in records:
+            stricter_solvent.record_step(record)
         stricter_capacity = TelemetryRecorder(initiation_population_capacity_overshoot_factor=3.0)
-        stricter_capacity.record_step(record)
+        for record in records:
+            stricter_capacity.record_step(record)
         assert not baseline.initiation_degeneracy()[0]
         assert stricter_solvent.initiation_degeneracy()[0]
         assert not stricter_capacity.initiation_degeneracy()[0]
@@ -410,7 +424,7 @@ class TestTelemetryRecorder:
                     correct_reports=1,
                     active_location_count=1,
                     ground_truth_active=True,
-                    ground_truth_locations=(location, (2, 2)),
+                    ground_truth_locations=(location,),
                     verified_report_locations=(location,),
                     n_attention_solvent_agents=2,
                     n_attention_eligible_agents=2,
@@ -422,10 +436,38 @@ class TestTelemetryRecorder:
         degenerate, reasons = rec.initiation_degeneracy()
 
         assert not degenerate
-        assert "precision_not_above_chance" not in reasons
+        assert "precision_not_above_static_prior" not in reasons
         assert rec.summary()["event_prevalence"] == pytest.approx(1.0)
-        assert rec.summary()["chance_precision"] == pytest.approx(1 / 3)
-        assert rec.summary()["location_support_size"] == 3
+        assert rec.summary()["chance_precision"] == pytest.approx(0.5)
+        assert rec.summary()["static_prior_precision"] == pytest.approx(0.5)
+        assert rec.summary()["location_support_size"] == 2
+
+    def test_static_prior_baseline_replaces_uniform_precision_null(self) -> None:
+        rec = TelemetryRecorder()
+        for step in range(5):
+            location = (0, 0) if step < 4 else (1, 1)
+            rec.record_step(
+                _make_record(
+                    time_step=step,
+                    population=2,
+                    reports_issued=5,
+                    correct_reports=2,
+                    active_location_count=1,
+                    ground_truth_active=True,
+                    ground_truth_locations=(location,),
+                    n_attention_solvent_agents=2,
+                    n_attention_eligible_agents=2,
+                    grounded_info_yield=1.0,
+                    attention_carrying_capacity=10.0,
+                )
+            )
+
+        degenerate, reasons = rec.initiation_degeneracy()
+
+        assert degenerate
+        assert "precision_not_above_static_prior" in reasons
+        assert rec.summary()["chance_precision"] == pytest.approx(0.5)
+        assert rec.summary()["static_prior_precision"] == pytest.approx(0.8)
 
     def test_zero_event_window_has_distinct_reason(self) -> None:
         rec = TelemetryRecorder()
@@ -442,7 +484,7 @@ class TestTelemetryRecorder:
 
         assert degenerate
         assert "no_ground_truth_events" in reasons
-        assert "precision_not_above_chance" not in reasons
+        assert "precision_not_above_static_prior" not in reasons
         assert rec.summary()["event_prevalence"] == pytest.approx(0.0)
 
     def test_trivial_location_support_has_distinct_reason(self) -> None:
@@ -463,7 +505,7 @@ class TestTelemetryRecorder:
 
         assert degenerate
         assert "insufficient_location_support" in reasons
-        assert "precision_not_above_chance" not in reasons
+        assert "precision_not_above_static_prior" not in reasons
 
 
 class TestCostAccumulator:

@@ -40,6 +40,7 @@ class EcologyMetrics(BaseModel):
     precision: float = Field(default=0.0, ge=0.0, le=1.0)
     event_prevalence: float = Field(default=0.0, ge=0.0, le=1.0)
     chance_precision: float = Field(default=0.0, ge=0.0, le=1.0)
+    static_prior_precision: float = Field(default=0.0, ge=0.0, le=1.0)
     location_support_size: int = Field(default=0, ge=0)
     grounded_yield_share: float = Field(default=0.0, ge=0.0, le=1.0)
     effective_grounded_yield_share: float = Field(default=0.0, ge=0.0, le=1.0)

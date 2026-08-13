@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -20,6 +21,7 @@ class InstrumentCheck(StrEnum):
     COORDINATE_FRAME = "coordinate_frame"
     DECLARATIONS = "declarations"
     INFERABILITY = "inferability"
+    BASELINE = "baseline"
 
 
 @dataclass(frozen=True)
@@ -44,6 +46,7 @@ class InstrumentValidityReport:
     inferability_precision: float
     decoder_precision: float
     chance_baseline: float
+    static_prior_baseline: float
     candidate_locations: tuple[EventLocation, ...]
 
     @property
@@ -79,10 +82,12 @@ def validate_instrument(
     supported_events = 0
     reportable_events = 0
     findings: list[InstrumentFinding] = []
+    active_location_history: list[tuple[EventLocation, ...]] = []
 
     for time_step in range(steps):
         adapter.step(time_step)
         active = tuple(adapter.get_active_locations(time_step))
+        active_location_history.append(active)
         is_event = adapter.get_ground_truth(time_step)
         if is_event:
             event_steps += 1
@@ -113,6 +118,7 @@ def validate_instrument(
         adapter,
     )
     chance_baseline = 1.0 / len(candidates) if candidates else 1.0
+    static_prior_baseline = _static_prior_baseline(active_location_history)
     support_precision = supported_events / reportable_events if reportable_events else 0.0
     decoder_precision = correct_reports / reportable_events if reportable_events else 0.0
 
@@ -144,17 +150,30 @@ def validate_instrument(
         )
     findings.append(
         InstrumentFinding(
+            check=InstrumentCheck.BASELINE,
+            passed=True,
+            message=(
+                "Static-prior precision is "
+                f"{static_prior_baseline:.2%} versus uniform precision "
+                f"{chance_baseline:.2%}; compare reports against the static prior."
+            ),
+            measured=static_prior_baseline,
+            threshold=chance_baseline,
+        )
+    )
+    findings.append(
+        InstrumentFinding(
             check=InstrumentCheck.INFERABILITY,
             passed=reportable_events > 0
-            and support_precision > chance_baseline + inferability_margin,
+            and support_precision > static_prior_baseline + inferability_margin,
             message=(
-                "Published evidence carries event locations above chance."
+                "Published evidence carries event locations above the static prior."
                 if reportable_events > 0
-                and support_precision > chance_baseline + inferability_margin
-                else "Published evidence does not carry event locations above chance."
+                and support_precision > static_prior_baseline + inferability_margin
+                else "Published evidence does not carry event locations above the static prior."
             ),
             measured=support_precision,
-            threshold=chance_baseline + inferability_margin,
+            threshold=static_prior_baseline + inferability_margin,
         )
     )
 
@@ -166,8 +185,21 @@ def validate_instrument(
         inferability_precision=support_precision,
         decoder_precision=decoder_precision,
         chance_baseline=chance_baseline,
+        static_prior_baseline=static_prior_baseline,
         candidate_locations=tuple(sorted(candidates)),
     )
+
+
+def _static_prior_baseline(active_locations: list[tuple[EventLocation, ...]]) -> float:
+    """Measure precision from always naming the modal event location."""
+    event_windows = [locations for locations in active_locations if locations]
+    if not event_windows:
+        return 0.0
+    counts = Counter(location for locations in event_windows for location in locations)
+    if not counts:
+        return 0.0
+    prior_location = counts.most_common(1)[0][0]
+    return sum(prior_location in locations for locations in event_windows) / len(event_windows)
 
 
 def _validate_stream_declarations(

@@ -116,6 +116,7 @@ class TattleTotsLayer:
                 precision=float(summary["precision"]),
                 event_prevalence=float(summary["event_prevalence"]),
                 chance_precision=float(summary["chance_precision"]),
+                static_prior_precision=float(summary["static_prior_precision"]),
                 location_support_size=int(summary["location_support_size"]),
                 grounded_yield_share=float(summary["grounded_yield_share"]),
                 effective_grounded_yield_share=float(summary["effective_grounded_yield_share"]),
