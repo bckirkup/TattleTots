@@ -48,6 +48,15 @@ class SpatialStrategy(enum.StrEnum):
     FIXED_REGION = "fixed_region"
 
 
+class SpatialInferenceStrategy(enum.StrEnum):
+    """Heritable strategy for decoding coordinate-bearing observations."""
+
+    PEAK = "peak"
+    WEIGHTED_CENTROID = "weighted_centroid"
+    KERNEL = "kernel"
+    FIXED_PRIOR = "fixed_prior"
+
+
 class ResidualPolicy(enum.StrEnum):
     """What an agent does with compression residuals."""
 
@@ -98,6 +107,11 @@ _ARRAY_MUTATION_KEYS = (
     "target_user_affinity",
     "fusion_weights",
     "region_affinity",
+)
+
+_ARRAY_RECOMBINATION_KEYS = (
+    *_ARRAY_MUTATION_KEYS,
+    "modality_reliability",
 )
 
 
@@ -228,7 +242,8 @@ def _mutate_array_preferences(data: dict[str, Any], rng: np.random.Generator, ra
         if len(arr) == 0:
             continue
         mask = rng.random(len(arr)) < rate
-        arr[mask] += rng.normal(0, 0.1, size=int(mask.sum()))
+        delta = rng.normal(0, 0.1, size=int(mask.sum()))
+        arr[mask] += delta
         arr = np.clip(arr, 0.0, None)
         total = arr.sum()
         if total > 0 and key != "region_affinity":
@@ -242,7 +257,7 @@ def _recombine_field(
     data_b: dict[str, Any],
     rng: np.random.Generator,
 ) -> object:
-    if key in _ARRAY_MUTATION_KEYS:
+    if key in _ARRAY_RECOMBINATION_KEYS:
         arr_a = np.array(data_a[key], dtype=np.float64)
         arr_b = np.array(data_b[key], dtype=np.float64)
         if len(arr_a) == len(arr_b) and len(arr_a) > 0:
@@ -250,6 +265,22 @@ def _recombine_field(
             return alpha * arr_a + (1 - alpha) * arr_b
         return arr_a if rng.random() < 0.5 else arr_b
     return data_a[key] if rng.random() < 0.5 else data_b[key]
+
+
+def _sample_spatial_traits(rng: np.random.Generator) -> dict[str, Any]:
+    """Sample independent spatial traits."""
+    region = (int(rng.integers(0, 10)), int(rng.integers(0, 10)))
+    radius = int(rng.integers(0, 5))
+    values = list(SpatialInferenceStrategy)
+    return {
+        "spatial_region": region,
+        "spatial_radius": radius,
+        "spatial_inference_strategy": values[int(rng.integers(0, len(values)))],
+        "spatial_kernel_bandwidth": float(rng.uniform(0.1, 10.0)),
+        "spatial_distance_power": float(rng.uniform(0.0, 4.0)),
+        "modality_reliability": rng.uniform(0.0, 2.0, size=8),
+        "absence_weight": float(rng.uniform(-1.0, 1.0)),
+    }
 
 
 class Genome(BaseModel):
@@ -384,6 +415,28 @@ class Genome(BaseModel):
         default_factory=lambda: np.array([], dtype=np.float64),
         description="Soft weights over domain regions",
     )
+    spatial_inference_strategy: SpatialInferenceStrategy = Field(
+        default=SpatialInferenceStrategy.PEAK,
+        description="Strategy for decoding coordinate-bearing observations",
+    )
+    spatial_kernel_bandwidth: float = Field(
+        default=2.0,
+        gt=0.0,
+        description="Kernel bandwidth for spatial interpolation",
+    )
+    spatial_distance_power: float = Field(
+        default=1.0,
+        ge=0.0,
+        description="Distance exponent for spatial evidence weighting",
+    )
+    modality_reliability: np.ndarray = Field(
+        default_factory=lambda: np.ones(8, dtype=np.float64),
+        description="Generic reliability weights indexed by modality hash",
+    )
+    absence_weight: float = Field(
+        default=0.0,
+        description="Weight for evidence supplied by unobserved features",
+    )
     residual_policy: ResidualPolicy = Field(
         default=ResidualPolicy.EXCRETE,
         description="How residuals are handled after compression",
@@ -446,9 +499,30 @@ class Genome(BaseModel):
         _mutate_enum_field(data, rng, rate, "sensing_strategy", SensingStrategy)
         _mutate_enum_field(data, rng, rate, "temporal_fusion_mode", TemporalFusionMode)
         _mutate_enum_field(data, rng, rate, "spatial_strategy", SpatialStrategy)
+        _mutate_enum_field(data, rng, rate, "spatial_inference_strategy", SpatialInferenceStrategy)
+        if rng.random() < rate:
+            data["spatial_kernel_bandwidth"] = float(
+                np.clip(float(data["spatial_kernel_bandwidth"]) + rng.normal(0.0, 1.0), 0.1, 10.0)
+            )
+        if rng.random() < rate:
+            data["spatial_distance_power"] = float(
+                np.clip(float(data["spatial_distance_power"]) + rng.normal(0.0, 0.5), 0.0, 4.0)
+            )
+        if rng.random() < rate:
+            data["absence_weight"] = float(
+                np.clip(float(data["absence_weight"]) + rng.normal(0.0, 0.25), -1.0, 1.0)
+            )
         _mutate_enum_field(data, rng, rate, "residual_policy", ResidualPolicy)
         _mutate_enum_field(data, rng, rate, "escalation_mode", EscalationMode)
         _mutate_array_preferences(data, rng, rate)
+        reliability = np.array(data["modality_reliability"], dtype=np.float64)
+        reliability_mask = rng.random(reliability.size) < rate
+        reliability[reliability_mask] = np.clip(
+            reliability[reliability_mask] + rng.normal(0.0, 0.2, reliability_mask.sum()),
+            0.0,
+            2.0,
+        )
+        data["modality_reliability"] = reliability
         return type(self).model_validate(data)
 
     @classmethod
@@ -524,8 +598,7 @@ class Genome(BaseModel):
             spatial_strategy=SpatialStrategy(
                 spatial_types[int(rng.integers(0, len(spatial_types)))]
             ),
-            spatial_region=(int(rng.integers(0, 10)), int(rng.integers(0, 10))),
-            spatial_radius=int(rng.integers(0, 5)),
+            **_sample_spatial_traits(rng),
             residual_policy=ResidualPolicy(
                 residual_types[int(rng.integers(0, len(residual_types)))]
             ),

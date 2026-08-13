@@ -107,6 +107,7 @@ class ObservationPacket:
     data: NDArray[np.float64]
     metadata: StreamMetadata | None = None
     status: NDArray[np.str_] | None = None
+    observed_fraction: NDArray[np.float64] | None = None
 
     @classmethod
     def from_stream(
@@ -130,4 +131,5 @@ class ObservationPacket:
             data=data,
             metadata=self.metadata if metadata is None else metadata,
             status=self.status if status is None else status,
+            observed_fraction=self.observed_fraction,
         )

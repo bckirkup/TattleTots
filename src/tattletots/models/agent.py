@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from tattletots.models.energy import EnergyReserves
 from tattletots.models.genome import Genome
 from tattletots.models.identity import seeded_id
+from tattletots.models.observation import ObservationPacket
 
 
 class LifecycleStage(enum.StrEnum):
@@ -62,9 +63,9 @@ class AgentState(BaseModel):
         default_factory=list,
         description="Rolling window of raw anomaly scores for baseline normalization",
     )
-    temporal_buffer: list[np.ndarray] = Field(
+    temporal_buffer: list[ObservationPacket] = Field(
         default_factory=list,
-        description="Ring buffer of post-sensing vectors for temporal fusion",
+        description="Ring buffer of post-sensing vectors and feature schemas",
     )
     residual_buffer: list[np.ndarray] = Field(
         default_factory=list,
@@ -102,6 +103,10 @@ class AgentState(BaseModel):
     last_inferred_location: tuple[int, int] | None = Field(
         default=None,
         description="Where this agent observed signal this step",
+    )
+    last_geometry_location: tuple[int, int] | None = Field(
+        default=None,
+        description="Genome-derived location from coordinate-bearing observations",
     )
     last_anomaly_score: float = Field(default=0.0, ge=0.0)
     last_escalated: bool = Field(default=False)

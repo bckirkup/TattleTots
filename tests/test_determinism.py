@@ -19,8 +19,8 @@ from tattletots.models.identity import stable_id_digest
 from tattletots.scenarios.gaussian_shift import GaussianShiftScenario
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_FINGERPRINT = "7a7fbcd916b0f8e90bc16aa246d944180d94b3eb4f07f006b1656b45479e6030"
-EXPECTED_LEGACY_FINGERPRINT = "de192bf7ae2b756626a1cea1f5b4ee181640859dae77e451ae115a114be045e3"
+EXPECTED_FINGERPRINT = "cb200668a68424aaa6c23d78236e5b4f95c848c8c31490f88595b85ead0d6e1e"
+EXPECTED_LEGACY_FINGERPRINT = "140c3a015b126e7d82ede30956b2c2ef2793cbfbb7f54f1f973b977522dff610"
 
 
 def _canonicalize(value: object) -> object:
@@ -127,6 +127,12 @@ def test_same_seed_reproduces_the_complete_run() -> None:
     second = _run_fingerprint(42)
 
     assert first == second
+
+
+def test_same_seed_has_zero_fingerprint_spread_across_repeated_runs() -> None:
+    fingerprints = {_run_fingerprint(42) for _ in range(10)}
+
+    assert len(fingerprints) == 1
 
 
 def test_different_seed_changes_the_complete_run() -> None:

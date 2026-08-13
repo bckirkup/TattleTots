@@ -509,6 +509,26 @@ def _summarize_factor_results(
     return factor_results, n_pass, n_fail
 
 
+def _check_factor_determinism(
+    fkey: str,
+    group: dict[str, Any],
+    ref_seeds: list[int],
+    results_by_factor_seed: dict[str, dict[int, dict[str, dict[str, float]]]],
+) -> list[dict[str, Any]]:
+    ref_by_seed = group["by_seed"]
+    failures: list[dict[str, Any]] = []
+    for seed in ref_seeds:
+        archived = ref_by_seed.get(seed)
+        rerun = results_by_factor_seed[fkey].get(seed)
+        if archived is None or rerun is None:
+            failures.append({"seed": seed, "reason": "missing_archived_or_rerun"})
+            continue
+        ok, checks = check_summary_against_archived(archived, rerun)
+        if not ok:
+            failures.extend([{"seed": seed, **failure} for failure in checks[:3]])
+    return failures
+
+
 def _summarize_factor(
     fkey: str,
     group: dict[str, Any],
@@ -517,16 +537,12 @@ def _summarize_factor(
     results_by_factor_seed: dict[str, dict[int, dict[str, dict[str, float]]]],
 ) -> dict[str, Any]:
     ref_by_seed = group["by_seed"]
-    determinism_failures: list[dict[str, Any]] = []
-    for seed in ref_seeds:
-        archived = ref_by_seed.get(seed)
-        rerun = results_by_factor_seed[fkey].get(seed)
-        if archived is None or rerun is None:
-            determinism_failures.append({"seed": seed, "reason": "missing_archived_or_rerun"})
-            continue
-        ok, fails = check_summary_against_archived(archived, rerun)
-        if not ok:
-            determinism_failures.extend([{"seed": seed, **f} for f in fails[:3]])
+    determinism_failures = _check_factor_determinism(
+        fkey,
+        group,
+        ref_seeds,
+        results_by_factor_seed,
+    )
 
     ref_summaries = [ref_by_seed[s] for s in ref_seeds if s in ref_by_seed]
     ref_mean = _mean_summary(ref_summaries)
