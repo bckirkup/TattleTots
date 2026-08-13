@@ -308,6 +308,10 @@ class Genome(BaseModel):
         le=1.0,
         description="Anomaly score threshold above which the agent escalates",
     )
+    reporter_policy: str | None = Field(
+        default=None,
+        description="Named non-genomic reporter policy; None uses ordinary escalation",
+    )
     target_user_affinity: np.ndarray = Field(
         default_factory=lambda: np.array([], dtype=np.float64),
         description="Affinity vector toward each user (softmax over users for report routing)",
@@ -538,7 +542,10 @@ class Genome(BaseModel):
         child_data: dict[str, object] = {}
 
         for key in data_a:
-            child_data[key] = _recombine_field(key, data_a, data_b, rng)
+            if key == "reporter_policy" and data_a[key] == data_b[key]:
+                child_data[key] = data_a[key]
+            else:
+                child_data[key] = _recombine_field(key, data_a, data_b, rng)
 
         return cls.model_validate(child_data)
 

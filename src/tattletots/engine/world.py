@@ -48,6 +48,12 @@ from tattletots.engine.trust import (
 from tattletots.engine.whistleblowing import (
     create_output_stream,
 )
+from tattletots.interface.reporter_policy import (
+    ReporterPolicy,
+    ReporterPolicyContext,
+    ReporterStream,
+    create_reporter_policy,
+)
 from tattletots.models.agent import Agent, AgentState, LifecycleStage
 from tattletots.models.energy import EnergyReserves
 from tattletots.models.genome import Genome, ParentalStrategy, ResidualPolicy, SpatialStrategy
@@ -77,6 +83,7 @@ class World:
     users: dict[str, User] = field(default_factory=dict)
     compression_models: dict[str, CompressionModel] = field(default_factory=dict)
     refine_models: dict[str, CompressionModel] = field(default_factory=dict)
+    reporter_policies: dict[str, ReporterPolicy] = field(default_factory=dict)
     time_step: int = 0
     rng: np.random.Generator = field(default_factory=lambda: np.random.default_rng(0))
     telemetry: TelemetryRecorder = field(default_factory=TelemetryRecorder)
@@ -90,6 +97,7 @@ class World:
     last_whistleblower_reports: list[WhistleblowerReport] = field(default_factory=list)
     _last_input_attribution: dict[str, tuple[float, float]] = field(default_factory=dict)
     _attention_deltas: dict[str, float] = field(default_factory=dict)
+    _last_reporter_groups: dict[str, float | int] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         seed = self.config.seed if self.config.seed is not None else 0
@@ -207,6 +215,7 @@ class World:
             agent.state.last_step_info_subsidy = 0.0
             agent.state.last_step_grounded_yield = 0.0
             agent.state.last_step_ungrounded_yield = 0.0
+            agent.state.policy_report_location = None
             agent.state.last_observed_dispatch = False
             agent.state.last_observed_outcome_necessary = None
 
@@ -332,7 +341,7 @@ class World:
             deaths=deaths,
             missed=missed,
         )
-        self.telemetry.record_step(record)
+        self.telemetry.record_step(record, reporter_groups=self._last_reporter_groups)
         return record
 
     def apply_post_dispatch_feedback(
@@ -421,6 +430,10 @@ class World:
         )
 
     def _init_agent_model(self, agent: Agent) -> None:
+        if agent.genome.reporter_policy is not None:
+            self.reporter_policies[agent.id] = create_reporter_policy(agent.genome.reporter_policy)
+        else:
+            self.reporter_policies.pop(agent.id, None)
         window = (
             max(20, agent.genome.temporal_memory_depth)
             if agent.genome.temporal_memory_depth > 0
@@ -594,7 +607,7 @@ class World:
         if combined.size == 0:
             return None
 
-        anomaly, threshold, fire = should_escalate(
+        anomaly, threshold, ordinary_fire = should_escalate(
             agent,
             model,
             combined,
@@ -607,11 +620,44 @@ class World:
             n_blocks=self.config.n_spatial_blocks,
             dim_to_location=self._dim_to_location,
         )
-        if not fire:
-            return None
-
+        policy = self.reporter_policies.get(agent.id)
+        location: tuple[int, int] | None = None
+        if policy is None:
+            if not ordinary_fire:
+                return None
+        else:
+            observation = combined.copy()
+            observation.setflags(write=False)
+            signal_vector = agent.state.signal_vector.astype(np.float64, copy=True)
+            signal_vector.setflags(write=False)
+            context = ReporterPolicyContext(
+                observation=observation,
+                signal_vector=signal_vector,
+                anomaly_score=anomaly,
+                escalation_threshold=threshold,
+                time_step=self.time_step,
+                location_frame=self._location_frame,
+                streams=tuple(
+                    ReporterStream.from_stream(self.streams[stream_id])
+                    for stream_id in agent.state.input_stream_ids
+                    if stream_id in self.streams
+                    and self.streams[stream_id].stream_type == StreamType.RAW
+                ),
+            )
+            decision = policy.decide(context)
+            if not decision.escalate:
+                return None
+            if decision.location is None:
+                raise ValueError(
+                    f"reporter policy for agent {agent.id!r} escalated without a location"
+                )
+            location = decision.location
+            if self._location_frame is not None:
+                location = project_location_to_frame(location, self._location_frame)
+            agent.state.policy_report_location = location
         if self.config.require_grounded_report_locations and (
             agent.state.last_geometry_location is None
+            and agent.state.policy_report_location is None
         ):
             return None
 
@@ -624,7 +670,8 @@ class World:
         agent.state.reports_issued += 1
         agent.state.last_escalated = True
 
-        location = self._resolve_report_location(agent, combined)
+        if location is None:
+            location = self._resolve_report_location(agent, combined)
 
         return Report(
             agent_id=agent.id,
@@ -773,6 +820,20 @@ class World:
         raw_ungrounded_yield = sum(a.state.last_step_raw_ungrounded_yield for a in living)
         raw_total_yield = raw_grounded_yield + raw_ungrounded_yield
         total_yield = grounded_yield + ungrounded_yield
+        designed_ids = {agent.id for agent in living if agent.genome.reporter_policy is not None}
+        designed_reports = [report for report in reports if report.agent_id in designed_ids]
+        ordinary_reports = [report for report in reports if report.agent_id not in designed_ids]
+        self._last_reporter_groups = {
+            "designed_population_share": len(designed_ids) / len(living) if living else 0.0,
+            "designed_reports": len(designed_reports),
+            "ordinary_reports": len(ordinary_reports),
+            "designed_correct_reports": sum(
+                1 for report in designed_reports if report.verified and report.correct
+            ),
+            "ordinary_correct_reports": sum(
+                1 for report in ordinary_reports if report.verified and report.correct
+            ),
+        }
         attention_delta_ids = set(self._attention_deltas)
         eligible_agents = [a for a in living if a.id in attention_delta_ids]
         return StepRecord(

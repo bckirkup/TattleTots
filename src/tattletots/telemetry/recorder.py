@@ -9,6 +9,16 @@ from tattletots.models.location import EventLocation
 from tattletots.telemetry.spatial_nulls import static_prior_precision
 
 
+def _empty_reporter_groups() -> dict[str, float | int]:
+    return {
+        "designed_population_share": 0.0,
+        "designed_reports": 0,
+        "ordinary_reports": 0,
+        "designed_correct_reports": 0,
+        "ordinary_correct_reports": 0,
+    }
+
+
 class TelemetrySummary(TypedDict):
     total_steps: int
     peak_population: int
@@ -34,6 +44,9 @@ class TelemetrySummary(TypedDict):
     total_responses_judged_unnecessary: int
     responder_necessity_rate: float
     unnecessary_dispatch_rate: float
+    designed_population_share: float
+    designed_precision: float
+    ordinary_precision: float
 
 
 @dataclass
@@ -89,6 +102,7 @@ class TelemetryRecorder:
     """Accumulates step records and provides summary analytics."""
 
     history: list[StepRecord] = field(default_factory=list)
+    reporter_group_history: list[dict[str, float | int]] = field(default_factory=list)
     initiation_min_grounded_yield_share: float = 0.5
     initiation_attention_insolvency_steps_fraction: float = 0.8
     initiation_min_solvent_fraction: float = 0.5
@@ -108,9 +122,15 @@ class TelemetryRecorder:
         self.initiation_min_solvent_fraction = min_solvent_fraction
         self.initiation_population_capacity_overshoot_factor = population_capacity_overshoot_factor
 
-    def record_step(self, record: StepRecord) -> None:
+    def record_step(
+        self,
+        record: StepRecord,
+        *,
+        reporter_groups: dict[str, float | int] | None = None,
+    ) -> None:
         """Append a step record."""
         self.history.append(record)
+        self.reporter_group_history.append(reporter_groups or _empty_reporter_groups())
 
     @property
     def total_steps(self) -> int:
@@ -186,6 +206,21 @@ class TelemetryRecorder:
             "population": [r.population for r in self.history],
             "reports_issued": [r.reports_issued for r in self.history],
             "correct_reports": [r.correct_reports for r in self.history],
+            "designed_population_share": [
+                float(groups["designed_population_share"]) for groups in self.reporter_group_history
+            ],
+            "designed_reports": [
+                int(groups["designed_reports"]) for groups in self.reporter_group_history
+            ],
+            "ordinary_reports": [
+                int(groups["ordinary_reports"]) for groups in self.reporter_group_history
+            ],
+            "designed_correct_reports": [
+                int(groups["designed_correct_reports"]) for groups in self.reporter_group_history
+            ],
+            "ordinary_correct_reports": [
+                int(groups["ordinary_correct_reports"]) for groups in self.reporter_group_history
+            ],
             "false_alarms": [r.false_alarms for r in self.history],
             "missed_events": [r.missed_events for r in self.history],
             "responses_dispatched": [r.responses_dispatched for r in self.history],
@@ -317,6 +352,30 @@ class TelemetryRecorder:
         capacities = [r.attention_carrying_capacity for r in self.history if r.population > 0]
         return sum(capacities) / len(capacities) if capacities else 0.0
 
+    def _reporter_group_summary(self) -> dict[str, float]:
+        designed_reports = sum(
+            int(groups["designed_reports"]) for groups in self.reporter_group_history
+        )
+        ordinary_reports = sum(
+            int(groups["ordinary_reports"]) for groups in self.reporter_group_history
+        )
+        designed_correct = sum(
+            int(groups["designed_correct_reports"]) for groups in self.reporter_group_history
+        )
+        ordinary_correct = sum(
+            int(groups["ordinary_correct_reports"]) for groups in self.reporter_group_history
+        )
+        population_shares = [
+            float(groups["designed_population_share"]) for groups in self.reporter_group_history
+        ]
+        return {
+            "designed_population_share": (
+                sum(population_shares) / len(population_shares) if population_shares else 0.0
+            ),
+            "designed_precision": designed_correct / max(designed_reports, 1),
+            "ordinary_precision": ordinary_correct / max(ordinary_reports, 1),
+        }
+
     def initiation_degeneracy(self) -> tuple[bool, list[str]]:
         """Return whether configured initiation degeneracies occurred."""
         if not self.history:
@@ -366,6 +425,7 @@ class TelemetryRecorder:
     def summary(self) -> TelemetrySummary:
         """Summary statistics for the entire run."""
         degenerate, reasons = self.initiation_degeneracy()
+        reporter_groups = self._reporter_group_summary()
         return {
             "total_steps": self.total_steps,
             "peak_population": self.peak_population,
@@ -395,4 +455,7 @@ class TelemetryRecorder:
             "unnecessary_dispatch_rate": (
                 self.total_responses_judged_unnecessary / max(self.total_responses_dispatched, 1)
             ),
+            "designed_population_share": reporter_groups["designed_population_share"],
+            "designed_precision": reporter_groups["designed_precision"],
+            "ordinary_precision": reporter_groups["ordinary_precision"],
         }

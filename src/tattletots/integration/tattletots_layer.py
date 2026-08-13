@@ -133,6 +133,9 @@ class TattleTotsLayer:
                 ),
                 responder_necessity_rate=float(summary["responder_necessity_rate"]),
                 unnecessary_dispatch_rate=float(summary["unnecessary_dispatch_rate"]),
+                designed_population_share=float(summary["designed_population_share"]),
+                designed_precision=float(summary["designed_precision"]),
+                ordinary_precision=float(summary["ordinary_precision"]),
             ),
             cost_metrics=CostMetrics(
                 total_surveillance_cost=cost_summary["total_surveillance_cost"],

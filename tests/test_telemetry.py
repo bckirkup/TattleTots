@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from tattletots.models.location import EventLocation
-from tattletots.output_schema import TimeSeries
+from tattletots.output_schema import EcologyMetrics, RunSummary, SimulationOutput, TimeSeries
 from tattletots.telemetry.cost_accounting import CostAccumulator, StepCosts
 from tattletots.telemetry.recorder import StepRecord, TelemetryRecorder
 
@@ -152,6 +152,9 @@ class TestTelemetryRecorder:
             "total_responses_judged_unnecessary",
             "responder_necessity_rate",
             "unnecessary_dispatch_rate",
+            "designed_population_share",
+            "designed_precision",
+            "ordinary_precision",
         }
         assert set(s.keys()) == expected_keys
 
@@ -257,6 +260,53 @@ class TestTelemetryRecorder:
         assert ts.population == [10, 9]
         assert ts.reports_issued == [3, 1]
         assert ts.cost_per_step == [pytest.approx(6.0), pytest.approx(15.0)]
+
+    def test_reporter_groups_round_trip_through_simulation_output(self, tmp_path) -> None:
+        rec = TelemetryRecorder()
+        rec.record_step(
+            _make_record(time_step=1, reports_issued=3, correct_reports=2),
+            reporter_groups={
+                "designed_population_share": 0.5,
+                "designed_reports": 2,
+                "ordinary_reports": 1,
+                "designed_correct_reports": 1,
+                "ordinary_correct_reports": 1,
+            },
+        )
+        rec.record_step(
+            _make_record(time_step=2, reports_issued=2, correct_reports=1),
+            reporter_groups={
+                "designed_population_share": 0.75,
+                "designed_reports": 1,
+                "ordinary_reports": 1,
+                "designed_correct_reports": 0,
+                "ordinary_correct_reports": 1,
+            },
+        )
+        summary = rec.summary()
+        output = SimulationOutput(
+            run_summary=RunSummary(domain="test", steps_completed=2),
+            ecology_metrics=EcologyMetrics(
+                designed_population_share=summary["designed_population_share"],
+                designed_precision=summary["designed_precision"],
+                ordinary_precision=summary["ordinary_precision"],
+            ),
+            time_series=TimeSeries.from_telemetry(rec, [0.0, 0.0]),
+        )
+
+        path = tmp_path / "simulation-output.json"
+        output.write_json(path)
+        loaded = SimulationOutput.read_json(path)
+
+        assert loaded.ecology_metrics.designed_population_share == pytest.approx(0.625)
+        assert loaded.ecology_metrics.designed_precision == pytest.approx(1 / 3)
+        assert loaded.ecology_metrics.ordinary_precision == pytest.approx(1.0)
+        assert loaded.time_series.designed_population_share == [0.5, 0.75]
+        assert loaded.time_series.designed_reports == [2, 1]
+        assert loaded.time_series.ordinary_reports == [1, 1]
+        assert loaded.time_series.designed_correct_reports == [1, 0]
+        assert loaded.time_series.ordinary_correct_reports == [1, 1]
+        assert len(rec.history) == len(rec.reporter_group_history) == 2
 
     def test_initiation_degeneracy_names_each_reason(self) -> None:
         cases = (
