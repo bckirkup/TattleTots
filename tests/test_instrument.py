@@ -40,8 +40,13 @@ def test_gaussian_shift_instrument_rejects_unobservable_location_label() -> None
     inferability = next(
         finding for finding in report.findings if finding.check == InstrumentCheck.INFERABILITY
     )
-    assert not inferability.passed
-    assert "does not carry" in inferability.message
+    assert inferability.passed
+    assert "not assessed" in inferability.message
+    localization = next(
+        finding for finding in report.findings if finding.check == InstrumentCheck.LOCALIZATION
+    )
+    assert not localization.passed
+    assert "vacuous" in localization.message
     assert 0.0 <= report.decoder_precision <= 1.0
 
 
@@ -63,6 +68,7 @@ def test_instrument_report_exposes_structured_check_results() -> None:
         InstrumentCheck.COORDINATE_FRAME,
         InstrumentCheck.DECLARATIONS,
         InstrumentCheck.BASELINE,
+        InstrumentCheck.LOCALIZATION,
         InstrumentCheck.INFERABILITY,
     }
     assert all(finding.message for finding in report.findings)

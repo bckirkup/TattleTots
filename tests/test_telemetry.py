@@ -261,21 +261,6 @@ class TestTelemetryRecorder:
     def test_initiation_degeneracy_names_each_reason(self) -> None:
         cases = (
             (
-                "precision_not_above_static_prior",
-                _make_record(
-                    ground_truth_active=True,
-                    active_location_count=1,
-                    ground_truth_locations=((0, 0), (1, 1)),
-                    verified_report_locations=((1, 1),),
-                    reports_issued=1,
-                    correct_reports=0,
-                    population=1,
-                    n_attention_solvent_agents=1,
-                    n_attention_eligible_agents=1,
-                    grounded_info_yield=1.0,
-                ),
-            ),
-            (
                 "grounded_yield_share_below_minimum",
                 _make_record(
                     reports_issued=1,
@@ -335,6 +320,28 @@ class TestTelemetryRecorder:
         assert not permissive.initiation_degeneracy()[0]
         assert strict.initiation_degeneracy()[0]
         assert strict.summary()["grounded_yield_share"] == pytest.approx(0.5)
+
+    def test_static_prior_precision_reason_uses_report_timing(self) -> None:
+        rec = TelemetryRecorder()
+        for step, location in enumerate(((0, 0), (1, 1))):
+            rec.record_step(
+                _make_record(
+                    time_step=step,
+                    active_location_count=1,
+                    ground_truth_locations=(location,),
+                    reports_issued=1,
+                    correct_reports=0,
+                    population=1,
+                    n_attention_solvent_agents=1,
+                    n_attention_eligible_agents=1,
+                    grounded_info_yield=1.0,
+                )
+            )
+
+        degenerate, reasons = rec.initiation_degeneracy()
+
+        assert degenerate
+        assert "precision_not_above_static_prior" in reasons
 
     def test_attention_degeneracy_threshold_and_capacity_sensitivity(self) -> None:
         records = [
@@ -505,6 +512,7 @@ class TestTelemetryRecorder:
 
         assert degenerate
         assert "insufficient_location_support" in reasons
+        assert "localization_vacuous" in reasons
         assert "precision_not_above_static_prior" not in reasons
 
 

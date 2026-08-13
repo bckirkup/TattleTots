@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from collections import Counter
 from dataclasses import dataclass, field
 from typing import TypedDict
 
 from tattletots.models.location import EventLocation
+from tattletots.telemetry.spatial_nulls import static_prior_precision
 
 
 class TelemetrySummary(TypedDict):
@@ -272,6 +272,9 @@ class TelemetryRecorder:
             support.update(record.verified_report_locations)
         return support
 
+    def _ground_truth_location_support(self) -> set[EventLocation]:
+        return {location for record in self.history for location in record.ground_truth_locations}
+
     def _chance_precision(self) -> float:
         if not self.history:
             return 0.0
@@ -284,18 +287,13 @@ class TelemetryRecorder:
         return mean_active_locations / support_size
 
     def _static_prior_precision(self) -> float:
-        """Return precision from always naming the modal event location."""
-        if not self.history:
-            return 0.0
-        location_counts = Counter(
-            location for record in self.history for location in record.ground_truth_locations
+        return static_prior_precision(
+            (
+                record.ground_truth_locations,
+                record.reports_issued,
+            )
+            for record in self.history
         )
-        if not location_counts:
-            return 0.0
-        prior_location = location_counts.most_common(1)[0][0]
-        return sum(
-            prior_location in record.ground_truth_locations for record in self.history
-        ) / len(self.history)
 
     def _grounded_yield_share(self) -> float:
         total = self.total_grounded_info_yield + self.total_ungrounded_info_yield
@@ -328,12 +326,15 @@ class TelemetryRecorder:
         event_steps = sum(r.active_location_count > 0 for r in self.history)
         if event_steps == 0:
             reasons.append("no_ground_truth_events")
-        support_size = len(self._location_support())
-        if support_size < 2:
+        ground_truth_support_size = len(self._ground_truth_location_support())
+        if ground_truth_support_size < 2:
             reasons.append("insufficient_location_support")
-        if event_steps > 0 and support_size >= 2:
+        static_prior = self._static_prior_precision()
+        if event_steps > 0 and (ground_truth_support_size < 2 or static_prior >= 0.99):
+            reasons.append("localization_vacuous")
+        elif event_steps > 0 and ground_truth_support_size >= 2:
             precision = self.total_correct_reports / max(self.total_reports, 1)
-            if precision <= self._static_prior_precision():
+            if precision <= static_prior:
                 reasons.append("precision_not_above_static_prior")
         if self._grounded_yield_share() < self.initiation_min_grounded_yield_share:
             reasons.append("grounded_yield_share_below_minimum")

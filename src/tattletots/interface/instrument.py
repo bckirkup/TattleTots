@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections import Counter
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -12,6 +11,7 @@ from tattletots.interface.domain_adapter import DomainAdapter
 from tattletots.models.location import EventLocation, LocationFrame
 from tattletots.models.observation import ObservationStatus, StreamMetadata
 from tattletots.models.stream import Stream
+from tattletots.telemetry.spatial_nulls import static_prior_precision
 
 
 class InstrumentCheck(StrEnum):
@@ -22,6 +22,7 @@ class InstrumentCheck(StrEnum):
     DECLARATIONS = "declarations"
     INFERABILITY = "inferability"
     BASELINE = "baseline"
+    LOCALIZATION = "localization"
 
 
 @dataclass(frozen=True)
@@ -82,13 +83,13 @@ def validate_instrument(
     supported_events = 0
     reportable_events = 0
     findings: list[InstrumentFinding] = []
-    active_location_history: list[tuple[EventLocation, ...]] = []
+    active_location_history: list[tuple[tuple[EventLocation, ...], int]] = []
 
     for time_step in range(steps):
         adapter.step(time_step)
         active = tuple(adapter.get_active_locations(time_step))
-        active_location_history.append(active)
         is_event = adapter.get_ground_truth(time_step)
+        active_location_history.append((active, int(is_event)))
         if is_event:
             event_steps += 1
             event_locations.update(active)
@@ -118,7 +119,7 @@ def validate_instrument(
         adapter,
     )
     chance_baseline = 1.0 / len(candidates) if candidates else 1.0
-    static_prior_baseline = _static_prior_baseline(active_location_history)
+    static_prior_baseline = static_prior_precision(active_location_history)
     support_precision = supported_events / reportable_events if reportable_events else 0.0
     decoder_precision = correct_reports / reportable_events if reportable_events else 0.0
 
@@ -161,16 +162,37 @@ def validate_instrument(
             threshold=chance_baseline,
         )
     )
+    localization_vacuous = len(event_locations) < 2 or static_prior_baseline >= 0.99
+    findings.append(
+        InstrumentFinding(
+            check=InstrumentCheck.LOCALIZATION,
+            passed=not localization_vacuous,
+            message=(
+                "Localization is non-vacuous across multiple event locations."
+                if not localization_vacuous
+                else "Localization is vacuous because event locations have no meaningful spread."
+            ),
+            measured=static_prior_baseline,
+            threshold=0.99,
+        )
+    )
     findings.append(
         InstrumentFinding(
             check=InstrumentCheck.INFERABILITY,
-            passed=reportable_events > 0
-            and support_precision > static_prior_baseline + inferability_margin,
-            message=(
-                "Published evidence carries event locations above the static prior."
-                if reportable_events > 0
+            passed=localization_vacuous
+            or (
+                reportable_events > 0
                 and support_precision > static_prior_baseline + inferability_margin
-                else "Published evidence does not carry event locations above the static prior."
+            ),
+            message=(
+                "Inferability is not assessed because localization is vacuous."
+                if localization_vacuous
+                else (
+                    "Published evidence carries event locations above the static prior."
+                    if reportable_events > 0
+                    and support_precision > static_prior_baseline + inferability_margin
+                    else "Published evidence does not carry event locations above the static prior."
+                )
             ),
             measured=support_precision,
             threshold=static_prior_baseline + inferability_margin,
@@ -188,18 +210,6 @@ def validate_instrument(
         static_prior_baseline=static_prior_baseline,
         candidate_locations=tuple(sorted(candidates)),
     )
-
-
-def _static_prior_baseline(active_locations: list[tuple[EventLocation, ...]]) -> float:
-    """Measure precision from always naming the modal event location."""
-    event_windows = [locations for locations in active_locations if locations]
-    if not event_windows:
-        return 0.0
-    counts = Counter(location for locations in event_windows for location in locations)
-    if not counts:
-        return 0.0
-    prior_location = counts.most_common(1)[0][0]
-    return sum(prior_location in locations for locations in event_windows) / len(event_windows)
 
 
 def _validate_stream_declarations(
