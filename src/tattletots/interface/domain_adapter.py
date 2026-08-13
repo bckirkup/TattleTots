@@ -12,7 +12,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from tattletots.models.dispatch_target import DispatchTarget
-from tattletots.models.location import EventLocation
+from tattletots.models.location import EventLocation, LocationFrame
 from tattletots.models.response_outcome import ResponseOutcome
 from tattletots.models.stream import Stream
 from tattletots.models.user import User
@@ -63,6 +63,16 @@ class DomainAdapter(ABC):
     @abstractmethod
     def get_active_locations(self, time_step: int) -> list[EventLocation]:
         """Return locations where a true event is occurring at this time step."""
+
+    def get_location_frame(self) -> LocationFrame | None:
+        """Return the public grading frame, without exposing feature provenance.
+
+        A domain may declare the coordinate extent used by ``get_active_locations``
+        because it is arena-level knowledge.  This frame must not be used to
+        reconstruct per-feature coordinates after fusion has destroyed provenance.
+        Domains that do not declare a frame retain legacy behavior.
+        """
+        return None
 
     @abstractmethod
     def infer_report_location(

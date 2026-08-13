@@ -10,7 +10,7 @@ from numpy.typing import NDArray
 from tattletots.models.agent import Agent
 from tattletots.models.genome import Genome, SpatialInferenceStrategy, SpatialStrategy
 from tattletots.models.identity import stable_id_digest
-from tattletots.models.location import EventLocation
+from tattletots.models.location import EventLocation, LocationFrame
 from tattletots.models.observation import ObservationPacket, ObservationStatus
 
 DimToLocationFn = Callable[[int], EventLocation]
@@ -170,6 +170,17 @@ def _project_location_to_observed_hull(
     lower = coordinates.min(axis=0)
     upper = coordinates.max(axis=0)
     projected = np.clip(np.asarray(location, dtype=np.float64), lower, upper)
+    return (int(round(projected[0])), int(round(projected[1])))
+
+
+def project_location_to_frame(location: EventLocation, frame: LocationFrame) -> EventLocation:
+    """Project a report into a domain's declared public coordinate frame."""
+    lower, upper = frame
+    projected = np.clip(
+        np.asarray(location, dtype=np.float64),
+        np.asarray(lower, dtype=np.float64),
+        np.asarray(upper, dtype=np.float64),
+    )
     return (int(round(projected[0])), int(round(projected[1])))
 
 

@@ -100,6 +100,9 @@ class TestGaussianShiftScenario:
         assert len(locs) == 1
         assert locs[0][1] == 0
 
+    def test_location_frame_is_optional(self) -> None:
+        assert GaussianShiftScenario().get_location_frame() is None
+
     def test_infer_report_location_from_stream_energy(self) -> None:
         scenario = GaussianShiftScenario(seed=42)
         scenario.step(0)

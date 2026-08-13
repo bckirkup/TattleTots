@@ -191,6 +191,16 @@ def test_geometry_location_precedes_callback_but_metadata_free_keeps_callback() 
     assert world._resolve_report_location(agent, np.ones(3)) == (9, 9)
 
 
+def test_declared_location_frame_projects_metadata_free_reports() -> None:
+    world = World(config=SimulationConfig(initial_population=2, seed=42))
+    agent = Agent()
+    agent.state.last_geometry_location = None
+    agent.state.last_inferred_location = (99, -3)
+    world.set_location_frame(((0, 0), (5, 5)))
+
+    assert world._resolve_report_location(agent, np.ones(3)) == (5, 0)
+
+
 def test_sparse_sensor_ground_truth_is_reachable_from_published_streams() -> None:
     scores: list[tuple[float, float, float]] = []
     for seed in (7, 42, 99, 123, 2024):
