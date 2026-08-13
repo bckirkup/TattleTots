@@ -4,22 +4,12 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from types import ModuleType
-from typing import cast
 
 import numpy as np
 from numpy.typing import NDArray
 
 from tattletots.engine.gpu_utils import get_array_module, to_numpy
 from tattletots.models.genome import CompressionType
-
-
-def _standardize(flat: NDArray[np.float64], xp: ModuleType) -> NDArray[np.float64]:
-    """Remove location and scale so model currency is dimensionless."""
-    centered = flat - xp.mean(flat)
-    scale = xp.sqrt(xp.mean(centered**2))
-    if float(scale) <= 1e-12:
-        return cast(NDArray[np.float64], xp.zeros_like(centered))
-    return cast(NDArray[np.float64], centered / scale)
 
 
 class CompressionModel(ABC):
