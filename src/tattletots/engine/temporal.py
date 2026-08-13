@@ -71,6 +71,8 @@ def _fuse_packet(agent: Agent, current: ObservationPacket) -> ObservationPacket:
 
     shape_changed = _has_shape_change(agent.state.temporal_buffer, current)
     if shape_changed:
+        # Dimensionality changes invalidate temporal fusion, matching the
+        # compression models' reset-on-dimension-change behavior.
         agent.state.temporal_buffer = []
     buffer = _append_sample(agent, current)
     if shape_changed:
@@ -84,10 +86,14 @@ def _fuse_packet(agent: Agent, current: ObservationPacket) -> ObservationPacket:
         fused = current.data if len(buffer) < 2 else _fuse_ar_lag(buffer, current.data)
     else:
         fused = current.data
+    shared_metadata = _shared_metadata(buffer, fused.size)
     return ObservationPacket(
         data=fused,
-        metadata=_shared_metadata(buffer, fused.size),
+        metadata=shared_metadata,
         status=_fused_status(buffer, fused.size),
+        observed_fraction=(
+            _observed_fraction(buffer, fused.size) if shared_metadata is not None else None
+        ),
     )
 
 
@@ -138,6 +144,20 @@ def _fused_status(
     result[missing] = ObservationStatus.MISSING.value
     result[masked] = ObservationStatus.MASKED.value
     return result
+
+
+def _observed_fraction(
+    buffer: list[ObservationPacket],
+    dimensionality: int,
+) -> NDArray[np.float64] | None:
+    statuses = [_sample_status(sample) for sample in buffer]
+    if any(status is None or status.size != dimensionality for status in statuses):
+        return None
+    observed = np.zeros(dimensionality, dtype=np.float64)
+    for status in statuses:
+        assert status is not None
+        observed += status == ObservationStatus.OBSERVED.value
+    return observed / len(statuses)
 
 
 def apply_temporal_observation(agent: Agent, current: ObservationPacket) -> ObservationPacket:

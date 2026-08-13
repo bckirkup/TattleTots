@@ -262,6 +262,8 @@ def test_temporal_fusion_retains_geometry_when_schema_agrees(
     assert second.metadata == first.metadata
     assert second.status is not None
     assert list(second.status) == ["observed", "observed"]
+    assert second.observed_fraction is not None
+    np.testing.assert_allclose(second.observed_fraction, [1.0, 1.0])
 
 
 def test_temporal_fusion_drops_geometry_when_schema_changes() -> None:
@@ -297,6 +299,7 @@ def test_temporal_fusion_drops_geometry_when_schema_changes() -> None:
     fused = apply_temporal_observation(agent, second)
 
     assert fused.metadata is None
+    assert fused.observed_fraction is None
     assert len(agent.state.temporal_buffer) == 2
 
 
@@ -316,6 +319,7 @@ def test_temporal_fusion_resets_history_when_dimensionality_changes() -> None:
 
     assert fused.data.size == 3
     assert fused.metadata is None
+    assert fused.observed_fraction is None
     assert len(agent.state.temporal_buffer) == 1
 
 
@@ -345,6 +349,56 @@ def test_temporal_status_preserves_alternating_missing_signal() -> None:
     assert fused.metadata == metadata
     assert fused.status is not None
     assert list(fused.status) == ["missing", "observed"]
+    assert fused.observed_fraction is not None
+    np.testing.assert_allclose(fused.observed_fraction, [0.5, 1.0])
+
+
+@pytest.mark.parametrize(
+    ("statuses", "expected_status", "expected_fraction"),
+    [
+        (
+            [["missing", "missing"], ["missing", "missing"]],
+            ["missing", "missing"],
+            [0.0, 0.0],
+        ),
+        (
+            [["observed", "missing"], ["missing", "observed"]],
+            ["missing", "missing"],
+            [0.5, 0.5],
+        ),
+        (
+            [["observed", "observed"], ["observed", "observed"]],
+            ["observed", "observed"],
+            [1.0, 1.0],
+        ),
+    ],
+)
+def test_temporal_observed_fraction_distinguishes_availability_histories(
+    statuses: list[list[str]],
+    expected_status: list[str],
+    expected_fraction: list[float],
+) -> None:
+    agent = Agent(
+        genome=Genome(
+            working_dim=8,
+            temporal_memory_depth=2,
+            temporal_fusion_mode=TemporalFusionMode.EMA,
+        )
+    )
+    metadata = _metadata(2)
+    for values in statuses:
+        packet = ObservationPacket(
+            data=np.ones(2),
+            metadata=metadata,
+            status=np.asarray(values, dtype="<U8"),
+        )
+        fused = apply_temporal_observation(agent, packet)
+
+    assert fused.metadata == metadata
+    assert fused.status is not None
+    assert list(fused.status) == expected_status
+    assert fused.observed_fraction is not None
+    np.testing.assert_allclose(fused.observed_fraction, expected_fraction)
 
 
 def test_window_stack_drops_geometry_if_fused_feature_count_changes(
@@ -370,6 +424,7 @@ def test_window_stack_drops_geometry_if_fused_feature_count_changes(
 
     assert fused.data.size == 4
     assert fused.metadata is None
+    assert fused.observed_fraction is None
 
 
 def test_numeric_only_streams_remain_metadata_free() -> None:
