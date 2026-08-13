@@ -100,12 +100,49 @@ def test_geometry_inference_uses_genome_strategy() -> None:
     fixed_agent = Agent(
         genome=Genome(
             spatial_inference_strategy=SpatialInferenceStrategy.FIXED_PRIOR,
-            spatial_region=(7, 6),
+            spatial_region=(99, -3),
         )
     )
 
     assert infer_geometry_location(peak_agent, packet) == (4, 2)
-    assert infer_geometry_location(fixed_agent, packet) == (7, 6)
+    assert infer_geometry_location(fixed_agent, packet) == (8, 0)
+
+
+def test_evidence_strategies_stay_within_declared_coordinate_hull() -> None:
+    packet = _geometry_packet()
+    bounds = ((0, 8), (0, 8))
+
+    for strategy in (
+        SpatialInferenceStrategy.PEAK,
+        SpatialInferenceStrategy.WEIGHTED_CENTROID,
+        SpatialInferenceStrategy.KERNEL,
+    ):
+        location = infer_geometry_location(
+            Agent(genome=Genome(spatial_inference_strategy=strategy)),
+            packet,
+        )
+        assert location is not None
+        assert bounds[0][0] <= location[0] <= bounds[0][1]
+        assert bounds[1][0] <= location[1] <= bounds[1][1]
+
+
+def test_zero_evidence_projects_prior_into_observed_hull() -> None:
+    packet = ObservationPacket(
+        data=np.zeros(2),
+        metadata=StreamMetadata(
+            coordinates=[(1.0, 2.0), (4.0, 5.0)],
+            modality=["a", "a"],
+        ),
+        status=np.array(["observed", "observed"], dtype="<U8"),
+    )
+    agent = Agent(
+        genome=Genome(
+            spatial_inference_strategy=SpatialInferenceStrategy.KERNEL,
+            spatial_region=(99, -3),
+        )
+    )
+
+    assert infer_geometry_location(agent, packet) == (4, 2)
 
 
 def test_masked_features_cannot_supply_absence_evidence() -> None:
@@ -152,6 +189,16 @@ def test_geometry_location_precedes_callback_but_metadata_free_keeps_callback() 
     assert world._resolve_report_location(agent, np.ones(3)) == (4, 2)
     agent.state.last_geometry_location = None
     assert world._resolve_report_location(agent, np.ones(3)) == (9, 9)
+
+
+def test_declared_location_frame_projects_metadata_free_reports() -> None:
+    world = World(config=SimulationConfig(initial_population=2, seed=42))
+    agent = Agent()
+    agent.state.last_geometry_location = None
+    agent.state.last_inferred_location = (99, -3)
+    world.set_location_frame(((0, 0), (5, 5)))
+
+    assert world._resolve_report_location(agent, np.ones(3)) == (5, 0)
 
 
 def test_sparse_sensor_ground_truth_is_reachable_from_published_streams() -> None:

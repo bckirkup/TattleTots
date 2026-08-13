@@ -35,6 +35,7 @@ from tattletots.engine.spatial import (
     apply_spatial_observation,
     infer_geometry_location,
     infer_spatial_location,
+    project_location_to_frame,
 )
 from tattletots.engine.temporal import apply_temporal_observation
 from tattletots.engine.trophic import compute_trophic_level, select_input_streams
@@ -51,7 +52,7 @@ from tattletots.models.agent import Agent, AgentState, LifecycleStage
 from tattletots.models.energy import EnergyReserves
 from tattletots.models.genome import Genome, ParentalStrategy, ResidualPolicy, SpatialStrategy
 from tattletots.models.identity import is_uuid_identifier, seeded_id
-from tattletots.models.location import EventLocation
+from tattletots.models.location import EventLocation, LocationFrame
 from tattletots.models.observation import ObservationPacket
 from tattletots.models.report import Report
 from tattletots.models.response_outcome import ResponseOutcome
@@ -83,6 +84,7 @@ class World:
     _ground_truth_active: bool = False
     _location_inference: LocationInferenceFn | None = None
     _dim_to_location: DimToLocationFn | None = None
+    _location_frame: LocationFrame | None = None
     _ground_truth_vector: NDArray[np.float64] | None = None
     last_reports: list[Report] = field(default_factory=list)
     last_whistleblower_reports: list[WhistleblowerReport] = field(default_factory=list)
@@ -187,6 +189,10 @@ class World:
     def set_dim_to_location(self, fn: DimToLocationFn) -> None:
         """Register mapping from dimension index to spatial location."""
         self._dim_to_location = fn
+
+    def set_location_frame(self, frame: LocationFrame | None) -> None:
+        """Register the domain's public frame for report-coordinate projection."""
+        self._location_frame = frame
 
     def set_ground_truth_vector(self, vec: NDArray[np.float64]) -> None:
         """Optional ground truth vector for whistleblowing."""
@@ -551,23 +557,25 @@ class World:
         agent: Agent,
         combined: NDArray[np.float64],
     ) -> EventLocation:
-        if agent.state.last_geometry_location is not None:
-            return agent.state.last_geometry_location
-        location = agent.state.last_inferred_location
+        location = agent.state.last_geometry_location
         if location is None:
-            location = infer_spatial_location(
-                agent,
-                combined,
-                n_blocks=self.config.n_spatial_blocks,
-                dim_to_location=self._dim_to_location,
-            )
-        if (
-            agent.genome.spatial_strategy == SpatialStrategy.GLOBAL
-            and self._location_inference is not None
-        ):
-            raw_data, raw_labels = gather_raw_stream_data(agent, self.streams)
-            if raw_data:
-                location = self._location_inference(raw_data, raw_labels)
+            location = agent.state.last_inferred_location
+            if location is None:
+                location = infer_spatial_location(
+                    agent,
+                    combined,
+                    n_blocks=self.config.n_spatial_blocks,
+                    dim_to_location=self._dim_to_location,
+                )
+            if (
+                agent.genome.spatial_strategy == SpatialStrategy.GLOBAL
+                and self._location_inference is not None
+            ):
+                raw_data, raw_labels = gather_raw_stream_data(agent, self.streams)
+                if raw_data:
+                    location = self._location_inference(raw_data, raw_labels)
+        if self._location_frame is not None:
+            location = project_location_to_frame(location, self._location_frame)
         return location
 
     def _maybe_escalate(

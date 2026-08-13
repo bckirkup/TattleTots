@@ -38,6 +38,7 @@ class TattleTotsLayer:
         for user in adapter.get_users():
             world.add_user(user)
         world.set_location_inference(adapter.infer_report_location)
+        world.set_location_frame(adapter.get_location_frame())
         world.seed_population()
         align_user_priorities_to_report_space(world)
         cops = init_user_cops(world, adapter, sim_config)
