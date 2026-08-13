@@ -257,6 +257,8 @@ def _recombine_field(
     data_b: dict[str, Any],
     rng: np.random.Generator,
 ) -> object:
+    if key == "reporter_policy" and data_a[key] == data_b[key]:
+        return data_a[key]
     if key in _ARRAY_RECOMBINATION_KEYS:
         arr_a = np.array(data_a[key], dtype=np.float64)
         arr_b = np.array(data_b[key], dtype=np.float64)
@@ -307,6 +309,10 @@ class Genome(BaseModel):
         ge=0.0,
         le=1.0,
         description="Anomaly score threshold above which the agent escalates",
+    )
+    reporter_policy: str | None = Field(
+        default=None,
+        description="Named non-genomic reporter policy; None uses ordinary escalation",
     )
     target_user_affinity: np.ndarray = Field(
         default_factory=lambda: np.array([], dtype=np.float64),

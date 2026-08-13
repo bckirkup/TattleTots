@@ -9,6 +9,16 @@ from tattletots.models.location import EventLocation
 from tattletots.telemetry.spatial_nulls import static_prior_precision
 
 
+def _empty_reporter_groups() -> dict[str, float | int]:
+    return {
+        "designed_population_share": 0.0,
+        "designed_reports": 0,
+        "ordinary_reports": 0,
+        "designed_correct_reports": 0,
+        "ordinary_correct_reports": 0,
+    }
+
+
 class TelemetrySummary(TypedDict):
     total_steps: int
     peak_population: int
@@ -89,6 +99,7 @@ class TelemetryRecorder:
     """Accumulates step records and provides summary analytics."""
 
     history: list[StepRecord] = field(default_factory=list)
+    reporter_group_history: list[dict[str, float | int]] = field(default_factory=list)
     initiation_min_grounded_yield_share: float = 0.5
     initiation_attention_insolvency_steps_fraction: float = 0.8
     initiation_min_solvent_fraction: float = 0.5
@@ -108,9 +119,15 @@ class TelemetryRecorder:
         self.initiation_min_solvent_fraction = min_solvent_fraction
         self.initiation_population_capacity_overshoot_factor = population_capacity_overshoot_factor
 
-    def record_step(self, record: StepRecord) -> None:
+    def record_step(
+        self,
+        record: StepRecord,
+        *,
+        reporter_groups: dict[str, float | int] | None = None,
+    ) -> None:
         """Append a step record."""
         self.history.append(record)
+        self.reporter_group_history.append(reporter_groups or _empty_reporter_groups())
 
     @property
     def total_steps(self) -> int:
@@ -186,6 +203,21 @@ class TelemetryRecorder:
             "population": [r.population for r in self.history],
             "reports_issued": [r.reports_issued for r in self.history],
             "correct_reports": [r.correct_reports for r in self.history],
+            "designed_population_share": [
+                float(groups["designed_population_share"]) for groups in self.reporter_group_history
+            ],
+            "designed_reports": [
+                int(groups["designed_reports"]) for groups in self.reporter_group_history
+            ],
+            "ordinary_reports": [
+                int(groups["ordinary_reports"]) for groups in self.reporter_group_history
+            ],
+            "designed_correct_reports": [
+                int(groups["designed_correct_reports"]) for groups in self.reporter_group_history
+            ],
+            "ordinary_correct_reports": [
+                int(groups["ordinary_correct_reports"]) for groups in self.reporter_group_history
+            ],
             "false_alarms": [r.false_alarms for r in self.history],
             "missed_events": [r.missed_events for r in self.history],
             "responses_dispatched": [r.responses_dispatched for r in self.history],
