@@ -208,17 +208,30 @@ def _validate_stream_declarations(
                         f"Missing feature {index} in stream {stream.label!r} declares {field}.",
                     )
                 )
+        sensor_coordinates = metadata.sensor_coordinates
+        if sensor_coordinates is None or sensor_coordinates[index] is None:
+            findings.append(
+                InstrumentFinding(
+                    InstrumentCheck.DECLARATIONS,
+                    True,
+                    f"Missing feature {index} in stream {stream.label!r} "
+                    "has no declared static sensor geometry; its absence is less localizable.",
+                )
+            )
 
 
 def _collect_stream_coordinates(
     metadata: StreamMetadata | None, locations: set[EventLocation]
 ) -> None:
     """Collect finite integer-valued coordinate declarations."""
-    if metadata is None or metadata.coordinates is None:
+    if metadata is None:
         return
-    for coordinate in metadata.coordinates:
-        if coordinate is not None and len(coordinate) >= 2 and np.all(np.isfinite(coordinate)):
-            locations.add((int(round(coordinate[0])), int(round(coordinate[1]))))
+    for coordinate_values in (metadata.coordinates, metadata.sensor_coordinates):
+        if coordinate_values is None:
+            continue
+        for coordinate in coordinate_values:
+            if coordinate is not None and len(coordinate) >= 2 and np.all(np.isfinite(coordinate)):
+                locations.add((int(round(coordinate[0])), int(round(coordinate[1]))))
 
 
 def _candidate_locations(

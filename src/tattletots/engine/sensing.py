@@ -257,12 +257,16 @@ def _combined_stream_metadata(streams: list[Stream]) -> StreamMetadata | None:
     if not any(stream.metadata is not None for stream in streams):
         return None
     coordinates = _combined_metadata_field(streams, lambda metadata: metadata.coordinates)
+    sensor_coordinates = _combined_metadata_field(
+        streams, lambda metadata: metadata.sensor_coordinates
+    )
     modalities = _combined_metadata_field(streams, lambda metadata: metadata.modality)
     identities = _combined_metadata_field(streams, lambda metadata: metadata.identity)
     footprints = _combined_metadata_field(streams, lambda metadata: metadata.footprints)
     resolutions = _combined_metadata_field(streams, lambda metadata: metadata.resolution)
     return StreamMetadata(
         coordinates=coordinates,
+        sensor_coordinates=sensor_coordinates,
         modality=modalities,
         identity=identities,
         footprints=footprints,

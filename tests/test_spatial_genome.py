@@ -108,6 +108,20 @@ def test_geometry_inference_uses_genome_strategy() -> None:
     assert infer_geometry_location(fixed_agent, packet) == (8, 0)
 
 
+def test_geometry_inference_uses_static_sensor_geometry_when_object_is_unknown() -> None:
+    packet = ObservationPacket(
+        data=np.array([0.2, 3.0]),
+        metadata=StreamMetadata(
+            sensor_coordinates=[(0.0, 0.0), (4.0, 2.0)],
+            modality=["sensor", "sensor"],
+        ),
+        status=np.array(["missing", "observed"], dtype="<U8"),
+    )
+    agent = Agent(genome=Genome(spatial_inference_strategy=SpatialInferenceStrategy.PEAK))
+
+    assert infer_geometry_location(agent, packet) == (4, 2)
+
+
 def test_evidence_strategies_stay_within_declared_coordinate_hull() -> None:
     packet = _geometry_packet()
     bounds = ((0, 8), (0, 8))

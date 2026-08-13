@@ -7,17 +7,18 @@ from tattletots.scenarios.gaussian_shift import GaussianShiftScenario
 from tattletots.scenarios.sparse_sensor import SparseSensorScenario
 
 
-def test_sparse_sensor_instrument_reaches_above_chance_but_exposes_declarations() -> None:
+def test_sparse_sensor_instrument_is_valid_and_reaches_above_chance() -> None:
     report = validate_instrument(SparseSensorScenario(seed=42), steps=200)
 
-    assert not report.valid
+    assert report.valid
     assert report.event_steps == 200
     assert report.distinct_event_locations > 1
     assert report.inferability_precision > report.chance_baseline
-    declaration = next(
-        finding for finding in report.findings if finding.check == InstrumentCheck.DECLARATIONS
+    assert all(
+        finding.passed
+        for finding in report.findings
+        if finding.check == InstrumentCheck.DECLARATIONS
     )
-    assert not declaration.passed
 
 
 def test_gaussian_shift_instrument_rejects_unobservable_location_label() -> None:
