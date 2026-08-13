@@ -28,7 +28,11 @@ class StreamMetadata(BaseModel):
 
     coordinates: list[tuple[float, ...] | None] | None = Field(
         default=None,
-        description="Coordinate of each feature, when the domain declares one.",
+        description="Coordinate of each observed object, when the domain declares one.",
+    )
+    sensor_coordinates: list[tuple[float, ...] | None] | None = Field(
+        default=None,
+        description="Static sensor geometry for each feature, when publicly known.",
     )
     modality: list[str | None] | None = Field(
         default=None,
@@ -49,7 +53,14 @@ class StreamMetadata(BaseModel):
 
     def validate_dimensionality(self, dimensionality: int) -> None:
         """Validate that every declared per-feature field matches a stream."""
-        for name in ("coordinates", "modality", "identity", "footprints", "resolution"):
+        for name in (
+            "coordinates",
+            "sensor_coordinates",
+            "modality",
+            "identity",
+            "footprints",
+            "resolution",
+        ):
             values = getattr(self, name)
             if values is not None and len(values) != dimensionality:
                 raise ValueError(
@@ -61,6 +72,11 @@ class StreamMetadata(BaseModel):
         return type(self)(
             coordinates=(
                 None if self.coordinates is None else [self.coordinates[int(i)] for i in indices]
+            ),
+            sensor_coordinates=(
+                None
+                if self.sensor_coordinates is None
+                else [self.sensor_coordinates[int(i)] for i in indices]
             ),
             modality=None if self.modality is None else [self.modality[int(i)] for i in indices],
             identity=None if self.identity is None else [self.identity[int(i)] for i in indices],
@@ -80,6 +96,8 @@ class StreamMetadata(BaseModel):
             pad = dimensionality - selected.feature_count
             if selected.coordinates is not None:
                 selected.coordinates.extend([None] * pad)
+            if selected.sensor_coordinates is not None:
+                selected.sensor_coordinates.extend([None] * pad)
             if selected.modality is not None:
                 selected.modality.extend([None] * pad)
             if selected.identity is not None:
@@ -93,7 +111,14 @@ class StreamMetadata(BaseModel):
     @property
     def feature_count(self) -> int:
         """Number of features represented by this metadata."""
-        for name in ("coordinates", "modality", "identity", "footprints", "resolution"):
+        for name in (
+            "coordinates",
+            "sensor_coordinates",
+            "modality",
+            "identity",
+            "footprints",
+            "resolution",
+        ):
             values = getattr(self, name)
             if values is not None:
                 return len(values)

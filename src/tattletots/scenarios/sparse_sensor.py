@@ -57,9 +57,8 @@ class SparseSensorScenario(DomainAdapter):
             tuple(map(float, location)) for location in self.sensor_locations
         ]
         metadata = StreamMetadata(
-            coordinates=coordinates,
+            sensor_coordinates=coordinates,
             modality=["point_sensor"] * self.n_sensors,
-            identity=[f"sensor_{index}" for index in range(self.n_sensors)],
             resolution=[1.0] * self.n_sensors,
         )
         self._streams = [

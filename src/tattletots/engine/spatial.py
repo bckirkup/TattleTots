@@ -190,14 +190,25 @@ def infer_geometry_location(
 ) -> EventLocation | None:
     """Decode a coordinate-bearing observation using heritable generic traits."""
     metadata = observation.metadata
-    if metadata is None or metadata.coordinates is None:
+    if metadata is None or (metadata.coordinates is None and metadata.sensor_coordinates is None):
         return None
     if metadata.feature_count != observation.data.size:
         return None
 
     points = [
         (index, coordinate)
-        for index, coordinate in enumerate(metadata.coordinates)
+        for index in range(metadata.feature_count)
+        for coordinate in [
+            (
+                metadata.coordinates[index]
+                if metadata.coordinates is not None and metadata.coordinates[index] is not None
+                else (
+                    metadata.sensor_coordinates[index]
+                    if metadata.sensor_coordinates is not None
+                    else None
+                )
+            )
+        ]
         if coordinate is not None and len(coordinate) >= 2
     ]
     if not points:

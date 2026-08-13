@@ -50,6 +50,17 @@ def test_missing_status_is_distinct_from_zero_value() -> None:
     assert list(stream.current_status) == ["missing", "observed"]
 
 
+def test_sensor_geometry_survives_missing_status_and_selection() -> None:
+    metadata = StreamMetadata(
+        sensor_coordinates=[(0.0, 0.0), (4.0, 2.0)],
+        modality=["point", "point"],
+    )
+    selected = metadata.select(np.array([1], dtype=np.int64))
+
+    assert selected.coordinates is None
+    assert selected.sensor_coordinates == [(4.0, 2.0)]
+
+
 def test_concat_truncation_preserves_feature_metadata() -> None:
     first = Stream(
         stream_type=StreamType.RAW,
