@@ -95,6 +95,59 @@ class TestCompression:
 
         assert score == pytest.approx(0.0)
 
+    @pytest.mark.parametrize("compression_type", list(CompressionType))
+    def test_yield_is_invariant_to_multiplicative_scale(
+        self,
+        compression_type: CompressionType,
+    ) -> None:
+        baseline = np.array([-0.7, 0.2, 1.1, 2.4, -1.3, 0.8, 3.2, -2.1])
+        current = np.array([0.4, -1.2, 2.1, 0.3, 1.7, -0.5, 2.8, -1.4])
+        yields: list[float] = []
+
+        for scale in (1e-6, 1.0, 1e6):
+            model = create_compression_model(compression_type, n_components=3)
+            model.fit_transform(baseline * scale)
+            _residual, info_yield, _score = model.observe(current * scale)
+            yields.append(info_yield)
+
+        assert yields[1] == pytest.approx(yields[0], abs=1e-10)
+        assert yields[2] == pytest.approx(yields[0], abs=1e-10)
+
+    @pytest.mark.parametrize("compression_type", list(CompressionType))
+    def test_yield_is_invariant_to_constant_offset(
+        self,
+        compression_type: CompressionType,
+    ) -> None:
+        baseline = np.array([-0.7, 0.2, 1.1, 2.4, -1.3, 0.8, 3.2, -2.1])
+        current = np.array([0.4, -1.2, 2.1, 0.3, 1.7, -0.5, 2.8, -1.4])
+        yields: list[float] = []
+
+        for offset in (-1e6, 0.0, 1e6):
+            model = create_compression_model(compression_type, n_components=3)
+            model.fit_transform(baseline + offset)
+            _residual, info_yield, _score = model.observe(current + offset)
+            yields.append(info_yield)
+
+        assert yields[1] == pytest.approx(yields[0], abs=1e-10)
+        assert yields[2] == pytest.approx(yields[0], abs=1e-10)
+
+    @pytest.mark.parametrize("compression_type", list(CompressionType))
+    def test_dimension_reset_cannot_reopen_scale_dependent_yield(
+        self,
+        compression_type: CompressionType,
+    ) -> None:
+        yields: list[float] = []
+        reset_input = np.array([0.4, -1.2, 2.1, 0.3, 1.7])
+
+        for scale in (1e-6, 1.0, 1e6):
+            model = create_compression_model(compression_type, n_components=3)
+            model.fit_transform(np.ones(4) * scale)
+            _residual, info_yield, _score = model.observe(reset_input * scale)
+            yields.append(info_yield)
+
+        assert yields[1] == pytest.approx(yields[0], abs=1e-10)
+        assert yields[2] == pytest.approx(yields[0], abs=1e-10)
+
     def test_pca_extracts_structure(self) -> None:
         rng = np.random.default_rng(42)
         # Data with clear structure: 2 components in 5D space
@@ -103,7 +156,8 @@ class TestCompression:
         data = activations @ basis + rng.standard_normal((10, 5)) * 0.1
 
         model = PCACompression(n_components=2, efficiency=1.0)
-        _, info_yield = model.fit_transform(data)
+        yields = [model.fit_transform(row)[1] for row in data]
+        info_yield = yields[-1]
         assert info_yield > 0.5  # Should capture most variance
 
     def test_pca_residual_has_lower_variance(self) -> None:

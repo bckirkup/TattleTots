@@ -4,12 +4,22 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from types import ModuleType
+from typing import cast
 
 import numpy as np
 from numpy.typing import NDArray
 
 from tattletots.engine.gpu_utils import get_array_module, to_numpy
 from tattletots.models.genome import CompressionType
+
+
+def _standardize(flat: NDArray[np.float64], xp: ModuleType) -> NDArray[np.float64]:
+    """Remove location and scale so model currency is dimensionless."""
+    centered = flat - xp.mean(flat)
+    scale = xp.sqrt(xp.mean(centered**2))
+    if float(scale) <= 1e-12:
+        return cast(NDArray[np.float64], xp.zeros_like(centered))
+    return cast(NDArray[np.float64], centered / scale)
 
 
 class CompressionModel(ABC):
@@ -85,11 +95,10 @@ class PCACompression(CompressionModel):
         centered = window - mean
 
         if centered.shape[0] < 2:
-            magnitude = float(xp.linalg.norm(flat))
             self._signal = to_numpy(flat[: self.n_components])
-            self._explained_var = magnitude * self.efficiency
+            self._explained_var = self.efficiency
             self._components = None
-            return to_numpy(flat), self._explained_var
+            return to_numpy(flat), self.efficiency
 
         # SVD for PCA
         n_comp = min(self.n_components, min(centered.shape))
@@ -105,7 +114,7 @@ class PCACompression(CompressionModel):
 
         total_var = float(xp.sum(s**2))
         explained_var = float(xp.sum(s[:n_comp] ** 2))
-        info_yield = (explained_var / max(total_var, 1e-10)) * self.efficiency
+        info_yield = (explained_var / max(total_var, np.finfo(float).tiny)) * self.efficiency
 
         self._signal = to_numpy(projected.flatten()[:n_comp])
         self._explained_var = info_yield
@@ -145,24 +154,25 @@ class AR1Compression(CompressionModel):
 
     def fit_transform(self, data: NDArray[np.float64]) -> tuple[NDArray[np.float64], float]:
         xp = self._xp
-        flat = xp.asarray(data.flatten(), dtype=xp.float64)
+        flat = _standardize(xp.asarray(data.flatten(), dtype=xp.float64), xp)
         if self._prev is None or len(flat) != len(self._prev):
-            self._prev = flat
+            self._prev = flat - xp.mean(flat)
             self._signal = to_numpy(flat[: self.n_components])
             return to_numpy(flat), 0.0
 
         # Simple AR(1): predict current from previous
         if len(flat) == len(self._prev) and len(flat) > 0:
+            centered = flat - xp.mean(flat)
             # Least-squares coefficient
             denom = float(xp.dot(self._prev, self._prev))
             if denom > 1e-10:
-                coeff = float(xp.dot(flat, self._prev)) / denom
+                coeff = float(xp.dot(centered, self._prev)) / denom
             else:
                 coeff = 0.0
             predicted = coeff * self._prev
-            residual = flat - predicted
+            residual = centered - predicted
             var_residual = float(xp.var(residual))
-            var_flat = float(xp.var(flat))
+            var_flat = float(xp.var(centered))
             info_yield = float(1.0 - var_residual / max(var_flat, 1e-10))
             info_yield = max(0.0, info_yield) * self.efficiency
         else:
@@ -170,7 +180,7 @@ class AR1Compression(CompressionModel):
             info_yield = 0.0
 
         self._signal = to_numpy(flat[: self.n_components])
-        self._prev = flat
+        self._prev = flat - xp.mean(flat)
         return to_numpy(residual), info_yield
 
     def anomaly_score(self, data: NDArray[np.float64]) -> float:
@@ -182,13 +192,15 @@ class AR1Compression(CompressionModel):
         if self._prev is None or len(flat) != len(self._prev):
             return 0.0
         xp = self._xp
+        flat = _standardize(flat, xp)
+        centered = flat - xp.mean(flat)
         denom = float(xp.dot(self._prev, self._prev))
         if denom > 1e-10:
-            coeff = float(xp.dot(flat, self._prev)) / denom
+            coeff = float(xp.dot(centered, self._prev)) / denom
         else:
             coeff = 0.0
         predicted = coeff * self._prev
-        return float(xp.mean((flat - predicted) ** 2))
+        return float(xp.mean((centered - predicted) ** 2))
 
     def get_signal_vector(self) -> NDArray[np.float64]:
         return self._signal
@@ -213,7 +225,8 @@ class ThresholdCompression(CompressionModel):
 
         if self._running_mean is None or len(flat) != len(self._running_mean):
             self._running_mean = flat.copy()
-            self._running_var = xp.ones_like(flat)
+            variance = float(xp.var(flat))
+            self._running_var = xp.full_like(flat, max(variance, np.finfo(float).tiny))
             self._count = 1
             self._signal = to_numpy(flat[: self.n_components])
             return to_numpy(flat), 0.0
@@ -226,7 +239,7 @@ class ThresholdCompression(CompressionModel):
         self._running_var = (1 - self._alpha) * self._running_var + self._alpha * diff**2
 
         # Residual is the z-scored deviation
-        std = xp.sqrt(xp.maximum(self._running_var, 1e-10))
+        std = xp.sqrt(xp.maximum(self._running_var, np.finfo(float).tiny))
         z_scores = diff / std
         # "Compression" = identifying which dimensions are anomalous
         residual = flat - self._running_mean
@@ -246,7 +259,7 @@ class ThresholdCompression(CompressionModel):
         xp = self._xp
         diff = flat - self._running_mean
         assert self._running_var is not None
-        std = xp.sqrt(xp.maximum(self._running_var, 1e-10))
+        std = xp.sqrt(xp.maximum(self._running_var, np.finfo(float).tiny))
         z_scores = diff / std
         return float(xp.max(xp.abs(z_scores)))
 
@@ -291,7 +304,9 @@ class WaveletCompression(CompressionModel):
         self._signal = to_numpy(approx[: self.n_components])
         input_var = float(xp.var(flat))
         residual_var = float(xp.var(residual))
-        info_yield = max(0.0, 1.0 - residual_var / max(input_var, 1e-10)) * self.efficiency
+        info_yield = (
+            max(0.0, 1.0 - residual_var / max(input_var, np.finfo(float).tiny)) * self.efficiency
+        )
         return to_numpy(residual[: flat.size]), info_yield
 
     def anomaly_score(self, data: NDArray[np.float64]) -> float:
