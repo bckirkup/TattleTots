@@ -40,7 +40,7 @@ src/tattletots/
 │                    #   temporal, development, escalation, trophic, trust,
 │                    #   reproduction, residual, whistleblowing, domestication
 ├── interface/       # DomainAdapter ABC for plugging in domain repos
-├── scenarios/       # Built-in test scenarios (Gaussian shift, High-dim shift)
+├── scenarios/       # Built-in tests (Gaussian, high-dimensional, sparse sensors)
 ├── telemetry/       # History recording and analytics
 └── cli.py           # Command-line entry point
 ```

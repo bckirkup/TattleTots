@@ -8,7 +8,8 @@ import numpy as np
 from numpy.typing import NDArray
 
 from tattletots.models.agent import Agent
-from tattletots.models.genome import Genome, SpatialStrategy
+from tattletots.models.genome import Genome, SpatialInferenceStrategy, SpatialStrategy
+from tattletots.models.identity import stable_id_digest
 from tattletots.models.location import EventLocation
 from tattletots.models.observation import ObservationPacket, ObservationStatus
 
@@ -114,12 +115,109 @@ def apply_spatial_observation(
         dim_to_location=dim_to_location,
     )
     if observation.status is None or observation.status.size == 0:
-        return ObservationPacket(masked, observation.metadata)
+        return ObservationPacket(
+            masked,
+            observation.metadata,
+            observation.status,
+            observation.observed_fraction,
+        )
     status = observation.status.copy()
     mask = agent.state.last_spatial_mask
     if mask.size == status.size:
         status[mask == 0.0] = ObservationStatus.MASKED.value
-    return ObservationPacket(masked, observation.metadata, status)
+    return ObservationPacket(
+        masked,
+        observation.metadata,
+        status,
+        observation.observed_fraction,
+    )
+
+
+def _feature_evidence(
+    genome: Genome,
+    observation: ObservationPacket,
+    index: int,
+) -> float:
+    """Convert one feature into generic spatial evidence."""
+    reliability = 1.0
+    metadata = observation.metadata
+    if metadata is not None and metadata.modality is not None:
+        modality = metadata.modality[index]
+        if modality is not None and genome.modality_reliability.size > 0:
+            bucket = stable_id_digest(modality) % genome.modality_reliability.size
+            reliability = float(genome.modality_reliability[bucket])
+
+    availability = 1.0
+    if observation.observed_fraction is not None:
+        availability = float(observation.observed_fraction[index])
+    if observation.status is not None:
+        availability = (
+            0.0 if observation.status[index] != ObservationStatus.OBSERVED.value else availability
+        )
+    return max(
+        0.0,
+        reliability * abs(float(observation.data[index]))
+        + genome.absence_weight * (1.0 - availability),
+    )
+
+
+def infer_geometry_location(
+    agent: Agent,
+    observation: ObservationPacket,
+) -> EventLocation | None:
+    """Decode a coordinate-bearing observation using heritable generic traits."""
+    metadata = observation.metadata
+    if metadata is None or metadata.coordinates is None:
+        return None
+    if metadata.feature_count != observation.data.size:
+        return None
+
+    points = [
+        (index, coordinate)
+        for index, coordinate in enumerate(metadata.coordinates)
+        if coordinate is not None and len(coordinate) >= 2
+    ]
+    if not points:
+        return None
+
+    genome = agent.genome
+    evidence = np.array(
+        [_feature_evidence(genome, observation, index) for index, _ in points],
+        dtype=np.float64,
+    )
+    coordinates = np.asarray(
+        [[point[0], point[1]] for _, point in points],
+        dtype=np.float64,
+    )
+    if not np.any(evidence > 0.0):
+        return genome.spatial_region
+
+    if genome.spatial_inference_strategy == SpatialInferenceStrategy.FIXED_PRIOR:
+        return genome.spatial_region
+    if genome.spatial_inference_strategy == SpatialInferenceStrategy.PEAK:
+        selected = coordinates[int(np.argmax(evidence))]
+        return (int(round(selected[0])), int(round(selected[1])))
+
+    if genome.spatial_inference_strategy == SpatialInferenceStrategy.WEIGHTED_CENTROID:
+        centroid = np.average(coordinates, axis=0, weights=evidence)
+        return (int(round(centroid[0])), int(round(centroid[1])))
+
+    low = np.floor(coordinates.min(axis=0)).astype(int)
+    high = np.ceil(coordinates.max(axis=0)).astype(int)
+    candidates = np.array(
+        [(row, col) for row in range(low[0], high[0] + 1) for col in range(low[1], high[1] + 1)],
+        dtype=np.float64,
+    )
+    distances = candidates[:, None, :] - coordinates[None, :, :]
+    squared_distance = np.sum(distances * distances, axis=2)
+    bandwidth = max(genome.spatial_kernel_bandwidth, 0.1)
+    kernel = np.exp(-squared_distance / (2.0 * bandwidth**2))
+    power = max(genome.spatial_distance_power, 0.0)
+    if power > 0.0:
+        kernel /= (1.0 + np.sqrt(squared_distance)) ** power
+    scores = kernel @ evidence
+    selected = candidates[int(np.argmax(scores))]
+    return (int(selected[0]), int(selected[1]))
 
 
 def infer_spatial_location(
