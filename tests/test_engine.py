@@ -175,6 +175,60 @@ class TestCompression:
         _, info_yield = model.fit_transform(curr)
         assert info_yield > 0  # Should detect autocorrelation
 
+    def test_ar1_anomaly_score_detects_level_shift(self) -> None:
+        model = AR1Compression(n_components=3)
+        baseline = np.array([-0.7, 0.2, 1.1, 2.4, -1.3, 0.8, 3.2, -2.1])
+        for _ in range(20):
+            model.observe(baseline)
+
+        baseline_score = model.anomaly_score(baseline)
+        shifted_score = model.anomaly_score(baseline + 10.0)
+
+        assert shifted_score > baseline_score + 1.0
+
+    @pytest.mark.parametrize("compression_type", list(CompressionType))
+    def test_anomaly_score_detects_structural_event(
+        self,
+        compression_type: CompressionType,
+    ) -> None:
+        model = create_compression_model(compression_type, n_components=3)
+        baseline = np.array([-0.7, 0.2, 1.1, 2.4, -1.3, 0.8, 3.2, -2.1])
+        event = np.array([4.0, -1.0, 5.0, -2.0, 6.0, -3.0, 7.0, -4.0])
+        for _ in range(20):
+            model.observe(baseline)
+
+        baseline_score = model.anomaly_score(baseline)
+        event_score = model.anomaly_score(event)
+
+        assert event_score > baseline_score + 1.0
+
+    @pytest.mark.parametrize("compression_type", list(CompressionType))
+    def test_anomaly_score_auc_separates_known_event_window(
+        self,
+        compression_type: CompressionType,
+    ) -> None:
+        model = create_compression_model(compression_type, n_components=3)
+        baseline = np.array([-0.7, 0.2, 1.1, 2.4, -1.3, 0.8, 3.2, -2.1])
+        event = np.array([4.0, -1.0, 5.0, -2.0, 6.0, -3.0, 7.0, -4.0])
+        scores: list[float] = []
+        labels: list[bool] = []
+
+        for step in range(26):
+            observation = event if step >= 20 else baseline
+            scores.append(model.anomaly_score(observation))
+            labels.append(step >= 20)
+            model.observe(observation)
+
+        positive = [score for score, label in zip(scores, labels, strict=True) if label]
+        negative = [score for score, label in zip(scores, labels, strict=True) if not label]
+        auc = sum(
+            1.0 if event_score > baseline_score else 0.5 if event_score == baseline_score else 0.0
+            for event_score in positive
+            for baseline_score in negative
+        ) / (len(positive) * len(negative))
+
+        assert auc > 0.55
+
     def test_threshold_detects_anomaly(self) -> None:
         model = ThresholdCompression(n_components=3)
         rng = np.random.default_rng(0)

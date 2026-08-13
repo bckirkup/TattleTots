@@ -154,33 +154,43 @@ class AR1Compression(CompressionModel):
 
     def fit_transform(self, data: NDArray[np.float64]) -> tuple[NDArray[np.float64], float]:
         xp = self._xp
-        flat = _standardize(xp.asarray(data.flatten(), dtype=xp.float64), xp)
+        flat = xp.asarray(data.flatten(), dtype=xp.float64)
         if self._prev is None or len(flat) != len(self._prev):
-            self._prev = flat - xp.mean(flat)
+            self._prev = flat
             self._signal = to_numpy(flat[: self.n_components])
             return to_numpy(flat), 0.0
 
         # Simple AR(1): predict current from previous
         if len(flat) == len(self._prev) and len(flat) > 0:
+            # Preserve raw observations for the detector and residual stream.
+            raw_denom = float(xp.dot(self._prev, self._prev))
+            if raw_denom > 1e-10:
+                raw_coeff = float(xp.dot(flat, self._prev)) / raw_denom
+            else:
+                raw_coeff = 0.0
+            residual = flat - raw_coeff * self._prev
+
+            # Compute currency from centered variance ratios only. This keeps
+            # level and amplitude available to perception without charging
+            # their units to information income.
             centered = flat - xp.mean(flat)
-            # Least-squares coefficient
-            denom = float(xp.dot(self._prev, self._prev))
-            if denom > 1e-10:
-                coeff = float(xp.dot(centered, self._prev)) / denom
+            previous_centered = self._prev - xp.mean(self._prev)
+            centered_denom = float(xp.dot(previous_centered, previous_centered))
+            if centered_denom > np.finfo(float).tiny:
+                coeff = float(xp.dot(centered, previous_centered)) / centered_denom
             else:
                 coeff = 0.0
-            predicted = coeff * self._prev
-            residual = centered - predicted
-            var_residual = float(xp.var(residual))
+            accounting_residual = centered - coeff * previous_centered
+            var_residual = float(xp.var(accounting_residual))
             var_flat = float(xp.var(centered))
-            info_yield = float(1.0 - var_residual / max(var_flat, 1e-10))
+            info_yield = float(1.0 - var_residual / max(var_flat, np.finfo(float).tiny))
             info_yield = max(0.0, info_yield) * self.efficiency
         else:
             residual = flat
             info_yield = 0.0
 
         self._signal = to_numpy(flat[: self.n_components])
-        self._prev = flat - xp.mean(flat)
+        self._prev = flat
         return to_numpy(residual), info_yield
 
     def anomaly_score(self, data: NDArray[np.float64]) -> float:
@@ -192,15 +202,13 @@ class AR1Compression(CompressionModel):
         if self._prev is None or len(flat) != len(self._prev):
             return 0.0
         xp = self._xp
-        flat = _standardize(flat, xp)
-        centered = flat - xp.mean(flat)
         denom = float(xp.dot(self._prev, self._prev))
         if denom > 1e-10:
-            coeff = float(xp.dot(centered, self._prev)) / denom
+            coeff = float(xp.dot(flat, self._prev)) / denom
         else:
             coeff = 0.0
         predicted = coeff * self._prev
-        return float(xp.mean((centered - predicted) ** 2))
+        return float(xp.mean((flat - predicted) ** 2))
 
     def get_signal_vector(self) -> NDArray[np.float64]:
         return self._signal

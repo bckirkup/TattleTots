@@ -19,8 +19,8 @@ from tattletots.models.identity import stable_id_digest
 from tattletots.scenarios.gaussian_shift import GaussianShiftScenario
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_FINGERPRINT = "943eff54532141fb5b9d16ade43b32c1c072f7e7e0dfbf234864d8fd576da2a8"
-EXPECTED_LEGACY_FINGERPRINT = "e45020f25af7782150a37781a44c1c38e3d9f4957836916a1c6795125cf9aa37"
+EXPECTED_FINGERPRINT = "4b98dbd41feb9fcd0d207de2b9a7b54fedacfd6f6bf8ac99b780e2829fcad8bc"
+EXPECTED_LEGACY_FINGERPRINT = "5263ba65680de33c6fe1d6dd693e725a084bd6e0f5fbe64fc06678d299c14b23"
 
 
 def _canonicalize(value: object) -> object:
