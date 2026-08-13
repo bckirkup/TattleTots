@@ -49,6 +49,7 @@ def _run_payload(
     reproduction_information_scale: float = 1.0,
     reproduction_attention_scale: float = 1.0,
     grounding_quality_strength: float = 0.5,
+    attention_trace: dict[int, dict[str, float]] | None = None,
 ) -> dict[str, object]:
     scenario = GaussianShiftScenario(seed=seed, total_steps=steps)
     config = SimulationConfig(
@@ -74,6 +75,8 @@ def _run_payload(
         scenario.step(step)
         world.set_event_state(scenario.get_active_locations(step))
         world.step()
+        if attention_trace is not None:
+            attention_trace[step + 1] = dict(world._attention_deltas)
 
     return {
         "agents": sorted(world.agents),
@@ -158,10 +161,20 @@ def _float_values(value: object) -> list[float]:
 def _assert_fingerprint(
     expected: str,
     payload: dict[str, object],
+    attention_trace: dict[int, dict[str, float]] | None = None,
 ) -> None:
     encoded = json.dumps(_canonicalize(payload), sort_keys=True, separators=(",", ":")).encode()
     actual = hashlib.sha256(encoded).hexdigest()
     if actual != expected:
+        boundary_lines = []
+        if attention_trace is not None and 6 in attention_trace:
+            boundary_lines = [
+                "attention deltas at step 6:",
+                *(
+                    f"{agent_id}={delta:.17g}"
+                    for agent_id, delta in sorted(attention_trace[6].items())
+                ),
+            ]
         pytest.fail(
             "\n".join(
                 [
@@ -169,6 +182,7 @@ def _assert_fingerprint(
                     _environment_diagnostics(),
                     "per-record diagnostics:",
                     _payload_diagnostics(payload),
+                    *boundary_lines,
                 ]
             )
         )
@@ -179,13 +193,15 @@ def test_seeded_run_has_golden_fingerprint() -> None:
 
 
 def test_legacy_setting_has_branch_golden_fingerprint() -> None:
+    attention_trace: dict[int, dict[str, float]] = {}
     payload = _run_payload(
         42,
         reproduction_coupling_strength=0.0,
         grounding_quality_strength=0.0,
+        attention_trace=attention_trace,
     )
 
-    _assert_fingerprint(EXPECTED_LEGACY_FINGERPRINT, payload)
+    _assert_fingerprint(EXPECTED_LEGACY_FINGERPRINT, payload, attention_trace)
 
 
 def test_reproduction_coupling_config_changes_run_fingerprint() -> None:
