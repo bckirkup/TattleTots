@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from tattletots.engine.config import SimulationConfig
 from tattletots.models.location import EventLocation
 from tattletots.models.report import Report
@@ -131,7 +133,7 @@ def apply_whistleblower_trust(
 def _classify_whistleblower_report(
     accused_report: Report | None,
     outcome: ResponseOutcome | None,
-) -> str | None:
+) -> Literal["corroborated", "refuted"] | None:
     confirmed = (accused_report is not None and accused_report.correct is False) or (
         outcome is not None and outcome.dispatched and not outcome.response_necessary
     )

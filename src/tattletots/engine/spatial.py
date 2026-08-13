@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from math import isclose
 
 import numpy as np
 from numpy.typing import NDArray
@@ -119,9 +118,7 @@ def apply_spatial_observation(
     status = observation.status.copy()
     mask = agent.state.last_spatial_mask
     if mask.size == status.size:
-        status[np.array([isclose(value, 0.0, rel_tol=0.0, abs_tol=0.0) for value in mask])] = (
-            ObservationStatus.MASKED.value
-        )
+        status[np.isclose(mask, 0.0, rtol=0.0, atol=0.0)] = ObservationStatus.MASKED.value
     return ObservationPacket(masked, observation.metadata, status)
 
 

@@ -118,28 +118,24 @@ def _mutate_scalar_fields(
     rng: np.random.Generator,
     rate: float,
 ) -> None:
-    _mutate_primary_scalar_fields(data, rng, rate)
-    _mutate_secondary_scalar_fields(data, rng, rate)
-    _mutate_spatial_scalar_fields(data, rng, rate)
-    _mutate_adaptive_scalar_fields(data, rng, rate)
+    _mutate_structure_fields(data, rng, rate)
+    _mutate_cost_fields(data, rng, rate)
+    _mutate_reproduction_and_investment_fields(data, rng, rate)
+    _mutate_memory_and_lineage_fields(data, rng, rate)
+    _mutate_spatial_fields(data, rng, rate)
+    _mutate_escalation_adaptation_fields(data, rng, rate)
 
 
-def _mutate_primary_scalar_fields(
-    data: dict[str, Any], rng: np.random.Generator, rate: float
-) -> None:
-    _mutate_core_primary_fields(data, rng, rate)
-    _mutate_behavioral_primary_fields(data, rng, rate)
-
-
-def _mutate_core_primary_fields(
-    data: dict[str, Any], rng: np.random.Generator, rate: float
-) -> None:
+def _mutate_structure_fields(data: dict[str, Any], rng: np.random.Generator, rate: float) -> None:
     if rng.random() < rate:
         data["n_components"] = int(np.clip(data["n_components"] + rng.integers(-2, 3), 1, 50))
     if rng.random() < rate:
         data["escalation_threshold"] = float(
             np.clip(float(data["escalation_threshold"]) + rng.normal(0, 0.05), 0.0, 1.0)
         )
+
+
+def _mutate_cost_fields(data: dict[str, Any], rng: np.random.Generator, rate: float) -> None:
     if rng.random() < rate:
         data["metabolic_efficiency"] = float(
             np.clip(float(data["metabolic_efficiency"]) + rng.normal(0, 0.1), 0.1, 5.0)
@@ -154,7 +150,7 @@ def _mutate_core_primary_fields(
         )
 
 
-def _mutate_behavioral_primary_fields(
+def _mutate_reproduction_and_investment_fields(
     data: dict[str, Any], rng: np.random.Generator, rate: float
 ) -> None:
     if rng.random() < rate:
@@ -179,7 +175,7 @@ def _mutate_behavioral_primary_fields(
         )
 
 
-def _mutate_secondary_scalar_fields(
+def _mutate_memory_and_lineage_fields(
     data: dict[str, Any], rng: np.random.Generator, rate: float
 ) -> None:
     if rng.random() < rate:
@@ -196,9 +192,7 @@ def _mutate_secondary_scalar_fields(
         )
 
 
-def _mutate_spatial_scalar_fields(
-    data: dict[str, Any], rng: np.random.Generator, rate: float
-) -> None:
+def _mutate_spatial_fields(data: dict[str, Any], rng: np.random.Generator, rate: float) -> None:
     if rng.random() < rate:
         row, col = data["spatial_region"]
         data["spatial_region"] = (
@@ -215,7 +209,7 @@ def _mutate_spatial_scalar_fields(
         )
 
 
-def _mutate_adaptive_scalar_fields(
+def _mutate_escalation_adaptation_fields(
     data: dict[str, Any], rng: np.random.Generator, rate: float
 ) -> None:
     if rng.random() < rate:
