@@ -491,29 +491,9 @@ class Genome(BaseModel):
             "target_user_affinity",
             "fusion_weights",
             "region_affinity",
-        )
-        inherited_spatial_fields = (
-            "spatial_inference_strategy",
-            "spatial_kernel_bandwidth",
-            "spatial_distance_power",
             "modality_reliability",
-            "absence_weight",
         )
         for key in data_a:
-            if key in inherited_spatial_fields:
-                if key == "modality_reliability":
-                    arr_a = np.array(data_a[key], dtype=np.float64)
-                    arr_b = np.array(data_b[key], dtype=np.float64)
-                    if len(arr_a) == len(arr_b) and len(arr_a) > 0:
-                        alpha = rng.random()
-                        child_data[key] = alpha * arr_a + (1 - alpha) * arr_b
-                    else:
-                        child_data[key] = arr_a if rng.random() < 0.5 else arr_b
-                elif key == "spatial_inference_strategy":
-                    child_data[key] = data_a[key] if rng.random() < 0.5 else data_b[key]
-                else:
-                    child_data[key] = data_a[key] if rng.random() < 0.5 else data_b[key]
-                continue
             if key in array_keys:
                 arr_a = np.array(data_a[key], dtype=np.float64)
                 arr_b = np.array(data_b[key], dtype=np.float64)

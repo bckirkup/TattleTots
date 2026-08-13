@@ -9,7 +9,11 @@ from tattletots.engine.spatial import infer_geometry_location
 from tattletots.engine.world import World
 from tattletots.models.agent import Agent
 from tattletots.models.genome import Genome, SpatialInferenceStrategy
-from tattletots.models.observation import ObservationPacket, StreamMetadata
+from tattletots.models.observation import (
+    ObservationPacket,
+    ObservationStatus,
+    StreamMetadata,
+)
 from tattletots.models.stream import Stream
 from tattletots.models.user import User
 from tattletots.scenarios.sparse_sensor import SparseSensorScenario
@@ -102,6 +106,35 @@ def test_geometry_inference_uses_genome_strategy() -> None:
 
     assert infer_geometry_location(peak_agent, packet) == (4, 2)
     assert infer_geometry_location(fixed_agent, packet) == (7, 6)
+
+
+def test_masked_features_cannot_supply_absence_evidence() -> None:
+    packet = ObservationPacket(
+        data=np.array([100.0, 1.0]),
+        metadata=StreamMetadata(
+            coordinates=[(0.0, 0.0), (8.0, 8.0)],
+            modality=["a", "a"],
+        ),
+        status=np.array(
+            [ObservationStatus.MASKED.value, ObservationStatus.OBSERVED.value],
+            dtype="<U8",
+        ),
+    )
+    no_absence_agent = Agent(
+        genome=Genome(
+            spatial_inference_strategy=SpatialInferenceStrategy.PEAK,
+            absence_weight=0.0,
+        )
+    )
+    absence_agent = Agent(
+        genome=Genome(
+            spatial_inference_strategy=SpatialInferenceStrategy.PEAK,
+            absence_weight=1.0,
+        )
+    )
+
+    assert infer_geometry_location(no_absence_agent, packet) == (8, 8)
+    assert infer_geometry_location(absence_agent, packet) == (8, 8)
 
 
 def test_geometry_location_precedes_callback_but_metadata_free_keeps_callback() -> None:

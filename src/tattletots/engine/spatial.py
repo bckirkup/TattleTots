@@ -151,9 +151,11 @@ def _feature_evidence(
     if observation.observed_fraction is not None:
         availability = float(observation.observed_fraction[index])
     if observation.status is not None:
-        availability = (
-            0.0 if observation.status[index] != ObservationStatus.OBSERVED.value else availability
-        )
+        status = observation.status[index]
+        if status == ObservationStatus.MASKED.value:
+            return 0.0
+        if status == ObservationStatus.MISSING.value:
+            availability = 0.0
     return max(
         0.0,
         reliability * abs(float(observation.data[index]))
