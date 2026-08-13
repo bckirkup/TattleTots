@@ -117,48 +117,69 @@ def apply_whistleblower_trust(
         accused_user = users.get(
             accused_report.target_user_id if accused_report else wb.target_user_id
         )
-
-        confirmed = False
-        refuted_flag = False
-        if accused_report is not None and accused_report.correct is False:
-            confirmed = True
-        if outcome is not None and outcome.dispatched and not outcome.response_necessary:
-            confirmed = True
-        if (
-            accused_report is not None
-            and accused_report.correct
-            and outcome is not None
-            and outcome.response_necessary
-        ):
-            refuted_flag = True
-
-        if confirmed and not refuted_flag:
+        classification = _classify_whistleblower_report(accused_report, outcome)
+        if classification == "corroborated":
             corroborated += 1
-            if whistle_user:
-                whistle_user.update_trust(
-                    wb.whistleblower_id,
-                    TrustOutcome.WHISTLEBLOWER_CORROBORATED,
-                    deltas=TrustUpdateDeltas(
-                        whistleblower_corroborated=config.trust_delta_whistleblower_corroborated
-                    ),
-                )
-            if accused_user:
-                accused_user.update_trust(
-                    wb.accused_agent_id,
-                    TrustOutcome.ACCUSED_CORROBORATED,
-                    deltas=TrustUpdateDeltas(
-                        accused_corroborated=config.trust_delta_accused_corroborated
-                    ),
-                )
-        elif refuted_flag:
+            _apply_corroboration_updates(wb, whistle_user, accused_user, config)
+        elif classification == "refuted":
             refuted += 1
-            if whistle_user:
-                whistle_user.update_trust(
-                    wb.whistleblower_id,
-                    TrustOutcome.WHISTLEBLOWER_REFUTED,
-                    deltas=TrustUpdateDeltas(
-                        whistleblower_refuted=config.trust_delta_whistleblower_refuted
-                    ),
-                )
+            _apply_refutation_update(wb, whistle_user, config)
 
     return corroborated, refuted
+
+
+def _classify_whistleblower_report(
+    accused_report: Report | None,
+    outcome: ResponseOutcome | None,
+) -> str | None:
+    confirmed = (accused_report is not None and accused_report.correct is False) or (
+        outcome is not None and outcome.dispatched and not outcome.response_necessary
+    )
+    refuted = (
+        accused_report is not None
+        and accused_report.correct
+        and outcome is not None
+        and outcome.response_necessary
+    )
+    if confirmed and not refuted:
+        return "corroborated"
+    if refuted:
+        return "refuted"
+    return None
+
+
+def _apply_corroboration_updates(
+    wb: WhistleblowerReport,
+    whistle_user: User | None,
+    accused_user: User | None,
+    config: SimulationConfig,
+) -> None:
+    if whistle_user:
+        whistle_user.update_trust(
+            wb.whistleblower_id,
+            TrustOutcome.WHISTLEBLOWER_CORROBORATED,
+            deltas=TrustUpdateDeltas(
+                whistleblower_corroborated=config.trust_delta_whistleblower_corroborated
+            ),
+        )
+    if accused_user:
+        accused_user.update_trust(
+            wb.accused_agent_id,
+            TrustOutcome.ACCUSED_CORROBORATED,
+            deltas=TrustUpdateDeltas(accused_corroborated=config.trust_delta_accused_corroborated),
+        )
+
+
+def _apply_refutation_update(
+    wb: WhistleblowerReport,
+    whistle_user: User | None,
+    config: SimulationConfig,
+) -> None:
+    if whistle_user:
+        whistle_user.update_trust(
+            wb.whistleblower_id,
+            TrustOutcome.WHISTLEBLOWER_REFUTED,
+            deltas=TrustUpdateDeltas(
+                whistleblower_refuted=config.trust_delta_whistleblower_refuted
+            ),
+        )

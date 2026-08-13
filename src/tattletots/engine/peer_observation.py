@@ -211,10 +211,7 @@ def apply_peer_witness_trust(
     """Update peer_trust from witnessed escalations, dispatches, outcomes, and rewards."""
     updates = 0
     living = _living_adults(agents)
-    reports_by_location: dict[EventLocation, list[Report]] = {}
-    for report in reports:
-        if report.verified:
-            reports_by_location.setdefault(report.location, []).append(report)
+    reports_by_location = _verified_reports_by_location(reports)
 
     for outcome in outcomes:
         if not outcome.dispatched or not outcome.agent_id:
@@ -242,3 +239,11 @@ def apply_peer_witness_trust(
             updates += _apply_missed_reporter_updates(living, reporters, outcome, config)
 
     return updates
+
+
+def _verified_reports_by_location(reports: list[Report]) -> dict[EventLocation, list[Report]]:
+    reports_by_location: dict[EventLocation, list[Report]] = {}
+    for report in reports:
+        if report.verified:
+            reports_by_location.setdefault(report.location, []).append(report)
+    return reports_by_location

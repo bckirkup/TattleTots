@@ -711,19 +711,22 @@ class World:
 
     def _apply_domestication(self, living_agents: list[Agent]) -> None:
         for downstream in living_agents:
-            for stream_id in downstream.state.input_stream_ids:
-                stream = self.streams.get(stream_id)
-                if stream is None or stream.stream_type != StreamType.RESIDUAL:
-                    continue
-                upstream_id = stream.source_agent_id
-                if upstream_id is None:
-                    continue
-                upstream = self.agents.get(upstream_id)
-                if upstream is None or not upstream.is_alive:
-                    continue
-                signal = compute_shaping_signal(downstream, upstream)
-                if signal.size > 0:
-                    apply_shaping(upstream, [signal])
+            self._apply_downstream_shaping(downstream)
+
+    def _apply_downstream_shaping(self, downstream: Agent) -> None:
+        for stream_id in downstream.state.input_stream_ids:
+            stream = self.streams.get(stream_id)
+            if stream is None or stream.stream_type != StreamType.RESIDUAL:
+                continue
+            upstream_id = stream.source_agent_id
+            if upstream_id is None:
+                continue
+            upstream = self.agents.get(upstream_id)
+            if upstream is None or not upstream.is_alive:
+                continue
+            signal = compute_shaping_signal(downstream, upstream)
+            if signal.size > 0:
+                apply_shaping(upstream, [signal])
 
     def _build_step_record(
         self,

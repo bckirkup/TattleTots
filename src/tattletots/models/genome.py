@@ -118,6 +118,22 @@ def _mutate_scalar_fields(
     rng: np.random.Generator,
     rate: float,
 ) -> None:
+    _mutate_primary_scalar_fields(data, rng, rate)
+    _mutate_secondary_scalar_fields(data, rng, rate)
+    _mutate_spatial_scalar_fields(data, rng, rate)
+    _mutate_adaptive_scalar_fields(data, rng, rate)
+
+
+def _mutate_primary_scalar_fields(
+    data: dict[str, Any], rng: np.random.Generator, rate: float
+) -> None:
+    _mutate_core_primary_fields(data, rng, rate)
+    _mutate_behavioral_primary_fields(data, rng, rate)
+
+
+def _mutate_core_primary_fields(
+    data: dict[str, Any], rng: np.random.Generator, rate: float
+) -> None:
     if rng.random() < rate:
         data["n_components"] = int(np.clip(data["n_components"] + rng.integers(-2, 3), 1, 50))
     if rng.random() < rate:
@@ -136,6 +152,11 @@ def _mutate_scalar_fields(
         data["maintenance_cost"] = float(
             np.clip(float(data["maintenance_cost"]) + rng.normal(0, 0.01), 0.01, 0.5)
         )
+
+
+def _mutate_behavioral_primary_fields(
+    data: dict[str, Any], rng: np.random.Generator, rate: float
+) -> None:
     if rng.random() < rate:
         data["reproduction_threshold"] = float(
             np.clip(float(data["reproduction_threshold"]) + rng.normal(0, 0.2), 0.5, 10.0)
@@ -156,6 +177,11 @@ def _mutate_scalar_fields(
         data["parental_investment"] = float(
             np.clip(float(data["parental_investment"]) + rng.normal(0, 0.05), 0.0, 1.0)
         )
+
+
+def _mutate_secondary_scalar_fields(
+    data: dict[str, Any], rng: np.random.Generator, rate: float
+) -> None:
     if rng.random() < rate:
         data["lineage_signature"] = float(float(data["lineage_signature"]) + rng.normal(0, 0.1))
     if rng.random() < rate:
@@ -168,6 +194,11 @@ def _mutate_scalar_fields(
         data["temporal_memory_depth"] = int(
             np.clip(int(data["temporal_memory_depth"]) + rng.integers(-5, 6), 0, 100)
         )
+
+
+def _mutate_spatial_scalar_fields(
+    data: dict[str, Any], rng: np.random.Generator, rate: float
+) -> None:
     if rng.random() < rate:
         row, col = data["spatial_region"]
         data["spatial_region"] = (
@@ -182,6 +213,11 @@ def _mutate_scalar_fields(
         data["residual_storage_steps"] = int(
             np.clip(int(data["residual_storage_steps"]) + rng.integers(-2, 3), 0, 20)
         )
+
+
+def _mutate_adaptive_scalar_fields(
+    data: dict[str, Any], rng: np.random.Generator, rate: float
+) -> None:
     if rng.random() < rate:
         data["escalation_memory_depth"] = int(
             np.clip(int(data["escalation_memory_depth"]) + rng.integers(-10, 11), 3, 200)
@@ -204,6 +240,22 @@ def _mutate_array_preferences(data: dict[str, Any], rng: np.random.Generator, ra
         if total > 0 and key != "region_affinity":
             arr /= total
         data[key] = arr
+
+
+def _recombine_field(
+    key: str,
+    data_a: dict[str, Any],
+    data_b: dict[str, Any],
+    rng: np.random.Generator,
+) -> object:
+    if key in _ARRAY_MUTATION_KEYS:
+        arr_a = np.array(data_a[key], dtype=np.float64)
+        arr_b = np.array(data_b[key], dtype=np.float64)
+        if len(arr_a) == len(arr_b) and len(arr_a) > 0:
+            alpha = rng.random()
+            return alpha * arr_a + (1 - alpha) * arr_b
+        return arr_a if rng.random() < 0.5 else arr_b
+    return data_a[key] if rng.random() < 0.5 else data_b[key]
 
 
 class Genome(BaseModel):
@@ -417,25 +469,8 @@ class Genome(BaseModel):
         data_b = parent_b.model_dump()
         child_data: dict[str, object] = {}
 
-        array_keys = (
-            "input_preference",
-            "target_user_affinity",
-            "fusion_weights",
-            "region_affinity",
-        )
         for key in data_a:
-            if key in array_keys:
-                arr_a = np.array(data_a[key], dtype=np.float64)
-                arr_b = np.array(data_b[key], dtype=np.float64)
-                if len(arr_a) == len(arr_b) and len(arr_a) > 0:
-                    alpha = rng.random()
-                    child_data[key] = alpha * arr_a + (1 - alpha) * arr_b
-                else:
-                    child_data[key] = arr_a if rng.random() < 0.5 else arr_b
-            elif key == "spatial_region":
-                child_data[key] = data_a[key] if rng.random() < 0.5 else data_b[key]
-            else:
-                child_data[key] = data_a[key] if rng.random() < 0.5 else data_b[key]
+            child_data[key] = _recombine_field(key, data_a, data_b, rng)
 
         return cls.model_validate(child_data)
 

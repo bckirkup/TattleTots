@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any, Literal, overload
+
 import numpy as np
 from numpy.typing import NDArray
 
@@ -251,38 +253,11 @@ def prepare_agent_observation(
 def _combined_stream_metadata(streams: list[Stream]) -> StreamMetadata | None:
     if not any(stream.metadata is not None for stream in streams):
         return None
-    coordinates: list[tuple[float, ...] | None] = []
-    modalities: list[str | None] = []
-    identities: list[str | None] = []
-    footprints: list[tuple[float, ...] | None] = []
-    resolutions: list[float | None] = []
-    for stream in streams:
-        metadata = stream.metadata
-        coordinates.extend(
-            metadata.coordinates
-            if metadata is not None and metadata.coordinates is not None
-            else [None] * stream.dimensionality
-        )
-        modalities.extend(
-            metadata.modality
-            if metadata is not None and metadata.modality is not None
-            else [None] * stream.dimensionality
-        )
-        identities.extend(
-            metadata.identity
-            if metadata is not None and metadata.identity is not None
-            else [None] * stream.dimensionality
-        )
-        footprints.extend(
-            metadata.footprints
-            if metadata is not None and metadata.footprints is not None
-            else [None] * stream.dimensionality
-        )
-        resolutions.extend(
-            metadata.resolution
-            if metadata is not None and metadata.resolution is not None
-            else [None] * stream.dimensionality
-        )
+    coordinates = _combined_metadata_field(streams, "coordinates")
+    modalities = _combined_metadata_field(streams, "modality")
+    identities = _combined_metadata_field(streams, "identity")
+    footprints = _combined_metadata_field(streams, "footprints")
+    resolutions = _combined_metadata_field(streams, "resolution")
     return StreamMetadata(
         coordinates=coordinates,
         modality=modalities,
@@ -290,6 +265,33 @@ def _combined_stream_metadata(streams: list[Stream]) -> StreamMetadata | None:
         footprints=footprints,
         resolution=resolutions,
     )
+
+
+@overload
+def _combined_metadata_field(
+    streams: list[Stream], field: Literal["coordinates", "footprints"]
+) -> list[tuple[float, ...] | None]: ...
+
+
+@overload
+def _combined_metadata_field(
+    streams: list[Stream], field: Literal["modality", "identity"]
+) -> list[str | None]: ...
+
+
+@overload
+def _combined_metadata_field(
+    streams: list[Stream], field: Literal["resolution"]
+) -> list[float | None]: ...
+
+
+def _combined_metadata_field(streams: list[Stream], field: str) -> list[Any]:
+    values: list[Any] = []
+    for stream in streams:
+        metadata = stream.metadata
+        field_values = getattr(metadata, field, None) if metadata is not None else None
+        values.extend(field_values if field_values is not None else [None] * stream.dimensionality)
+    return values
 
 
 def _combined_stream_status(streams: list[Stream]) -> NDArray[np.str_]:

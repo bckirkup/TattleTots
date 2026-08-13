@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from itertools import product
 from typing import Any
 
 
@@ -32,44 +33,68 @@ def _build_coral_key_runs(
 ) -> list[dict[str, Any]]:
     runs: list[dict[str, Any]] = []
     factors = domain_data["factors"]
-    for iuu in factors["iuu_vessel_count"]:
-        for adv in factors["adversary_level"]:
-            for sar in factors["sar_revisit_interval"]:
-                for stream_dim in factors["stream_dimension"]:
-                    for level_idx, tt_level in enumerate(tattletots_levels):
-                        for seed in seeds:
-                            run_name = (
-                                f"ck_iuu{iuu}_adv{adv}_sar{sar}_dim{stream_dim}"
-                                f"_ttL{level_idx + 1}_s{seed}"
-                            )
-                            sim_cfg = tt_level.copy()
-                            sim_cfg["max_steps"] = steps
-                            sim_cfg["seed"] = seed
-                            adv_params = domain_data["adversary_levels"][adv]
-                            dom_cfg = {
-                                "total_epochs": steps,
-                                "seed": seed,
-                                "fleet": {
-                                    "n_iuu_vessels": iuu,
-                                    "underreport_fraction": adv_params["underreport_fraction"],
-                                },
-                                "sensors": {"sar_revisit_interval": sar},
-                                "adversary": {
-                                    "ais_disable_probability": adv_params["ais_disable_probability"],
-                                    "spoof_probability": adv_params["spoof_probability"],
-                                    "platform_interference_rate": adv_params[
-                                        "platform_interference_rate"
-                                    ],
-                                },
-                            }
-                            _append_run(
-                                runs,
-                                name=run_name,
-                                domain="coral_key",
-                                sim_config=sim_cfg,
-                                domain_config=dom_cfg,
-                            )
+    combinations = product(
+        factors["iuu_vessel_count"],
+        factors["adversary_level"],
+        factors["sar_revisit_interval"],
+        factors["stream_dimension"],
+        enumerate(tattletots_levels),
+        seeds,
+    )
+    for iuu, adv, sar, stream_dim, (level_idx, tt_level), seed in combinations:
+        _append_coral_key_run(
+            runs,
+            domain_data,
+            iuu,
+            adv,
+            sar,
+            stream_dim,
+            level_idx,
+            tt_level,
+            seed,
+            steps,
+        )
     return runs
+
+
+def _append_coral_key_run(
+    runs: list[dict[str, Any]],
+    domain_data: dict[str, Any],
+    iuu: int,
+    adv: str,
+    sar: int,
+    stream_dim: int,
+    level_idx: int,
+    tt_level: dict[str, Any],
+    seed: int,
+    steps: int,
+) -> None:
+    run_name = f"ck_iuu{iuu}_adv{adv}_sar{sar}_dim{stream_dim}_ttL{level_idx + 1}_s{seed}"
+    sim_cfg = tt_level.copy()
+    sim_cfg["max_steps"] = steps
+    sim_cfg["seed"] = seed
+    adv_params = domain_data["adversary_levels"][adv]
+    dom_cfg = {
+        "total_epochs": steps,
+        "seed": seed,
+        "fleet": {
+            "n_iuu_vessels": iuu,
+            "underreport_fraction": adv_params["underreport_fraction"],
+        },
+        "sensors": {"sar_revisit_interval": sar},
+        "adversary": {
+            "ais_disable_probability": adv_params["ais_disable_probability"],
+            "spoof_probability": adv_params["spoof_probability"],
+            "platform_interference_rate": adv_params["platform_interference_rate"],
+        },
+    }
+    _append_run(
+        runs,
+        name=run_name,
+        domain="coral_key",
+        sim_config=sim_cfg,
+        domain_config=dom_cfg,
+    )
 
 
 def _build_fire_ecology_runs(

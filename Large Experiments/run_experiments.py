@@ -27,7 +27,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 from baseline_parallel import resolve_worker_count, resolve_workspace_root, run_process_pool
 from experiment_runs import collect_experiment_runs
@@ -125,7 +125,7 @@ REPOS = {
 }
 
 
-def deep_merge(dict1: Dict[str, Any], dict2: Dict[str, Any]) -> Dict[str, Any]:
+def deep_merge(dict1: dict[str, Any], dict2: dict[str, Any]) -> dict[str, Any]:
     """Recursively merges dict2 into dict1 in place."""
     for k, v in dict2.items():
         if k in dict1 and isinstance(dict1[k], dict) and isinstance(v, dict):
@@ -135,13 +135,17 @@ def deep_merge(dict1: Dict[str, Any], dict2: Dict[str, Any]) -> Dict[str, Any]:
     return dict1
 
 
-def generate_experiment_configs(smoke_test: bool = False) -> Dict[str, Any]:
+def generate_experiment_configs(smoke_test: bool = False) -> dict[str, Any]:
     """Generates the full designed experiments configuration structure."""
     config = {
-        "output_directory": "designed_experiments_results" if not smoke_test else "smoke_test_results",
+        "output_directory": "designed_experiments_results"
+        if not smoke_test
+        else "smoke_test_results",
         "steps": 5 if smoke_test else 800,
         "seeds": [42] if smoke_test else [42, 43, 44],  # Triplicate runs
-        "tattletots_levels": TATTLETOTS_LEVELS if not smoke_test else [TATTLETOTS_LEVELS[2]],  # Level 3 for smoke test
+        "tattletots_levels": TATTLETOTS_LEVELS
+        if not smoke_test
+        else [TATTLETOTS_LEVELS[2]],  # Level 3 for smoke test
         "domains": {
             "coral_key": {
                 "factors": {
@@ -169,11 +173,13 @@ def generate_experiment_configs(smoke_test: bool = False) -> Dict[str, Any]:
                         "underreport_fraction": 0.30,
                         "platform_interference_rate": 0.15,
                     },
-                }
+                },
             },
             "fire_ecology": {
                 "factors": {
-                    "deployment_phase": ["phase_0", "phase_1", "phase_2", "phase_3"] if not smoke_test else ["phase_2"],
+                    "deployment_phase": ["phase_0", "phase_1", "phase_2", "phase_3"]
+                    if not smoke_test
+                    else ["phase_2"],
                     "sensor_dropout": ["0%", "20%", "50%"] if not smoke_test else ["0%"],
                     "stream_dimension": [400, 1000, 5000] if not smoke_test else [1000],
                 },
@@ -182,21 +188,25 @@ def generate_experiment_configs(smoke_test: bool = False) -> Dict[str, Any]:
                     "phase_1": {"n_cameras": 8, "n_weather_stations": 4, "n_fuel_sensors": 0},
                     "phase_2": {"n_cameras": 12, "n_weather_stations": 6, "n_fuel_sensors": 4},
                     "phase_3": {"n_cameras": 12, "n_weather_stations": 8, "n_fuel_sensors": 6},
-                }
+                },
             },
             "grain_guard": {
                 "factors": {
-                    "landscape": ["monoculture", "orchard", "intercrop"] if not smoke_test else ["monoculture"],
-                    "sensor_budget": ["sparse", "medium", "dense"] if not smoke_test else ["medium"],
+                    "landscape": ["monoculture", "orchard", "intercrop"]
+                    if not smoke_test
+                    else ["monoculture"],
+                    "sensor_budget": ["sparse", "medium", "dense"]
+                    if not smoke_test
+                    else ["medium"],
                     "stream_dimension": [117, 500, 1000] if not smoke_test else [1000],
                 },
                 "sensor_budgets": {
                     "sparse": {"n_traps": 5, "n_weather_stations": 1, "n_soil_sensors": 2},
                     "medium": {"n_traps": 10, "n_weather_stations": 2, "n_soil_sensors": 4},
                     "dense": {"n_traps": 20, "n_weather_stations": 4, "n_soil_sensors": 8},
-                }
-            }
-        }
+                },
+            },
+        },
     }
     return config
 
@@ -204,18 +214,18 @@ def generate_experiment_configs(smoke_test: bool = False) -> Dict[str, Any]:
 def run_single_run(
     run_name: str,
     domain_key: str,
-    sim_config: Dict[str, Any],
-    domain_config: Dict[str, Any],
+    sim_config: dict[str, Any],
+    domain_config: dict[str, Any],
     output_dir: Path,
     verbose: bool,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Executes a single run of a designed experiment."""
     repo_info = REPOS[domain_key]
     workspace_root = _WORKSPACE_ROOT
-    
+
     # 1. Load default config
     default_config_path = workspace_root / repo_info["default_config"]
-    with open(default_config_path, "r") as f:
+    with open(default_config_path) as f:
         config_data = json.load(f)
 
     # 2. Merge simulation and domain configs
@@ -261,11 +271,11 @@ def run_single_run(
             )
 
         elapsed_time = time.time() - start_time
-        
+
         # Extract key metrics
         metrics = {}
         if results_path.exists():
-            with open(results_path, "r") as r_file:
+            with open(results_path) as r_file:
                 res_data = json.load(r_file)
             metrics = {
                 "steps_completed": res_data.get("run_summary", {}).get("steps_completed"),
@@ -297,10 +307,8 @@ def run_single_run(
         }
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Designed Experiments Runner for TattleTots"
-    )
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Designed Experiments Runner for TattleTots")
     parser.add_argument(
         "--config",
         type=Path,
@@ -332,7 +340,81 @@ def main() -> int:
         action="store_true",
         help="Print detailed progress logs",
     )
-    args = parser.parse_args()
+    return parser.parse_args()
+
+
+def _execute_experiment_runs(
+    args: argparse.Namespace,
+    runs_to_execute: list[dict[str, Any]],
+    output_dir: Path,
+    results_key: dict[str, Any],
+    worker_count: int,
+) -> None:
+    submit_kwargs = [
+        (
+            run["name"],
+            run["domain"],
+            run["sim_config"],
+            run["domain_config"],
+            output_dir,
+            args.verbose,
+        )
+        for run in runs_to_execute
+    ]
+
+    def _store_success(run: dict[str, Any], res: dict[str, Any]) -> None:
+        results_key["runs"][run["name"]] = res
+
+    def _store_failure(run: dict[str, Any], exc: Exception) -> None:
+        results_key["runs"][run["name"]] = {
+            "status": "failed",
+            "error": f"Unhandled exception: {exc}",
+        }
+
+    if args.parallel:
+        run_process_pool(
+            run_single_run,
+            submit_kwargs,
+            runs_to_execute,
+            max_workers=worker_count,
+            on_success=_store_success,
+            on_failure=_store_failure,
+        )
+        return
+    for run in runs_to_execute:
+        name = run["name"]
+        res = run_single_run(
+            name,
+            run["domain"],
+            run["sim_config"],
+            run["domain_config"],
+            output_dir,
+            args.verbose,
+        )
+        results_key["runs"][name] = res
+        print(
+            f"[+] Finished: {name} (Status: {res['status']}, Time: {res.get('elapsed_seconds', 0.0):.1f}s)"
+        )
+
+
+def _print_experiment_summary(results_key: dict[str, Any]) -> None:
+    print("\n=== Designed Experiments Execution Summary ===")
+    print(
+        f"{'Run Name':<45} | {'Domain':<15} | {'Status':<10} | {'Time (s)':<8} | {'Population':<10}"
+    )
+    print("-" * 98)
+    for name, run_res in results_key["runs"].items():
+        status = run_res.get("status", "unknown")
+        domain = run_res.get("domain", "unknown")
+        elapsed = f"{run_res.get('elapsed_seconds', 0.0):.1f}"
+        metrics = run_res.get("metrics", {})
+        pop = str(metrics.get("final_population", "N/A"))
+        print(f"{name:<45} | {domain:<15} | {status:<10} | {elapsed:<8} | {pop:<10}")
+    print("=" * 98)
+
+
+def main() -> int:
+    args = _parse_args()
 
     # 1. Generate or load config
     config_path = args.config or Path("designed_experiments_config.json")
@@ -345,7 +427,7 @@ def main() -> int:
             print(f"[+] Generated designed experiments configuration at: {safe_config_path_obj}")
     else:
         safe_config_path_obj = safe_config_path(config_path, base=_SCRIPT_DIR)
-        with open(safe_config_path_obj, "r") as f:
+        with open(safe_config_path_obj) as f:
             exp_config = json.load(f)
         print(f"[+] Loaded designed experiments configuration from: {safe_config_path_obj}")
 
@@ -370,7 +452,7 @@ def main() -> int:
     print("=" * 60)
 
     results_key = {
-        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
         "is_smoke_test": args.smoke_test,
         "output_directory": str(output_dir),
         "runs": {},
@@ -379,50 +461,7 @@ def main() -> int:
     start_time = time.time()
 
     # 4. Execute runs
-    submit_kwargs = [
-        (
-            run["name"],
-            run["domain"],
-            run["sim_config"],
-            run["domain_config"],
-            output_dir,
-            args.verbose,
-        )
-        for run in runs_to_execute
-    ]
-
-    def _store_success(run: Dict[str, Any], res: Dict[str, Any]) -> None:
-        results_key["runs"][run["name"]] = res
-
-    def _store_failure(run: Dict[str, Any], exc: Exception) -> None:
-        results_key["runs"][run["name"]] = {
-            "status": "failed",
-            "error": f"Unhandled exception: {exc}",
-        }
-
-    if args.parallel:
-        run_process_pool(
-            run_single_run,
-            submit_kwargs,
-            runs_to_execute,
-            max_workers=worker_count,
-            on_success=_store_success,
-            on_failure=_store_failure,
-        )
-    else:
-        for run in runs_to_execute:
-            name = run["name"]
-            res = run_single_run(
-                name,
-                run["domain"],
-                run["sim_config"],
-                run["domain_config"],
-                output_dir,
-                args.verbose,
-            )
-            results_key["runs"][name] = res
-            print(f"[+] Finished: {name} (Status: {res['status']}, Time: {res.get('elapsed_seconds', 0.0):.1f}s)")
-
+    _execute_experiment_runs(args, runs_to_execute, output_dir, results_key, worker_count)
     total_elapsed = time.time() - start_time
     print("=" * 60)
     print(f"[+] All runs finished in {total_elapsed:.1f}s.")
@@ -435,17 +474,7 @@ def main() -> int:
     print(f"[+] Designed experiments summary key written to: {key_file_path}")
 
     # Print summary table
-    print("\n=== Designed Experiments Execution Summary ===")
-    print(f"{'Run Name':<45} | {'Domain':<15} | {'Status':<10} | {'Time (s)':<8} | {'Population':<10}")
-    print("-" * 98)
-    for name, run_res in results_key["runs"].items():
-        status = run_res.get("status", "unknown")
-        domain = run_res.get("domain", "unknown")
-        elapsed = f"{run_res.get('elapsed_seconds', 0.0):.1f}"
-        metrics = run_res.get("metrics", {})
-        pop = str(metrics.get("final_population", "N/A"))
-        print(f"{name:<45} | {domain:<15} | {status:<10} | {elapsed:<8} | {pop:<10}")
-    print("=" * 98)
+    _print_experiment_summary(results_key)
 
     any_failed = any(r.get("status") == "failed" for r in results_key["runs"].values())
     return 1 if any_failed else 0

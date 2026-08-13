@@ -53,8 +53,6 @@ def _load_baseline_runs(domain: str) -> dict[str, Any]:
 
 
 def _parse_bma_run(name: str) -> tuple[str, str, int] | None:
-    if not name.endswith(tuple(f"_s{s}" for s in range(1000, 1100)) + tuple(f"_s{s}" for s in (42, 43, 44))):
-        pass
     if "_s" not in name:
         return None
     base, seed_str = name.rsplit("_s", 1)
@@ -183,7 +181,9 @@ def compare(
     comparisons: list[dict[str, Any]] = []
     for run_name, run_entry in bma_key.get("runs", {}).items():
         if run_entry.get("status") != "success":
-            comparisons.append({"run_name": run_name, "status": "failed", "error": run_entry.get("error")})
+            comparisons.append(
+                {"run_name": run_name, "status": "failed", "error": run_entry.get("error")}
+            )
             continue
 
         parsed = _parse_bma_run(run_name)
@@ -210,7 +210,9 @@ def compare(
             out_file = bma_key_path.parent / run_entry.get("output_file", "")
             if out_file.is_file():
                 full = json.loads(out_file.read_text())
-                bma_val = _extract_bma_metric(domain, {"domain_specific": full.get("domain_metrics", {})})
+                bma_val = _extract_bma_metric(
+                    domain, {"domain_specific": full.get("domain_metrics", {})}
+                )
 
         baseline_info = _baseline_best_and_targets(
             domain,
@@ -261,7 +263,9 @@ def compare(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Compare BMA quick-validation vs archived baselines")
+    parser = argparse.ArgumentParser(
+        description="Compare BMA quick-validation vs archived baselines"
+    )
     parser.add_argument(
         "--bma-key",
         type=Path,
