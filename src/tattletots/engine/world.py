@@ -29,10 +29,10 @@ from tattletots.engine.reproduction import attempt_reproduction
 from tattletots.engine.residual import apply_residual_policy
 from tattletots.engine.sensing import (
     gather_raw_stream_data,
-    prepare_agent_input_with_attribution,
+    prepare_agent_observation,
 )
-from tattletots.engine.spatial import apply_spatial_mask, infer_spatial_location
-from tattletots.engine.temporal import apply_temporal_fusion
+from tattletots.engine.spatial import apply_spatial_observation, infer_spatial_location
+from tattletots.engine.temporal import apply_temporal_observation
 from tattletots.engine.trophic import compute_trophic_level, select_input_streams
 from tattletots.engine.trust import (
     apply_response_outcome_trust,
@@ -48,6 +48,7 @@ from tattletots.models.energy import EnergyReserves
 from tattletots.models.genome import Genome, ParentalStrategy, ResidualPolicy, SpatialStrategy
 from tattletots.models.identity import is_uuid_identifier, seeded_id
 from tattletots.models.location import EventLocation
+from tattletots.models.observation import ObservationPacket
 from tattletots.models.report import Report
 from tattletots.models.response_outcome import ResponseOutcome
 from tattletots.models.stream import Stream, StreamType
@@ -443,24 +444,24 @@ class World:
         self.streams[residual_stream.id] = residual_stream
         agent.state.output_stream_id = residual_stream.id
 
-    def _prepare_input_pipeline(self, agent: Agent) -> NDArray[np.float64]:
+    def _prepare_input_pipeline(self, agent: Agent) -> ObservationPacket:
         """Run sensing → temporal → spatial pipeline."""
-        sensed, _, grounded_mass, ungrounded_mass = prepare_agent_input_with_attribution(
+        sensed, _, grounded_mass, ungrounded_mass = prepare_agent_observation(
             agent,
             self.streams,
             self.config,
         )
         self._last_input_attribution[agent.id] = (grounded_mass, ungrounded_mass)
-        if sensed.size == 0:
+        if sensed.data.size == 0:
             return sensed
-        temporal = apply_temporal_fusion(agent, sensed)
-        spatial = apply_spatial_mask(
+        temporal = apply_temporal_observation(agent, sensed)
+        spatial = apply_spatial_observation(
             agent,
             temporal,
             n_blocks=self.config.n_spatial_blocks,
             dim_to_location=self._dim_to_location,
         )
-        agent.state.projected_input = spatial
+        agent.state.projected_input = spatial.data
         return spatial
 
     def _compress(self, agent: Agent) -> float:
@@ -469,7 +470,8 @@ class World:
         if model is None:
             return 0.0
 
-        combined = self._prepare_input_pipeline(agent)
+        observation = self._prepare_input_pipeline(agent)
+        combined = observation.data
         if combined.size == 0:
             agent.state.last_step_yield = 0.0
             agent.state.last_step_grounded_yield = 0.0
@@ -573,7 +575,7 @@ class World:
 
         combined = agent.state.projected_input
         if combined.size == 0:
-            combined = self._prepare_input_pipeline(agent)
+            combined = self._prepare_input_pipeline(agent).data
         if combined.size == 0:
             return None
 

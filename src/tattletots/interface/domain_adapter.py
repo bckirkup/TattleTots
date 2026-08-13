@@ -27,11 +27,23 @@ class DomainAdapter(ABC):
     3. Defining user profiles
     4. Scoring relevance
     5. Computing domain costs
+
+    A domain's active ground-truth locations must be inferable, at the
+    declared grading resolution, from the evidence carried by its published
+    streams.  A label that is not represented in those observations is an
+    unobservable instrument, not merely a difficult evolutionary task.  The
+    engine transports stream metadata without interpreting domain concepts.
     """
 
     @abstractmethod
     def get_streams(self) -> list[Stream]:
-        """Return the domain's data streams (initialized, ready for first step)."""
+        """Return initialized streams whose evidence supports ground truth.
+
+        Domains may attach ``Stream.metadata`` and per-step observation status
+        to make feature geometry, modality, identity, footprint, resolution,
+        and missingness explicit.  If a domain publishes no metadata, legacy
+        numeric-only behavior remains supported.
+        """
 
     @abstractmethod
     def get_users(self) -> list[User]:

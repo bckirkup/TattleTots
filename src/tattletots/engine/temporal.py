@@ -7,6 +7,7 @@ from numpy.typing import NDArray
 
 from tattletots.models.agent import Agent
 from tattletots.models.genome import TemporalFusionMode
+from tattletots.models.observation import ObservationPacket
 
 
 def _fuse_ema(buffer: list[NDArray[np.float64]]) -> NDArray[np.float64]:
@@ -76,3 +77,20 @@ def apply_temporal_fusion(
         return _fuse_ar_lag(buffer, current)
 
     return current
+
+
+def apply_temporal_observation(agent: Agent, current: ObservationPacket) -> ObservationPacket:
+    """Fuse an observation while retaining geometry only when it is stable."""
+    if current.data.size == 0:
+        return current
+    if current.metadata is None:
+        return ObservationPacket(apply_temporal_fusion(agent, current.data))
+
+    # The runtime history stores numeric arrays only.  Geometry is valid after
+    # fusion only when every retained sample has the same feature schema.
+    fused = apply_temporal_fusion(agent, current.data)
+    if len(agent.state.temporal_buffer) > 1:
+        # Consequently temporal accumulation of spatial evidence is not yet
+        # expressible; a later slice must carry feature schema in the history.
+        return ObservationPacket(fused)
+    return ObservationPacket(fused, current.metadata, current.status)

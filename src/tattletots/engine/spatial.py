@@ -10,6 +10,7 @@ from numpy.typing import NDArray
 from tattletots.models.agent import Agent
 from tattletots.models.genome import Genome, SpatialStrategy
 from tattletots.models.location import EventLocation
+from tattletots.models.observation import ObservationPacket, ObservationStatus
 
 DimToLocationFn = Callable[[int], EventLocation]
 
@@ -96,6 +97,29 @@ def apply_spatial_mask(
 
     agent.state.last_spatial_mask = mask
     return data * mask
+
+
+def apply_spatial_observation(
+    agent: Agent,
+    observation: ObservationPacket,
+    *,
+    n_blocks: int = 10,
+    dim_to_location: DimToLocationFn | None = None,
+) -> ObservationPacket:
+    """Apply spatial weighting and mark masked features as unavailable."""
+    masked = apply_spatial_mask(
+        agent,
+        observation.data,
+        n_blocks=n_blocks,
+        dim_to_location=dim_to_location,
+    )
+    if observation.status is None or observation.status.size == 0:
+        return ObservationPacket(masked, observation.metadata)
+    status = observation.status.copy()
+    mask = agent.state.last_spatial_mask
+    if mask.size == status.size:
+        status[mask == 0.0] = ObservationStatus.MASKED.value
+    return ObservationPacket(masked, observation.metadata, status)
 
 
 def infer_spatial_location(
