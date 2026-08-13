@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
+from tattletots.engine import sensing
 from tattletots.engine.config import SimulationConfig
 from tattletots.engine.sensing import prepare_agent_observation
 from tattletots.engine.spatial import apply_spatial_observation
@@ -104,6 +106,74 @@ def test_subspace_selection_preserves_selected_metadata() -> None:
         "sensor-4",
         "sensor-5",
     }
+
+
+@pytest.mark.parametrize(
+    ("strategy", "working_dim", "n_blocks"),
+    [
+        (SensingStrategy.CONCAT, 8, 10),
+        (SensingStrategy.SUBSPACE_SAMPLE, 8, 10),
+        (SensingStrategy.BLOCK_SPECIALIZE, 8, 3),
+        (SensingStrategy.WEIGHTED_FUSE, 8, 10),
+    ],
+)
+def test_metadata_and_status_lengths_match_numeric_selection(
+    strategy: SensingStrategy,
+    working_dim: int,
+    n_blocks: int,
+) -> None:
+    stream = Stream(
+        stream_type=StreamType.RAW,
+        dimensionality=10,
+        current_data=np.arange(10.0),
+        metadata=_metadata(10),
+    )
+    agent = _agent([stream], sensing_strategy=strategy)
+    observation, _, _, _ = prepare_agent_observation(
+        agent,
+        {stream.id: stream},
+        SimulationConfig(max_stream_dim=working_dim, n_spatial_blocks=n_blocks),
+    )
+
+    if observation.metadata is None:
+        assert observation.status is None
+        return
+    assert observation.metadata.feature_count == observation.data.size
+    assert observation.status is not None
+    assert observation.status.size == observation.data.size
+
+
+def test_metadata_consumes_numeric_selection_without_rederiving(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stream = Stream(
+        stream_type=StreamType.RAW,
+        dimensionality=6,
+        current_data=np.arange(6.0),
+        metadata=_metadata(6),
+    )
+    agent = _agent(
+        [stream],
+        sensing_strategy=SensingStrategy.SUBSPACE_SAMPLE,
+    )
+    selections = [np.array([1, 4, 5], dtype=np.int64)]
+
+    def select_once(total_dim: int, working_dim: int, seed: int) -> np.ndarray:
+        assert total_dim == 6
+        assert working_dim == 8
+        return selections.pop()
+
+    monkeypatch.setattr(sensing, "_stable_sample_indices", select_once)
+    observation, _, _, _ = sensing.prepare_agent_observation(
+        agent,
+        {stream.id: stream},
+        SimulationConfig(max_stream_dim=8),
+    )
+
+    assert selections == []
+    assert observation.data[:3].tolist() == [1.0, 4.0, 5.0]
+    assert observation.metadata is not None
+    assert observation.metadata.identity[:3] == ["sensor-1", "sensor-4", "sensor-5"]
 
 
 def test_weighted_fusion_drops_geometry_after_provenance_is_combined() -> None:

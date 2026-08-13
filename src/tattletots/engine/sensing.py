@@ -75,30 +75,22 @@ def _fuse_weighted(
 
 
 def _fuse_subspace_sample(
-    agent: Agent,
-    genome: Genome,
     input_data: list[NDArray[np.float64]],
     working_dim: int,
+    indices: NDArray[np.int64],
 ) -> NDArray[np.float64]:
     combined = np.concatenate(input_data)
-    seed = stable_id_digest(agent.id) % (2**31) + genome.dim_offset
-    indices = _stable_sample_indices(combined.size, working_dim, seed)
     sampled = combined[indices]
     return _pad_or_truncate(sampled, working_dim)
 
 
 def _fuse_block_specialize(
-    genome: Genome,
     input_data: list[NDArray[np.float64]],
     working_dim: int,
-    n_blocks: int,
+    indices: NDArray[np.int64],
 ) -> NDArray[np.float64]:
     combined = np.concatenate(input_data)
-    block_size = max(1, int(np.ceil(combined.size / n_blocks)))
-    block_idx = genome.block_index % n_blocks
-    start = block_idx * block_size
-    end = min(start + block_size, combined.size)
-    block = combined[start:end]
+    block = combined[indices]
     return _pad_or_truncate(block, working_dim)
 
 
@@ -134,6 +126,25 @@ def prepare_agent_input_with_attribution(
     Grounded mass comes from raw domain streams. All non-raw streams, including
     curated residuals, contribute to the ungrounded mass.
     """
+    projected, input_labels, grounded, ungrounded, _ = _prepare_agent_input_with_selection(
+        agent,
+        streams,
+        config,
+    )
+    return projected, input_labels, grounded, ungrounded
+
+
+def _prepare_agent_input_with_selection(
+    agent: Agent,
+    streams: dict[str, Stream],
+    config: SimulationConfig,
+) -> tuple[
+    NDArray[np.float64],
+    list[str],
+    float,
+    float,
+    NDArray[np.int64] | None,
+]:
     input_data: list[NDArray[np.float64]] = []
     input_labels: list[str] = []
     input_streams: list[Stream] = []
@@ -146,45 +157,57 @@ def prepare_agent_input_with_attribution(
             input_streams.append(stream)
 
     if not input_data:
-        return np.array([], dtype=np.float64), input_labels, 0.0, 0.0
+        return np.array([], dtype=np.float64), input_labels, 0.0, 0.0, None
 
     genome = agent.genome
     working_dim = min(genome.working_dim, config.max_working_dim, config.max_stream_dim)
     strategy = genome.sensing_strategy
+    selection: NDArray[np.int64] | None = None
 
     if strategy == SensingStrategy.CONCAT:
         projected = _fuse_concat(input_data, working_dim)
         grounded, ungrounded = _mass_for_concat(input_streams, working_dim)
-        return projected, input_labels, grounded, ungrounded
+        selection = np.arange(
+            min(sum(data.size for data in input_data), working_dim),
+            dtype=np.int64,
+        )
+        return projected, input_labels, grounded, ungrounded, selection
 
     if strategy == SensingStrategy.WEIGHTED_FUSE:
         projected = _fuse_weighted(agent, genome, input_data, working_dim)
         grounded, ungrounded = _mass_for_weighted(agent, genome, input_streams, working_dim)
-        return projected, input_labels, grounded, ungrounded
+        return projected, input_labels, grounded, ungrounded, None
 
     if strategy == SensingStrategy.SUBSPACE_SAMPLE:
-        projected = _fuse_subspace_sample(agent, genome, input_data, working_dim)
-        grounded, ungrounded = _mass_for_subspace(agent, genome, input_streams, working_dim)
-        return projected, input_labels, grounded, ungrounded
+        total_dim = sum(data.size for data in input_data)
+        seed = stable_id_digest(agent.id) % (2**31) + genome.dim_offset
+        selection = _stable_sample_indices(total_dim, working_dim, seed)
+        projected = _fuse_subspace_sample(input_data, working_dim, selection)
+        grounded, ungrounded = _mass_for_subspace(
+            input_streams,
+            selection,
+        )
+        return projected, input_labels, grounded, ungrounded, selection
 
     if strategy == SensingStrategy.BLOCK_SPECIALIZE:
-        projected = _fuse_block_specialize(
-            genome,
-            input_data,
-            working_dim,
-            config.n_spatial_blocks,
+        total_dim = sum(data.size for data in input_data)
+        block_size = max(1, int(np.ceil(total_dim / config.n_spatial_blocks)))
+        block_idx = genome.block_index % config.n_spatial_blocks
+        start = block_idx * block_size
+        end = min(start + block_size, total_dim)
+        selection = np.arange(
+            start,
+            min(end, start + working_dim),
+            dtype=np.int64,
         )
-        grounded, ungrounded = _mass_for_block(
-            genome,
-            input_streams,
-            working_dim,
-            config.n_spatial_blocks,
-        )
-        return projected, input_labels, grounded, ungrounded
+        projected = _fuse_block_specialize(input_data, working_dim, selection)
+        grounded, ungrounded = _mass_for_block(input_streams, selection)
+        return projected, input_labels, grounded, ungrounded, selection
 
     combined = np.concatenate(input_data)[:working_dim]
     grounded, ungrounded = _mass_for_concat(input_streams, working_dim)
-    return combined, input_labels, grounded, ungrounded
+    selection = np.arange(min(combined.size, working_dim), dtype=np.int64)
+    return combined, input_labels, grounded, ungrounded, selection
 
 
 def prepare_agent_observation(
@@ -198,7 +221,7 @@ def prepare_agent_observation(
     metadata-bearing path is deliberately separate so transport does not
     alter legacy numeric behavior.
     """
-    projected, labels, grounded, ungrounded = prepare_agent_input_with_attribution(
+    projected, labels, grounded, ungrounded, selection = _prepare_agent_input_with_selection(
         agent,
         streams,
         config,
@@ -216,29 +239,12 @@ def prepare_agent_observation(
         return ObservationPacket(data=projected), labels, grounded, ungrounded
 
     statuses = _combined_stream_status(input_streams)
-    strategy = agent.genome.sensing_strategy
     working_dim = min(agent.genome.working_dim, config.max_working_dim, config.max_stream_dim)
-    if strategy == SensingStrategy.WEIGHTED_FUSE:
+    if selection is None:
         # Weighted addition destroys one-to-one feature provenance.
         return ObservationPacket(data=projected), labels, grounded, ungrounded
-    if strategy == SensingStrategy.SUBSPACE_SAMPLE:
-        combined_size = sum(stream.current_data.size for stream in input_streams)
-        seed = stable_id_digest(agent.id) % (2**31) + agent.genome.dim_offset
-        indices = _stable_sample_indices(combined_size, working_dim, seed)
-        metadata = metadata.select(indices).truncate_or_pad(working_dim)
-        statuses = statuses[indices]
-    elif strategy == SensingStrategy.BLOCK_SPECIALIZE:
-        combined_size = sum(stream.current_data.size for stream in input_streams)
-        block_size = max(1, int(np.ceil(combined_size / config.n_spatial_blocks)))
-        block_idx = agent.genome.block_index % config.n_spatial_blocks
-        start = block_idx * block_size
-        end = min(start + block_size, combined_size)
-        indices = np.arange(start, min(end, start + working_dim), dtype=np.int64)
-        metadata = metadata.select(indices).truncate_or_pad(working_dim)
-        statuses = statuses[indices]
-    else:
-        metadata = metadata.truncate_or_pad(working_dim)
-        statuses = _pad_status(statuses, working_dim)
+    metadata = metadata.select(selection).truncate_or_pad(working_dim)
+    statuses = _pad_status(statuses[selection], working_dim)
     return ObservationPacket(projected, metadata, statuses), labels, grounded, ungrounded
 
 
@@ -365,33 +371,20 @@ def _source_for_dimensions(streams: list[Stream]) -> list[bool]:
 
 
 def _mass_for_subspace(
-    agent: Agent,
-    genome: Genome,
     streams: list[Stream],
-    working_dim: int,
+    indices: NDArray[np.int64],
 ) -> tuple[float, float]:
     source_is_grounded = _source_for_dimensions(streams)
-    total_dim = len(source_is_grounded)
-    n = min(working_dim, total_dim)
-    seed = stable_id_digest(agent.id) % (2**31) + genome.dim_offset
-    indices = _stable_sample_indices(total_dim, working_dim, seed)
-    grounded = sum(source_is_grounded[int(index)] for index in indices[:n])
-    return float(grounded), float(n - grounded)
+    grounded = sum(source_is_grounded[int(index)] for index in indices)
+    return float(grounded), float(len(indices) - grounded)
 
 
 def _mass_for_block(
-    genome: Genome,
     streams: list[Stream],
-    working_dim: int,
-    n_blocks: int,
+    indices: NDArray[np.int64],
 ) -> tuple[float, float]:
     source_is_grounded = _source_for_dimensions(streams)
-    block_size = max(1, int(np.ceil(len(source_is_grounded) / n_blocks)))
-    block_idx = genome.block_index % n_blocks
-    start = block_idx * block_size
-    end = min(start + block_size, len(source_is_grounded))
-    selected = source_is_grounded[start:end]
-    selected = selected[:working_dim]
+    selected = [source_is_grounded[int(index)] for index in indices]
     grounded = sum(selected)
     return float(grounded), float(len(selected) - grounded)
 

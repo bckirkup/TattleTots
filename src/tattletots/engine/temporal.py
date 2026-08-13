@@ -90,5 +90,7 @@ def apply_temporal_observation(agent: Agent, current: ObservationPacket) -> Obse
     # fusion only when every retained sample has the same feature schema.
     fused = apply_temporal_fusion(agent, current.data)
     if len(agent.state.temporal_buffer) > 1:
+        # Consequently temporal accumulation of spatial evidence is not yet
+        # expressible; a later slice must carry feature schema in the history.
         return ObservationPacket(fused)
     return ObservationPacket(fused, current.metadata, current.status)
