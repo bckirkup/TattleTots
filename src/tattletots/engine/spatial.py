@@ -163,6 +163,16 @@ def _feature_evidence(
     )
 
 
+def _project_location_to_observed_hull(
+    location: EventLocation, coordinates: NDArray[np.float64]
+) -> EventLocation:
+    """Project a heritable prior into the coordinate hull supplied by evidence."""
+    lower = coordinates.min(axis=0)
+    upper = coordinates.max(axis=0)
+    projected = np.clip(np.asarray(location, dtype=np.float64), lower, upper)
+    return (int(round(projected[0])), int(round(projected[1])))
+
+
 def infer_geometry_location(
     agent: Agent,
     observation: ObservationPacket,
@@ -192,10 +202,10 @@ def infer_geometry_location(
         dtype=np.float64,
     )
     if not np.any(evidence > 0.0):
-        return genome.spatial_region
+        return _project_location_to_observed_hull(genome.spatial_region, coordinates)
 
     if genome.spatial_inference_strategy == SpatialInferenceStrategy.FIXED_PRIOR:
-        return genome.spatial_region
+        return _project_location_to_observed_hull(genome.spatial_region, coordinates)
     if genome.spatial_inference_strategy == SpatialInferenceStrategy.PEAK:
         selected = coordinates[int(np.argmax(evidence))]
         return (int(round(selected[0])), int(round(selected[1])))
