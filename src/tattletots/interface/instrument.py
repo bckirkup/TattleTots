@@ -11,6 +11,7 @@ from tattletots.interface.domain_adapter import DomainAdapter
 from tattletots.models.location import EventLocation, LocationFrame
 from tattletots.models.observation import ObservationStatus, StreamMetadata
 from tattletots.models.stream import Stream
+from tattletots.telemetry.spatial_nulls import static_prior_precision
 
 
 class InstrumentCheck(StrEnum):
@@ -20,6 +21,8 @@ class InstrumentCheck(StrEnum):
     COORDINATE_FRAME = "coordinate_frame"
     DECLARATIONS = "declarations"
     INFERABILITY = "inferability"
+    BASELINE = "baseline"
+    LOCALIZATION = "localization"
 
 
 @dataclass(frozen=True)
@@ -44,6 +47,7 @@ class InstrumentValidityReport:
     inferability_precision: float
     decoder_precision: float
     chance_baseline: float
+    static_prior_baseline: float
     candidate_locations: tuple[EventLocation, ...]
 
     @property
@@ -79,11 +83,13 @@ def validate_instrument(
     supported_events = 0
     reportable_events = 0
     findings: list[InstrumentFinding] = []
+    active_location_history: list[tuple[tuple[EventLocation, ...], int]] = []
 
     for time_step in range(steps):
         adapter.step(time_step)
         active = tuple(adapter.get_active_locations(time_step))
         is_event = adapter.get_ground_truth(time_step)
+        active_location_history.append((active, int(is_event)))
         if is_event:
             event_steps += 1
             event_locations.update(active)
@@ -113,6 +119,7 @@ def validate_instrument(
         adapter,
     )
     chance_baseline = 1.0 / len(candidates) if candidates else 1.0
+    static_prior_baseline = static_prior_precision(active_location_history)
     support_precision = supported_events / reportable_events if reportable_events else 0.0
     decoder_precision = correct_reports / reportable_events if reportable_events else 0.0
 
@@ -144,14 +151,42 @@ def validate_instrument(
         )
     findings.append(
         InstrumentFinding(
+            check=InstrumentCheck.BASELINE,
+            passed=True,
+            message=(
+                "Static-prior precision is "
+                f"{static_prior_baseline:.2%} versus uniform precision "
+                f"{chance_baseline:.2%}; static prior is the localization "
+                "competence null, while uniform is the inferability null."
+            ),
+            measured=static_prior_baseline,
+            threshold=chance_baseline,
+        )
+    )
+    localization_vacuous = len(event_locations) < 2 or static_prior_baseline >= 0.99
+    findings.append(
+        InstrumentFinding(
+            check=InstrumentCheck.LOCALIZATION,
+            passed=not localization_vacuous,
+            message=(
+                "Localization is non-vacuous across multiple event locations."
+                if not localization_vacuous
+                else "Localization is vacuous because event locations have no meaningful spread."
+            ),
+            measured=static_prior_baseline,
+            threshold=0.99,
+        )
+    )
+    findings.append(
+        InstrumentFinding(
             check=InstrumentCheck.INFERABILITY,
             passed=reportable_events > 0
             and support_precision > chance_baseline + inferability_margin,
             message=(
-                "Published evidence carries event locations above chance."
+                "Published evidence carries event locations above uniform chance."
                 if reportable_events > 0
                 and support_precision > chance_baseline + inferability_margin
-                else "Published evidence does not carry event locations above chance."
+                else "Published evidence does not carry event locations above uniform chance."
             ),
             measured=support_precision,
             threshold=chance_baseline + inferability_margin,
@@ -166,6 +201,7 @@ def validate_instrument(
         inferability_precision=support_precision,
         decoder_precision=decoder_precision,
         chance_baseline=chance_baseline,
+        static_prior_baseline=static_prior_baseline,
         candidate_locations=tuple(sorted(candidates)),
     )
 

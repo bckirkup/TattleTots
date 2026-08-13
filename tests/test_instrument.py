@@ -23,8 +23,9 @@ def test_sparse_sensor_instrument_is_valid_and_reaches_above_chance() -> None:
     assert report.valid
     assert report.event_steps == 200
     assert report.distinct_event_locations > 1
-    assert report.inferability_precision > report.chance_baseline
+    assert report.inferability_precision > report.static_prior_baseline
     assert 0.0 <= report.decoder_precision <= 1.0
+    assert 0.0 <= report.static_prior_baseline <= 1.0
     assert all(
         finding.passed
         for finding in report.findings
@@ -41,6 +42,11 @@ def test_gaussian_shift_instrument_rejects_unobservable_location_label() -> None
     )
     assert not inferability.passed
     assert "does not carry" in inferability.message
+    localization = next(
+        finding for finding in report.findings if finding.check == InstrumentCheck.LOCALIZATION
+    )
+    assert not localization.passed
+    assert "vacuous" in localization.message
     assert 0.0 <= report.decoder_precision <= 1.0
 
 
@@ -50,6 +56,7 @@ def test_inferability_baseline_does_not_depend_on_decoder_output() -> None:
 
     assert uninformative.inferability_precision == reference.inferability_precision
     assert uninformative.chance_baseline == reference.chance_baseline
+    assert uninformative.static_prior_baseline == reference.static_prior_baseline
     assert uninformative.decoder_precision != reference.decoder_precision
 
 
@@ -60,6 +67,8 @@ def test_instrument_report_exposes_structured_check_results() -> None:
         InstrumentCheck.EVENT_WINDOW,
         InstrumentCheck.COORDINATE_FRAME,
         InstrumentCheck.DECLARATIONS,
+        InstrumentCheck.BASELINE,
+        InstrumentCheck.LOCALIZATION,
         InstrumentCheck.INFERABILITY,
     }
     assert all(finding.message for finding in report.findings)

@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import TypedDict
 
 from tattletots.models.location import EventLocation
+from tattletots.telemetry.spatial_nulls import static_prior_precision
 
 
 class TelemetrySummary(TypedDict):
@@ -18,6 +19,7 @@ class TelemetrySummary(TypedDict):
     precision: float
     event_prevalence: float
     chance_precision: float
+    static_prior_precision: float
     location_support_size: int
     grounded_yield_share: float
     effective_grounded_yield_share: float
@@ -270,6 +272,9 @@ class TelemetryRecorder:
             support.update(record.verified_report_locations)
         return support
 
+    def _ground_truth_location_support(self) -> set[EventLocation]:
+        return {location for record in self.history for location in record.ground_truth_locations}
+
     def _chance_precision(self) -> float:
         if not self.history:
             return 0.0
@@ -280,6 +285,15 @@ class TelemetryRecorder:
             self.history
         )
         return mean_active_locations / support_size
+
+    def _static_prior_precision(self) -> float:
+        return static_prior_precision(
+            (
+                record.ground_truth_locations,
+                record.reports_issued,
+            )
+            for record in self.history
+        )
 
     def _grounded_yield_share(self) -> float:
         total = self.total_grounded_info_yield + self.total_ungrounded_info_yield
@@ -312,13 +326,16 @@ class TelemetryRecorder:
         event_steps = sum(r.active_location_count > 0 for r in self.history)
         if event_steps == 0:
             reasons.append("no_ground_truth_events")
-        support_size = len(self._location_support())
-        if support_size < 2:
+        ground_truth_support_size = len(self._ground_truth_location_support())
+        if ground_truth_support_size < 2:
             reasons.append("insufficient_location_support")
-        if event_steps > 0 and support_size >= 2:
+        static_prior = self._static_prior_precision()
+        if event_steps > 0 and (ground_truth_support_size < 2 or static_prior >= 0.99):
+            reasons.append("localization_vacuous")
+        elif event_steps > 0 and ground_truth_support_size >= 2:
             precision = self.total_correct_reports / max(self.total_reports, 1)
-            if precision <= self._chance_precision():
-                reasons.append("precision_not_above_chance")
+            if precision <= static_prior:
+                reasons.append("precision_not_above_static_prior")
         if self._grounded_yield_share() < self.initiation_min_grounded_yield_share:
             reasons.append("grounded_yield_share_below_minimum")
 
@@ -359,6 +376,7 @@ class TelemetryRecorder:
             "precision": (self.total_correct_reports / max(self.total_reports, 1)),
             "event_prevalence": self._event_prevalence(),
             "chance_precision": self._chance_precision(),
+            "static_prior_precision": self._static_prior_precision(),
             "location_support_size": len(self._location_support()),
             "grounded_yield_share": self._grounded_yield_share(),
             "effective_grounded_yield_share": self._effective_grounded_yield_share(),
