@@ -17,6 +17,7 @@ from tattletots.interface.reporter_policy import (
 from tattletots.models.agent import Agent, AgentState, LifecycleStage
 from tattletots.models.genome import Genome
 from tattletots.models.observation import ObservationStatus, StreamMetadata
+from tattletots.models.report import Report
 from tattletots.models.stream import Stream, StreamType
 from tattletots.models.user import User
 
@@ -181,3 +182,44 @@ def test_reporter_group_telemetry_is_separate_from_step_fingerprint_payload() ->
     assert groups["ordinary_reports"] == 0
     assert groups["designed_correct_reports"] == 1
     assert groups["ordinary_correct_reports"] == 0
+
+
+def test_reporter_group_uses_dead_authors_and_preserves_report_totals() -> None:
+    world, agent = _world()
+    user_id = next(iter(world.users))
+    report = Report(
+        agent_id=agent.id,
+        target_user_id=user_id,
+        time_step=0,
+        signal_vector=np.zeros(1),
+        confidence=1.0,
+        anomaly_score=1.0,
+        location=(1, 2),
+        verified=True,
+        correct=True,
+    )
+    unknown_report = Report(
+        agent_id="author-no-longer-present",
+        target_user_id=user_id,
+        time_step=0,
+        signal_vector=np.zeros(1),
+        confidence=1.0,
+        anomaly_score=1.0,
+        location=(1, 2),
+    )
+    agent.kill()
+
+    record = world._build_step_record(
+        reports=[report, unknown_report],
+        births=[],
+        deaths=[agent.id],
+        missed=[],
+    )
+    groups = world._last_reporter_groups
+
+    assert record.reports_issued == 2
+    assert groups["designed_reports"] == 1
+    assert groups["designed_correct_reports"] == 1
+    assert groups["ordinary_reports"] == 1
+    assert groups["ordinary_correct_reports"] == 0
+    assert groups["designed_reports"] + groups["ordinary_reports"] == record.reports_issued

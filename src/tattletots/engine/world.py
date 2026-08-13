@@ -795,6 +795,11 @@ class World:
             if signal.size > 0:
                 apply_shaping(upstream, [signal])
 
+    def _reporter_author_is_designed(self, agent_id: str) -> bool:
+        """Classify by the author's genome, including authors that just died."""
+        author = self.agents.get(agent_id)
+        return author is not None and author.genome.reporter_policy is not None
+
     def _build_step_record(
         self,
         reports: list[Report],
@@ -821,8 +826,12 @@ class World:
         raw_total_yield = raw_grounded_yield + raw_ungrounded_yield
         total_yield = grounded_yield + ungrounded_yield
         designed_ids = {agent.id for agent in living if agent.genome.reporter_policy is not None}
-        designed_reports = [report for report in reports if report.agent_id in designed_ids]
-        ordinary_reports = [report for report in reports if report.agent_id not in designed_ids]
+        designed_reports = [
+            report for report in reports if self._reporter_author_is_designed(report.agent_id)
+        ]
+        ordinary_reports = [
+            report for report in reports if not self._reporter_author_is_designed(report.agent_id)
+        ]
         self._last_reporter_groups = {
             "designed_population_share": len(designed_ids) / len(living) if living else 0.0,
             "designed_reports": len(designed_reports),
