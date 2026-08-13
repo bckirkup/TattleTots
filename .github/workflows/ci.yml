@@ -63,6 +63,21 @@ jobs:
         run: |
           pip install -e domain-runner[dev]
           pip install -e ".[dev]"
+      - name: Print numerical environment
+        run: |
+          python - <<'PY'
+          import platform
+          import sys
+
+          import numpy as np
+          import scipy
+
+          print(f"python: {platform.python_version()} ({sys.executable})")
+          print(f"numpy: {np.__version__}")
+          print(f"scipy: {scipy.__version__}")
+          print("numpy.show_config():")
+          np.show_config()
+          PY
       - name: Run unit tests
         run: pytest -m "not smoke" --cov=tattletots --cov-report=term-missing
       - name: Run COP relevance and dispatch tests

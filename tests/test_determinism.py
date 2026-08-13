@@ -3,14 +3,19 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import os
+import platform
 import subprocess
 import sys
+from contextlib import redirect_stdout
 from dataclasses import asdict
 from pathlib import Path
 
 import numpy as np
+import pytest
+import scipy
 
 from tattletots.cli import _load_scenario
 from tattletots.engine.config import SimulationConfig
@@ -36,7 +41,7 @@ def _canonicalize(value: object) -> object:
     return value
 
 
-def _run_fingerprint(
+def _run_payload(
     seed: int,
     steps: int = 8,
     *,
@@ -44,7 +49,7 @@ def _run_fingerprint(
     reproduction_information_scale: float = 1.0,
     reproduction_attention_scale: float = 1.0,
     grounding_quality_strength: float = 0.5,
-) -> str:
+) -> dict[str, object]:
     scenario = GaussianShiftScenario(seed=seed, total_steps=steps)
     config = SimulationConfig(
         initial_population=4,
@@ -70,28 +75,106 @@ def _run_fingerprint(
         world.set_event_state(scenario.get_active_locations(step))
         world.step()
 
-    payload = {
+    return {
         "agents": sorted(world.agents),
         "streams": sorted(world.streams),
         "users": sorted(world.users),
         "records": [asdict(record) for record in world.telemetry.history],
     }
+
+
+def _run_fingerprint(
+    seed: int,
+    steps: int = 8,
+    *,
+    reproduction_coupling_strength: float = 1.0,
+    reproduction_information_scale: float = 1.0,
+    reproduction_attention_scale: float = 1.0,
+    grounding_quality_strength: float = 0.5,
+) -> str:
+    payload = _run_payload(
+        seed,
+        steps,
+        reproduction_coupling_strength=reproduction_coupling_strength,
+        reproduction_information_scale=reproduction_information_scale,
+        reproduction_attention_scale=reproduction_attention_scale,
+        grounding_quality_strength=grounding_quality_strength,
+    )
     encoded = json.dumps(_canonicalize(payload), sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(encoded).hexdigest()
 
 
+def _environment_diagnostics() -> str:
+    config = io.StringIO()
+    with redirect_stdout(config):
+        np.show_config()
+    return "\n".join(
+        [
+            f"python: {platform.python_version()} ({sys.executable})",
+            f"numpy: {np.__version__}",
+            f"scipy: {scipy.__version__}",
+            "numpy.show_config():",
+            config.getvalue().rstrip(),
+        ]
+    )
+
+
+def _payload_diagnostics(payload: dict[str, object]) -> str:
+    records = payload["records"]
+    assert isinstance(records, list)
+    lines = []
+    for index, record in enumerate(records):
+        canonical = _canonicalize(record)
+        encoded = json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()
+        values = _float_values(record)
+        magnitude = max((abs(value) for value in values), default=0.0)
+        lines.append(
+            f"record[{index}] max_abs={magnitude:.17g} digest={hashlib.sha256(encoded).hexdigest()}"
+        )
+    return "\n".join(lines)
+
+
+def _float_values(value: object) -> list[float]:
+    if isinstance(value, float):
+        return [value]
+    if isinstance(value, dict):
+        return [item for child in value.values() for item in _float_values(child)]
+    if isinstance(value, (list, tuple)):
+        return [item for child in value for item in _float_values(child)]
+    return []
+
+
+def _assert_fingerprint(
+    expected: str,
+    payload: dict[str, object],
+) -> None:
+    encoded = json.dumps(_canonicalize(payload), sort_keys=True, separators=(",", ":")).encode()
+    actual = hashlib.sha256(encoded).hexdigest()
+    if actual != expected:
+        pytest.fail(
+            "\n".join(
+                [
+                    f"fingerprint mismatch: expected={expected} actual={actual}",
+                    _environment_diagnostics(),
+                    "per-record diagnostics:",
+                    _payload_diagnostics(payload),
+                ]
+            )
+        )
+
+
 def test_seeded_run_has_golden_fingerprint() -> None:
-    assert _run_fingerprint(42) == EXPECTED_FINGERPRINT
+    _assert_fingerprint(EXPECTED_FINGERPRINT, _run_payload(42))
 
 
 def test_legacy_setting_has_branch_golden_fingerprint() -> None:
-    legacy = _run_fingerprint(
+    payload = _run_payload(
         42,
         reproduction_coupling_strength=0.0,
         grounding_quality_strength=0.0,
     )
 
-    assert legacy == EXPECTED_LEGACY_FINGERPRINT
+    _assert_fingerprint(EXPECTED_LEGACY_FINGERPRINT, payload)
 
 
 def test_reproduction_coupling_config_changes_run_fingerprint() -> None:
