@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
+from typing import TypeVar
+
 import numpy as np
 from numpy.typing import NDArray
 
@@ -11,6 +14,8 @@ from tattletots.models.genome import Genome, SensingStrategy
 from tattletots.models.identity import stable_id_digest
 from tattletots.models.observation import ObservationPacket, ObservationStatus, StreamMetadata
 from tattletots.models.stream import Stream
+
+_MetadataValue = TypeVar("_MetadataValue")
 
 
 def _stable_sample_indices(
@@ -251,38 +256,11 @@ def prepare_agent_observation(
 def _combined_stream_metadata(streams: list[Stream]) -> StreamMetadata | None:
     if not any(stream.metadata is not None for stream in streams):
         return None
-    coordinates: list[tuple[float, ...] | None] = []
-    modalities: list[str | None] = []
-    identities: list[str | None] = []
-    footprints: list[tuple[float, ...] | None] = []
-    resolutions: list[float | None] = []
-    for stream in streams:
-        metadata = stream.metadata
-        coordinates.extend(
-            metadata.coordinates
-            if metadata is not None and metadata.coordinates is not None
-            else [None] * stream.dimensionality
-        )
-        modalities.extend(
-            metadata.modality
-            if metadata is not None and metadata.modality is not None
-            else [None] * stream.dimensionality
-        )
-        identities.extend(
-            metadata.identity
-            if metadata is not None and metadata.identity is not None
-            else [None] * stream.dimensionality
-        )
-        footprints.extend(
-            metadata.footprints
-            if metadata is not None and metadata.footprints is not None
-            else [None] * stream.dimensionality
-        )
-        resolutions.extend(
-            metadata.resolution
-            if metadata is not None and metadata.resolution is not None
-            else [None] * stream.dimensionality
-        )
+    coordinates = _combined_metadata_field(streams, lambda metadata: metadata.coordinates)
+    modalities = _combined_metadata_field(streams, lambda metadata: metadata.modality)
+    identities = _combined_metadata_field(streams, lambda metadata: metadata.identity)
+    footprints = _combined_metadata_field(streams, lambda metadata: metadata.footprints)
+    resolutions = _combined_metadata_field(streams, lambda metadata: metadata.resolution)
     return StreamMetadata(
         coordinates=coordinates,
         modality=modalities,
@@ -290,6 +268,18 @@ def _combined_stream_metadata(streams: list[Stream]) -> StreamMetadata | None:
         footprints=footprints,
         resolution=resolutions,
     )
+
+
+def _combined_metadata_field(
+    streams: list[Stream],
+    accessor: Callable[[StreamMetadata], Sequence[_MetadataValue] | None],
+) -> list[_MetadataValue | None]:
+    values: list[_MetadataValue | None] = []
+    for stream in streams:
+        metadata = stream.metadata
+        field_values = accessor(metadata) if metadata is not None else None
+        values.extend(field_values if field_values is not None else [None] * stream.dimensionality)
+    return values
 
 
 def _combined_stream_status(streams: list[Stream]) -> NDArray[np.str_]:

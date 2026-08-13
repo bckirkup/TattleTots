@@ -124,7 +124,7 @@ def apply_spatial_observation(
     status = observation.status.copy()
     mask = agent.state.last_spatial_mask
     if mask.size == status.size:
-        status[mask == 0.0] = ObservationStatus.MASKED.value
+        status[np.isclose(mask, 0.0, rtol=0.0, atol=0.0)] = ObservationStatus.MASKED.value
     return ObservationPacket(
         masked,
         observation.metadata,

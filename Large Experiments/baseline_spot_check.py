@@ -19,12 +19,11 @@ import json
 import sys
 import time
 from collections import defaultdict
-from dataclasses import asdict
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import numpy as np
-
 from baseline_parallel import resolve_worker_count, resolve_workspace_root, run_process_pool
 from path_safety import KEY_JSON, safe_output_dir
 
@@ -131,10 +130,15 @@ def resolve_key_json(domain: str) -> Path:
 def load_domain_configs() -> dict[str, dict[str, Any]]:
     return {
         "fire_ecology": json.loads(
-            (_WORKSPACE_ROOT / "Scrapiron_and_the_Bear/baselines/fire_ecology_baselines_config.json").read_text()
+            (
+                _WORKSPACE_ROOT
+                / "Scrapiron_and_the_Bear/baselines/fire_ecology_baselines_config.json"
+            ).read_text()
         ),
         "grain_guard": json.loads(
-            (_WORKSPACE_ROOT / "Xylella_SPQR/baselines/grain_guard_baselines_config.json").read_text()
+            (
+                _WORKSPACE_ROOT / "Xylella_SPQR/baselines/grain_guard_baselines_config.json"
+            ).read_text()
         ),
         "coral_key": json.loads(
             (
@@ -384,7 +388,9 @@ def check_summary_against_archived(
                     }
                 )
                 continue
-            ok, rel_err = check_equivalence_pair(float(ref_val), float(test_val), rel_tol=rel_tol, eps0=eps0)
+            ok, rel_err = check_equivalence_pair(
+                float(ref_val), float(test_val), rel_tol=rel_tol, eps0=eps0
+            )
             if not ok:
                 failures.append(
                     {
@@ -411,7 +417,9 @@ def check_envelope_equivalence(
         for metric, ref_vals in metrics.items():
             test_val = test_mean.get(arch, {}).get(metric)
             if test_val is None:
-                failures.append({"architecture": arch, "metric": metric, "reason": "missing_in_test"})
+                failures.append(
+                    {"architecture": arch, "metric": metric, "reason": "missing_in_test"}
+                )
                 continue
             lo = min(ref_vals)
             hi = max(ref_vals)
@@ -449,6 +457,126 @@ def _execute_spot_job(domain: str, kwargs: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _build_spot_jobs(
+    domain: str,
+    selected_keys: list[str],
+    groups: dict[str, Any],
+    ref_seeds: list[int],
+    test_seeds: list[int],
+    cfg: dict[str, Any],
+    kwargs_fn: Callable[..., dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    jobs: list[dict[str, Any]] = []
+    job_meta: list[dict[str, Any]] = []
+    for fkey in selected_keys:
+        metadata = groups[fkey]["metadata"]
+        for seed in ref_seeds + test_seeds:
+            kw = kwargs_fn(metadata, seed, cfg)
+            kw["_factor_key"] = fkey
+            jobs.append(kw)
+            tag = "ref" if seed in ref_seeds else "test"
+            job_meta.append(
+                {
+                    "name": f"{domain}_{hash(fkey) & 0xFFFF:04x}_{tag}_s{seed}",
+                    "factor_key": fkey,
+                    "seed": seed,
+                    "seed_group": tag,
+                    "metadata": metadata,
+                }
+            )
+    return jobs, job_meta
+
+
+def _summarize_factor_results(
+    selected_keys: list[str],
+    groups: dict[str, Any],
+    ref_seeds: list[int],
+    test_seeds: list[int],
+    results_by_factor_seed: dict[str, dict[int, dict[str, dict[str, float]]]],
+) -> tuple[list[dict[str, Any]], int, int]:
+    factor_results: list[dict[str, Any]] = []
+    n_pass = 0
+    n_fail = 0
+    for fkey in selected_keys:
+        factor_result = _summarize_factor(
+            fkey, groups[fkey], ref_seeds, test_seeds, results_by_factor_seed
+        )
+        factor_results.append(factor_result)
+        if factor_result["passed"]:
+            n_pass += 1
+        else:
+            n_fail += 1
+    return factor_results, n_pass, n_fail
+
+
+def _check_factor_determinism(
+    fkey: str,
+    group: dict[str, Any],
+    ref_seeds: list[int],
+    results_by_factor_seed: dict[str, dict[int, dict[str, dict[str, float]]]],
+) -> list[dict[str, Any]]:
+    ref_by_seed = group["by_seed"]
+    failures: list[dict[str, Any]] = []
+    for seed in ref_seeds:
+        archived = ref_by_seed.get(seed)
+        rerun = results_by_factor_seed[fkey].get(seed)
+        if archived is None or rerun is None:
+            failures.append({"seed": seed, "reason": "missing_archived_or_rerun"})
+            continue
+        ok, checks = check_summary_against_archived(archived, rerun)
+        if not ok:
+            failures.extend([{"seed": seed, **failure} for failure in checks[:3]])
+    return failures
+
+
+def _summarize_factor(
+    fkey: str,
+    group: dict[str, Any],
+    ref_seeds: list[int],
+    test_seeds: list[int],
+    results_by_factor_seed: dict[str, dict[int, dict[str, dict[str, float]]]],
+) -> dict[str, Any]:
+    ref_by_seed = group["by_seed"]
+    determinism_failures = _check_factor_determinism(
+        fkey,
+        group,
+        ref_seeds,
+        results_by_factor_seed,
+    )
+
+    ref_summaries = [ref_by_seed[s] for s in ref_seeds if s in ref_by_seed]
+    ref_mean = _mean_summary(ref_summaries)
+    test_summaries = [
+        results_by_factor_seed[fkey][s] for s in test_seeds if s in results_by_factor_seed[fkey]
+    ]
+    test_mean = _mean_summary(test_summaries) if test_summaries else {}
+
+    mean_ok, mean_failures = check_equivalence(ref_mean, test_mean) if test_mean else (False, [])
+    ref_values: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
+    for summary in ref_summaries:
+        for arch, metrics in summary.items():
+            for metric, val in metrics.items():
+                ref_values[arch][metric].append(float(val))
+    env_ok, env_failures = (
+        check_envelope_equivalence(ref_values, test_mean) if test_mean else (False, [])
+    )
+    passed = not determinism_failures and len(ref_summaries) == len(ref_seeds)
+    return {
+        "factor_key": fkey,
+        "metadata": group["metadata"],
+        "passed": passed,
+        "determinism_failures": determinism_failures[:10],
+        "new_seed_mean_passed": mean_ok,
+        "new_seed_mean_failures": mean_failures[:5],
+        "new_seed_envelope_passed": env_ok,
+        "new_seed_envelope_failures": env_failures[:5],
+        "worst_det_rel_err": max(
+            (f.get("rel_err", 0.0) for f in determinism_failures), default=0.0
+        ),
+        "worst_mean_rel_err": max((f.get("rel_err", 0.0) for f in mean_failures), default=0.0),
+    }
+
+
 def run_domain_spot_check(
     domain: str,
     *,
@@ -469,25 +597,9 @@ def run_domain_spot_check(
     cfg = domain_cfgs[domain]
     kwargs_fn = spec["run_kwargs_fn"]
 
-    jobs: list[dict[str, Any]] = []
-    job_meta: list[dict[str, Any]] = []
-    for fkey in selected_keys:
-        group = groups[fkey]
-        metadata = group["metadata"]
-        for seed in ref_seeds + test_seeds:
-            kw = kwargs_fn(metadata, seed, cfg)
-            kw["_factor_key"] = fkey
-            jobs.append(kw)
-            tag = "ref" if seed in ref_seeds else "test"
-            job_meta.append(
-                {
-                    "name": f"{domain}_{hash(fkey) & 0xFFFF:04x}_{tag}_s{seed}",
-                    "factor_key": fkey,
-                    "seed": seed,
-                    "seed_group": tag,
-                    "metadata": metadata,
-                }
-            )
+    jobs, job_meta = _build_spot_jobs(
+        domain, selected_keys, groups, ref_seeds, test_seeds, cfg, kwargs_fn
+    )
 
     worker_count = resolve_worker_count(workers, len(jobs))
     print(f"[*] {spec['label']}: {len(selected_keys)} factor-settings, {len(jobs)} reruns")
@@ -516,66 +628,9 @@ def run_domain_spot_check(
     )
     elapsed = time.time() - t0
 
-    factor_results: list[dict[str, Any]] = []
-    n_pass = 0
-    n_fail = 0
-    for fkey in selected_keys:
-        group = groups[fkey]
-        ref_by_seed = group["by_seed"]
-
-        determinism_failures: list[dict[str, Any]] = []
-        for seed in ref_seeds:
-            archived = ref_by_seed.get(seed)
-            rerun = results_by_factor_seed[fkey].get(seed)
-            if archived is None or rerun is None:
-                determinism_failures.append(
-                    {"seed": seed, "reason": "missing_archived_or_rerun"}
-                )
-                continue
-            ok, fails = check_summary_against_archived(archived, rerun)
-            if not ok:
-                determinism_failures.extend([{"seed": seed, **f} for f in fails[:3]])
-
-        ref_summaries = [ref_by_seed[s] for s in ref_seeds if s in ref_by_seed]
-        ref_mean = _mean_summary(ref_summaries)
-        test_summaries = [
-            results_by_factor_seed[fkey][s] for s in test_seeds if s in results_by_factor_seed[fkey]
-        ]
-        test_mean = _mean_summary(test_summaries) if test_summaries else {}
-
-        mean_ok, mean_failures = check_equivalence(ref_mean, test_mean) if test_mean else (False, [])
-        ref_values: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
-        for summary in ref_summaries:
-            for arch, metrics in summary.items():
-                for metric, val in metrics.items():
-                    ref_values[arch][metric].append(float(val))
-        env_ok, env_failures = (
-            check_envelope_equivalence(ref_values, test_mean) if test_mean else (False, [])
-        )
-
-        passed = not determinism_failures and len(ref_summaries) == len(ref_seeds)
-        if passed:
-            n_pass += 1
-        else:
-            n_fail += 1
-        factor_results.append(
-            {
-                "factor_key": fkey,
-                "metadata": group["metadata"],
-                "passed": passed,
-                "determinism_failures": determinism_failures[:10],
-                "new_seed_mean_passed": mean_ok,
-                "new_seed_mean_failures": mean_failures[:5],
-                "new_seed_envelope_passed": env_ok,
-                "new_seed_envelope_failures": env_failures[:5],
-                "worst_det_rel_err": max(
-                    (f.get("rel_err", 0.0) for f in determinism_failures), default=0.0
-                ),
-                "worst_mean_rel_err": max(
-                    (f.get("rel_err", 0.0) for f in mean_failures), default=0.0
-                ),
-            }
-        )
+    factor_results, n_pass, n_fail = _summarize_factor_results(
+        selected_keys, groups, ref_seeds, test_seeds, results_by_factor_seed
+    )
 
     domain_passed = n_fail == 0 and not failures_exec
     return {
@@ -594,14 +649,66 @@ def run_domain_spot_check(
     }
 
 
+def _run_domains(
+    domains: list[str],
+    args: argparse.Namespace,
+    ref_seeds: list[int],
+    rng: np.random.Generator,
+    domain_cfgs: dict[str, dict[str, Any]],
+    report: dict[str, Any],
+) -> int:
+    exit_code = 0
+    for domain in domains:
+        print("=" * 60)
+        try:
+            result = run_domain_spot_check(
+                domain,
+                sample_n=args.sample,
+                ref_seeds=ref_seeds,
+                test_seed_offset=args.test_seed_offset,
+                rng=rng,
+                workers=args.workers,
+                domain_cfgs=domain_cfgs,
+            )
+        except Exception as exc:
+            print(f"[-] {domain} spot-check failed: {exc}")
+            result = {"domain": domain, "passed": False, "error": str(exc)}
+            exit_code = 1
+            report["all_passed"] = False
+        else:
+            status = "PASS" if result["passed"] else "FAIL"
+            print(
+                f"[{status}] {result['label']}: "
+                f"{result['passed_factor_settings']}/{result['sampled_factor_settings']} "
+                f"factor-settings equivalent ({result['elapsed_seconds']:.1f}s)"
+            )
+            if not result["passed"]:
+                exit_code = 1
+                report["all_passed"] = False
+                _print_failed_factors(result)
+        report["domains"][domain] = result
+    return exit_code
+
+
+def _print_failed_factors(result: dict[str, Any]) -> None:
+    for ff in result.get("failed_factors", [])[:5]:
+        print(
+            f"    FAIL metadata={ff.get('metadata')} worst_det={ff.get('worst_det_rel_err', 'n/a')}"
+        )
+
+
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Baseline statistical spot-check (equivalence-by-tolerance)")
+    parser = argparse.ArgumentParser(
+        description="Baseline statistical spot-check (equivalence-by-tolerance)"
+    )
     parser.add_argument(
         "--domain",
         choices=[*DOMAIN_SPECS.keys(), "all"],
         default="all",
     )
-    parser.add_argument("--sample", type=int, default=100, help="Factor-settings to sample per domain")
+    parser.add_argument(
+        "--sample", type=int, default=100, help="Factor-settings to sample per domain"
+    )
     parser.add_argument("--seed", type=int, default=42, help="RNG seed for factor-setting sampling")
     parser.add_argument("--workers", type=int, default=None)
     parser.add_argument("--ref-seeds", type=str, default="42,43,44")
@@ -638,43 +745,11 @@ def main(argv: list[str] | None = None) -> int:
         "all_passed": True,
     }
 
-    exit_code = 0
-    for domain in domains:
-        print("=" * 60)
-        try:
-            result = run_domain_spot_check(
-                domain,
-                sample_n=args.sample,
-                ref_seeds=ref_seeds,
-                test_seed_offset=args.test_seed_offset,
-                rng=rng,
-                workers=args.workers,
-                domain_cfgs=domain_cfgs,
-            )
-        except Exception as exc:
-            print(f"[-] {domain} spot-check failed: {exc}")
-            result = {"domain": domain, "passed": False, "error": str(exc)}
-            exit_code = 1
-            report["all_passed"] = False
-        else:
-            status = "PASS" if result["passed"] else "FAIL"
-            print(
-                f"[{status}] {result['label']}: "
-                f"{result['passed_factor_settings']}/{result['sampled_factor_settings']} "
-                f"factor-settings equivalent ({result['elapsed_seconds']:.1f}s)"
-            )
-            if not result["passed"]:
-                exit_code = 1
-                report["all_passed"] = False
-                for ff in result.get("failed_factors", [])[:5]:
-                    print(
-                        f"    FAIL metadata={ff.get('metadata')} "
-                        f"worst_det={ff.get('worst_det_rel_err', 'n/a')}"
-                    )
+    exit_code = _run_domains(domains, args, ref_seeds, rng, domain_cfgs, report)
 
-        report["domains"][domain] = result
-
-    report_path = output_dir / "spot_check_report.json"
+    report_path = (output_dir / "spot_check_report.json").resolve()
+    if not report_path.is_relative_to(_WORKSPACE_ROOT.resolve()):
+        raise ValueError(f"Report path escapes workspace: {report_path}")
     report_path.write_text(json.dumps(report, indent=2, default=str))
     print("=" * 60)
     print(f"[+] Report written to {report_path}")

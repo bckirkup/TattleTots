@@ -18,7 +18,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 from baseline_parallel import resolve_worker_count, resolve_workspace_root, run_process_pool
 from path_safety import KEY_JSON, safe_config_path, safe_output_dir
@@ -46,7 +46,7 @@ REPOS = {
 }
 
 
-def deep_merge(dict1: Dict[str, Any], dict2: Dict[str, Any]) -> Dict[str, Any]:
+def deep_merge(dict1: dict[str, Any], dict2: dict[str, Any]) -> dict[str, Any]:
     """Recursively merges dict2 into dict1 in place."""
     for k, v in dict2.items():
         if k in dict1 and isinstance(dict1[k], dict) and isinstance(v, dict):
@@ -59,10 +59,10 @@ def deep_merge(dict1: Dict[str, Any], dict2: Dict[str, Any]) -> Dict[str, Any]:
 def run_single_simulation(
     run_name: str,
     domain_key: str,
-    config_overrides: Dict[str, Any],
+    config_overrides: dict[str, Any],
     output_dir: Path,
     verbose: bool,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Executes a single simulation run, saving configs, results, and logs."""
     repo_info = REPOS.get(domain_key)
     if not repo_info:
@@ -86,7 +86,7 @@ def run_single_simulation(
             "error": error_msg,
         }
 
-    with open(default_config_path, "r") as f:
+    with open(default_config_path) as f:
         config_data = json.load(f)
 
     # 2. Apply overrides
@@ -140,14 +140,14 @@ def run_single_simulation(
         metrics = {}
         if results_path.exists():
             try:
-                with open(results_path, "r") as r_file:
+                with open(results_path) as r_file:
                     res_data = json.load(r_file)
-                
+
                 # Extract standard metrics
                 ecology = res_data.get("ecology_metrics", {})
                 costs = res_data.get("cost_metrics", {})
                 summary = res_data.get("run_summary", {})
-                
+
                 metrics = {
                     "steps_completed": summary.get("steps_completed"),
                     "final_population": ecology.get("final_population"),
@@ -172,7 +172,9 @@ def run_single_simulation(
 
     except subprocess.CalledProcessError as e:
         elapsed_time = time.time() - start_time
-        print(f"[-] Run '{run_name}' failed with exit code {e.returncode} after {elapsed_time:.1f}s. Check log: {log_path.name}")
+        print(
+            f"[-] Run '{run_name}' failed with exit code {e.returncode} after {elapsed_time:.1f}s. Check log: {log_path.name}"
+        )
         return {
             "status": "failed",
             "domain": domain_key,
@@ -194,10 +196,8 @@ def run_single_simulation(
         }
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Batch runner for TattleTots domain simulations"
-    )
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Batch runner for TattleTots domain simulations")
     parser.add_argument(
         "--config",
         type=Path,
@@ -225,7 +225,77 @@ def main() -> int:
         action="store_true",
         help="Print detailed simulation logs to stdout (otherwise captured in log files)",
     )
-    args = parser.parse_args()
+    return parser.parse_args()
+
+
+def _execute_batch_runs(
+    args: argparse.Namespace,
+    runs: list[dict[str, Any]],
+    output_dir: Path,
+    results_key: dict[str, Any],
+    worker_count: int,
+) -> None:
+    submit_kwargs = [
+        (
+            run["name"],
+            run["domain"],
+            run.get("config_overrides", {}),
+            output_dir,
+            args.verbose,
+        )
+        for run in runs
+    ]
+
+    def _store_success(run: dict[str, Any], res: dict[str, Any]) -> None:
+        results_key["runs"][run["name"]] = res
+
+    def _store_failure(run: dict[str, Any], exc: Exception) -> None:
+        results_key["runs"][run["name"]] = {
+            "status": "failed",
+            "error": f"Unhandled exception: {exc}",
+        }
+
+    if args.parallel:
+        run_process_pool(
+            run_single_simulation,
+            submit_kwargs,
+            runs,
+            max_workers=worker_count,
+            on_success=_store_success,
+            on_failure=_store_failure,
+        )
+        return
+    for run in runs:
+        name = run["name"]
+        results_key["runs"][name] = run_single_simulation(
+            name,
+            run["domain"],
+            run.get("config_overrides", {}),
+            output_dir,
+            args.verbose,
+        )
+        print("-" * 40)
+
+
+def _print_batch_summary(results_key: dict[str, Any]) -> None:
+    print("\n=== Batch Execution Summary ===")
+    print(
+        f"{'Run Name':<25} | {'Domain':<15} | {'Status':<10} | {'Time (s)':<8} | {'Cost':<10} | {'Population':<10}"
+    )
+    print("-" * 88)
+    for name, run_res in results_key["runs"].items():
+        status = run_res.get("status", "unknown")
+        domain = run_res.get("domain", "unknown")
+        elapsed = f"{run_res.get('elapsed_seconds', 0.0):.1f}"
+        metrics = run_res.get("metrics", {})
+        cost = f"{metrics.get('total_cost', 0.0):.2f}" if "total_cost" in metrics else "N/A"
+        pop = str(metrics.get("final_population", "N/A"))
+        print(f"{name:<25} | {domain:<15} | {status:<10} | {elapsed:<8} | {cost:<10} | {pop:<10}")
+    print("=" * 88)
+
+
+def main() -> int:
+    args = _parse_args()
 
     # 1. Load batch config
     if not args.config.exists():
@@ -234,7 +304,7 @@ def main() -> int:
 
     try:
         config_path = safe_config_path(args.config, base=_SCRIPT_DIR)
-        with open(config_path, "r") as f:
+        with open(config_path) as f:
             batch_config = json.load(f)
     except Exception as e:
         print(f"[-] Error: Failed to parse batch config file: {e}")
@@ -266,7 +336,7 @@ def main() -> int:
     print("=" * 60)
 
     results_key = {
-        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
         "batch_config_file": str(args.config),
         "output_directory": str(output_dir),
         "runs": {},
@@ -275,49 +345,7 @@ def main() -> int:
     start_time = time.time()
 
     # 3. Execute runs
-    submit_kwargs = [
-        (
-            run["name"],
-            run["domain"],
-            run.get("config_overrides", {}),
-            output_dir,
-            args.verbose,
-        )
-        for run in runs
-    ]
-
-    def _store_success(run: Dict[str, Any], res: Dict[str, Any]) -> None:
-        results_key["runs"][run["name"]] = res
-
-    def _store_failure(run: Dict[str, Any], exc: Exception) -> None:
-        results_key["runs"][run["name"]] = {
-            "status": "failed",
-            "error": f"Unhandled exception: {exc}",
-        }
-
-    if args.parallel:
-        run_process_pool(
-            run_single_simulation,
-            submit_kwargs,
-            runs,
-            max_workers=worker_count,
-            on_success=_store_success,
-            on_failure=_store_failure,
-        )
-    else:
-        # Run sequentially
-        for run in runs:
-            name = run["name"]
-            res = run_single_simulation(
-                name,
-                run["domain"],
-                run.get("config_overrides", {}),
-                output_dir,
-                args.verbose,
-            )
-            results_key["runs"][name] = res
-            print("-" * 40)
-
+    _execute_batch_runs(args, runs, output_dir, results_key, worker_count)
     total_elapsed = time.time() - start_time
     print("=" * 60)
     print(f"[+] All runs finished in {total_elapsed:.1f}s.")
@@ -328,22 +356,9 @@ def main() -> int:
         json.dump(results_key, f, indent=2)
 
     print(f"[+] Batch summary key written to: {key_file_path}")
-    
+
     # 5. Print a summary table of the runs
-    print("\n=== Batch Execution Summary ===")
-    print(f"{'Run Name':<25} | {'Domain':<15} | {'Status':<10} | {'Time (s)':<8} | {'Cost':<10} | {'Population':<10}")
-    print("-" * 88)
-    for name, run_res in results_key["runs"].items():
-        status = run_res.get("status", "unknown")
-        domain = run_res.get("domain", "unknown")
-        elapsed = f"{run_res.get('elapsed_seconds', 0.0):.1f}"
-        
-        metrics = run_res.get("metrics", {})
-        cost = f"{metrics.get('total_cost', 0.0):.2f}" if "total_cost" in metrics else "N/A"
-        pop = str(metrics.get("final_population", "N/A"))
-        
-        print(f"{name:<25} | {domain:<15} | {status:<10} | {elapsed:<8} | {cost:<10} | {pop:<10}")
-    print("=" * 88)
+    _print_batch_summary(results_key)
 
     # Return 0 if all runs succeeded, otherwise 1
     any_failed = any(r.get("status") == "failed" for r in results_key["runs"].values())
