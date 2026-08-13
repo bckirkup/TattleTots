@@ -610,6 +610,11 @@ class World:
         if not fire:
             return None
 
+        if self.config.require_grounded_report_locations and (
+            agent.state.last_geometry_location is None
+        ):
+            return None
+
         user_ids = list(self.users.keys())
         if not user_ids:
             return None
