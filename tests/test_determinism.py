@@ -123,6 +123,10 @@ def _payload_diagnostics(payload: dict[str, object]) -> str:
     records = payload["records"]
     assert isinstance(records, list)
     lines = []
+    for section in ("agents", "streams", "users"):
+        value = payload[section]
+        encoded = json.dumps(_canonicalize(value), sort_keys=True, separators=(",", ":")).encode()
+        lines.append(f"{section} digest={hashlib.sha256(encoded).hexdigest()}")
     for index, record in enumerate(records):
         canonical = _canonicalize(record)
         encoded = json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()
@@ -131,6 +135,13 @@ def _payload_diagnostics(payload: dict[str, object]) -> str:
         lines.append(
             f"record[{index}] max_abs={magnitude:.17g} digest={hashlib.sha256(encoded).hexdigest()}"
         )
+        assert isinstance(record, dict)
+        for key in sorted(record):
+            value = _canonicalize(record[key])
+            encoded = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+            lines.append(
+                f"record[{index}].{key}={value!r} digest={hashlib.sha256(encoded).hexdigest()}"
+            )
     return "\n".join(lines)
 
 
