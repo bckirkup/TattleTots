@@ -42,6 +42,7 @@ class InstrumentValidityReport:
     event_steps: int
     distinct_event_locations: int
     inferability_precision: float
+    decoder_precision: float
     chance_baseline: float
     candidate_locations: tuple[EventLocation, ...]
 
@@ -59,9 +60,12 @@ def validate_instrument(
 ) -> InstrumentValidityReport:
     """Validate an adapter's measurement window and published evidence.
 
-    The adapter is stepped exactly once per measured time step.  The validator
-    uses only current stream values, statuses, and metadata when calling the
-    adapter's report-location function.  It does not inspect domain internals
+    The adapter is stepped exactly once per measured time step. Validation
+    consumes the adapter's run; callers should construct a fresh adapter for
+    each validation or subsequent measurement. Evidence support is measured
+    from declared coordinates and the adapter's public dimension mapping, not
+    from the incumbent report decoder. Decoder precision is retained as an
+    informational comparison. The validator does not inspect domain internals
     or compare against expected golden values.
     """
     if steps <= 0:
@@ -70,9 +74,9 @@ def validate_instrument(
     frame = adapter.get_location_frame()
     event_steps = 0
     event_locations: set[EventLocation] = set()
-    observed_locations: set[EventLocation] = set()
     evidence_locations: set[EventLocation] = set()
     correct_reports = 0
+    supported_events = 0
     reportable_events = 0
     findings: list[InstrumentFinding] = []
 
@@ -93,7 +97,8 @@ def validate_instrument(
             stream_labels.append(stream.label)
             _collect_stream_coordinates(stream.metadata, evidence_locations)
 
-        observed_locations.update(active)
+        if is_event and any(location in evidence_locations for location in active):
+            supported_events += 1
         report = adapter.infer_report_location(stream_data, stream_labels)
         if is_event and report in active:
             correct_reports += 1
@@ -101,17 +106,15 @@ def validate_instrument(
         if frame is not None:
             _check_frame_location(frame, active, "ground truth", time_step, findings)
             _check_frame_location(frame, [report], "report", time_step, findings)
-        else:
-            evidence_locations.add(report)
 
     candidates = _candidate_locations(
         frame,
         evidence_locations,
-        observed_locations,
         adapter,
     )
     chance_baseline = 1.0 / len(candidates) if candidates else 1.0
-    precision = correct_reports / reportable_events if reportable_events else 0.0
+    support_precision = supported_events / reportable_events if reportable_events else 0.0
+    decoder_precision = correct_reports / reportable_events if reportable_events else 0.0
 
     _append_window_finding(findings, steps, event_steps, event_locations)
     if frame is None:
@@ -142,13 +145,15 @@ def validate_instrument(
     findings.append(
         InstrumentFinding(
             check=InstrumentCheck.INFERABILITY,
-            passed=reportable_events > 0 and precision > chance_baseline + inferability_margin,
+            passed=reportable_events > 0
+            and support_precision > chance_baseline + inferability_margin,
             message=(
-                "Published evidence recovers event locations above chance."
-                if reportable_events > 0 and precision > chance_baseline + inferability_margin
-                else "Published evidence does not recover event locations above chance."
+                "Published evidence carries event locations above chance."
+                if reportable_events > 0
+                and support_precision > chance_baseline + inferability_margin
+                else "Published evidence does not carry event locations above chance."
             ),
-            measured=precision,
+            measured=support_precision,
             threshold=chance_baseline + inferability_margin,
         )
     )
@@ -158,7 +163,8 @@ def validate_instrument(
         measured_steps=steps,
         event_steps=event_steps,
         distinct_event_locations=len(event_locations),
-        inferability_precision=precision,
+        inferability_precision=support_precision,
+        decoder_precision=decoder_precision,
         chance_baseline=chance_baseline,
         candidate_locations=tuple(sorted(candidates)),
     )
@@ -198,16 +204,26 @@ def _validate_stream_declarations(
             )
         if state != ObservationStatus.MISSING.value:
             continue
-        for field in ("coordinates", "identity"):
-            values = getattr(metadata, field)
-            if values is not None and values[index] is not None:
-                findings.append(
-                    InstrumentFinding(
-                        InstrumentCheck.DECLARATIONS,
-                        False,
-                        f"Missing feature {index} in stream {stream.label!r} declares {field}.",
-                    )
+        coordinates = metadata.coordinates
+        identity = metadata.identity
+        if coordinates is not None and coordinates[index] is not None:
+            findings.append(
+                InstrumentFinding(
+                    InstrumentCheck.DECLARATIONS,
+                    False,
+                    f"Missing feature {index} in stream {stream.label!r} "
+                    "declares observed-object coordinates.",
                 )
+            )
+        if identity is not None and identity[index] is not None:
+            findings.append(
+                InstrumentFinding(
+                    InstrumentCheck.DECLARATIONS,
+                    False,
+                    f"Missing feature {index} in stream {stream.label!r} "
+                    "declares observed-object identity.",
+                )
+            )
         sensor_coordinates = metadata.sensor_coordinates
         if sensor_coordinates is None or sensor_coordinates[index] is None:
             findings.append(
@@ -237,14 +253,13 @@ def _collect_stream_coordinates(
 def _candidate_locations(
     frame: LocationFrame | None,
     evidence_locations: set[EventLocation],
-    observed_locations: set[EventLocation],
     adapter: DomainAdapter,
 ) -> set[EventLocation]:
     """Build a public candidate set without reading domain internals."""
     if frame is not None:
         (lower_x, lower_y), (upper_x, upper_y) = frame
         return {(x, y) for x in range(lower_x, upper_x + 1) for y in range(lower_y, upper_y + 1)}
-    candidates = set(evidence_locations) | set(observed_locations)
+    candidates = set(evidence_locations)
     offset = 0
     for stream in adapter.get_streams():
         for index in range(stream.current_data.size):
