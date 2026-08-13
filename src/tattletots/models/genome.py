@@ -214,41 +214,21 @@ def _mutate_array_preferences(data: dict[str, Any], rng: np.random.Generator, ra
         if total > 0 and key != "region_affinity":
             arr /= total
         data[key] = arr
-        if key == "input_preference":
-            reliability = np.array(data["modality_reliability"], dtype=np.float64)
-            reliability_mask = np.resize(mask, reliability.size)
-            reliability_delta = np.resize(delta, reliability.size)
-            reliability[reliability_mask] = np.clip(
-                reliability[reliability_mask] + reliability_delta[reliability_mask],
-                0.0,
-                2.0,
-            )
-            data["modality_reliability"] = reliability
-
-
-def _synchronize_spatial_inference_traits(data: dict[str, Any]) -> None:
-    """Keep the derived spatial search parameters heritable without new RNG draws."""
-    region = data["spatial_region"]
-    radius = int(data["spatial_radius"])
-    values = list(SpatialInferenceStrategy)
-    data["spatial_inference_strategy"] = values[(int(region[0]) + radius) % len(values)]
-    data["spatial_kernel_bandwidth"] = 0.5 + radius
-    data["spatial_distance_power"] = 0.5 + (int(region[1]) % 4)
-    data["absence_weight"] = (radius - 2) / 2
 
 
 def _sample_spatial_traits(rng: np.random.Generator) -> dict[str, Any]:
-    """Sample spatial traits at the legacy RNG position."""
+    """Sample independent spatial traits."""
     region = (int(rng.integers(0, 10)), int(rng.integers(0, 10)))
     radius = int(rng.integers(0, 5))
     values = list(SpatialInferenceStrategy)
     return {
         "spatial_region": region,
         "spatial_radius": radius,
-        "spatial_inference_strategy": values[(region[0] + radius) % len(values)],
-        "spatial_kernel_bandwidth": 0.5 + radius,
-        "spatial_distance_power": 0.5 + (region[1] % 4),
-        "absence_weight": (radius - 2) / 2,
+        "spatial_inference_strategy": values[int(rng.integers(0, len(values)))],
+        "spatial_kernel_bandwidth": float(rng.uniform(0.1, 10.0)),
+        "spatial_distance_power": float(rng.uniform(0.0, 4.0)),
+        "modality_reliability": rng.uniform(0.0, 2.0, size=8),
+        "absence_weight": float(rng.uniform(-1.0, 1.0)),
     }
 
 
@@ -468,10 +448,30 @@ class Genome(BaseModel):
         _mutate_enum_field(data, rng, rate, "sensing_strategy", SensingStrategy)
         _mutate_enum_field(data, rng, rate, "temporal_fusion_mode", TemporalFusionMode)
         _mutate_enum_field(data, rng, rate, "spatial_strategy", SpatialStrategy)
-        _synchronize_spatial_inference_traits(data)
+        _mutate_enum_field(data, rng, rate, "spatial_inference_strategy", SpatialInferenceStrategy)
+        if rng.random() < rate:
+            data["spatial_kernel_bandwidth"] = float(
+                np.clip(float(data["spatial_kernel_bandwidth"]) + rng.normal(0.0, 1.0), 0.1, 10.0)
+            )
+        if rng.random() < rate:
+            data["spatial_distance_power"] = float(
+                np.clip(float(data["spatial_distance_power"]) + rng.normal(0.0, 0.5), 0.0, 4.0)
+            )
+        if rng.random() < rate:
+            data["absence_weight"] = float(
+                np.clip(float(data["absence_weight"]) + rng.normal(0.0, 0.25), -1.0, 1.0)
+            )
         _mutate_enum_field(data, rng, rate, "residual_policy", ResidualPolicy)
         _mutate_enum_field(data, rng, rate, "escalation_mode", EscalationMode)
         _mutate_array_preferences(data, rng, rate)
+        reliability = np.array(data["modality_reliability"], dtype=np.float64)
+        reliability_mask = rng.random(reliability.size) < rate
+        reliability[reliability_mask] = np.clip(
+            reliability[reliability_mask] + rng.normal(0.0, 0.2, reliability_mask.sum()),
+            0.0,
+            2.0,
+        )
+        data["modality_reliability"] = reliability
         return type(self).model_validate(data)
 
     @classmethod
@@ -492,16 +492,27 @@ class Genome(BaseModel):
             "fusion_weights",
             "region_affinity",
         )
-        choose_spatial_a = True
-        inherited_spatial_fields = {
+        inherited_spatial_fields = (
             "spatial_inference_strategy",
             "spatial_kernel_bandwidth",
             "spatial_distance_power",
             "modality_reliability",
             "absence_weight",
-        }
+        )
         for key in data_a:
             if key in inherited_spatial_fields:
+                if key == "modality_reliability":
+                    arr_a = np.array(data_a[key], dtype=np.float64)
+                    arr_b = np.array(data_b[key], dtype=np.float64)
+                    if len(arr_a) == len(arr_b) and len(arr_a) > 0:
+                        alpha = rng.random()
+                        child_data[key] = alpha * arr_a + (1 - alpha) * arr_b
+                    else:
+                        child_data[key] = arr_a if rng.random() < 0.5 else arr_b
+                elif key == "spatial_inference_strategy":
+                    child_data[key] = data_a[key] if rng.random() < 0.5 else data_b[key]
+                else:
+                    child_data[key] = data_a[key] if rng.random() < 0.5 else data_b[key]
                 continue
             if key in array_keys:
                 arr_a = np.array(data_a[key], dtype=np.float64)
@@ -512,13 +523,10 @@ class Genome(BaseModel):
                 else:
                     child_data[key] = arr_a if rng.random() < 0.5 else arr_b
             elif key == "spatial_region":
-                choose_spatial_a = rng.random() < 0.5
-                child_data[key] = data_a[key] if choose_spatial_a else data_b[key]
+                child_data[key] = data_a[key] if rng.random() < 0.5 else data_b[key]
             else:
                 child_data[key] = data_a[key] if rng.random() < 0.5 else data_b[key]
 
-        for key in inherited_spatial_fields:
-            child_data[key] = data_a[key] if choose_spatial_a else data_b[key]
         return cls.model_validate(child_data)
 
     @classmethod

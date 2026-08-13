@@ -47,6 +47,14 @@ def test_random_founders_span_competent_and_incompetent_strategies() -> None:
     assert len(strategies) >= 3
     assert SpatialInferenceStrategy.FIXED_PRIOR in strategies
     assert SpatialInferenceStrategy.KERNEL in strategies
+    assert any(
+        not np.isclose(genome.spatial_kernel_bandwidth, 0.5 + genome.spatial_radius)
+        for genome in genomes
+    )
+    assert any(
+        not np.isclose(genome.spatial_distance_power, 0.5 + (genome.spatial_region[1] % 4))
+        for genome in genomes
+    )
 
 
 def test_spatial_traits_recombine_from_parent_genomes() -> None:
@@ -70,6 +78,16 @@ def test_spatial_traits_recombine_from_parent_genomes() -> None:
         SpatialInferenceStrategy.KERNEL,
     }
     assert {child.spatial_kernel_bandwidth for child in children} <= {1.0, 9.0}
+
+
+def test_modality_reliability_has_independent_mutation_draws() -> None:
+    parent = Genome(modality_reliability=np.ones(8, dtype=np.float64))
+    children = [parent.mutate(np.random.default_rng(seed), rate=1.0) for seed in range(5)]
+
+    assert any(
+        not np.array_equal(child.modality_reliability, parent.modality_reliability)
+        for child in children
+    )
 
 
 def test_geometry_inference_uses_genome_strategy() -> None:
