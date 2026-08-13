@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from tattletots.engine import sensing
+from tattletots.engine import sensing, temporal
 from tattletots.engine.config import SimulationConfig
 from tattletots.engine.sensing import prepare_agent_observation
 from tattletots.engine.spatial import apply_spatial_observation
@@ -13,7 +13,7 @@ from tattletots.engine.temporal import apply_temporal_observation
 from tattletots.engine.world import World
 from tattletots.models.agent import Agent, AgentState
 from tattletots.models.genome import Genome, SensingStrategy, SpatialStrategy, TemporalFusionMode
-from tattletots.models.observation import ObservationStatus, StreamMetadata
+from tattletots.models.observation import ObservationPacket, ObservationStatus, StreamMetadata
 from tattletots.models.stream import Stream, StreamType
 
 
@@ -227,7 +227,17 @@ def test_spatial_mask_marks_features_as_masked_but_keeps_geometry() -> None:
     assert list(masked.status) == ["masked", "observed", "observed", "observed", "masked"]
 
 
-def test_temporal_fusion_drops_geometry_when_history_schema_is_untracked() -> None:
+@pytest.mark.parametrize(
+    "mode",
+    [
+        TemporalFusionMode.EMA,
+        TemporalFusionMode.WINDOW_STACK,
+        TemporalFusionMode.AR_LAG,
+    ],
+)
+def test_temporal_fusion_retains_geometry_when_schema_agrees(
+    mode: TemporalFusionMode,
+) -> None:
     stream = Stream(
         stream_type=StreamType.RAW,
         dimensionality=2,
@@ -237,7 +247,7 @@ def test_temporal_fusion_drops_geometry_when_history_schema_is_untracked() -> No
     agent = _agent(
         [stream],
         temporal_memory_depth=2,
-        temporal_fusion_mode=TemporalFusionMode.EMA,
+        temporal_fusion_mode=mode,
     )
     observation, _, _, _ = prepare_agent_observation(
         agent,
@@ -249,7 +259,117 @@ def test_temporal_fusion_drops_geometry_when_history_schema_is_untracked() -> No
     second = apply_temporal_observation(agent, observation)
 
     assert first.metadata is not None
-    assert second.metadata is None
+    assert second.metadata == first.metadata
+    assert second.status is not None
+    assert list(second.status) == ["observed", "observed"]
+
+
+def test_temporal_fusion_drops_geometry_when_schema_changes() -> None:
+    first_stream = Stream(
+        stream_type=StreamType.RAW,
+        dimensionality=2,
+        current_data=np.ones(2),
+        metadata=_metadata(2, "first"),
+    )
+    second_stream = Stream(
+        stream_type=StreamType.RAW,
+        dimensionality=2,
+        current_data=np.ones(2),
+        metadata=_metadata(2, "second"),
+    )
+    agent = _agent(
+        [first_stream],
+        temporal_memory_depth=2,
+        temporal_fusion_mode=TemporalFusionMode.EMA,
+    )
+    first, _, _, _ = prepare_agent_observation(
+        agent,
+        {first_stream.id: first_stream},
+        SimulationConfig(max_stream_dim=2),
+    )
+    second = ObservationPacket(
+        data=second_stream.current_data,
+        metadata=second_stream.metadata,
+        status=second_stream.current_status,
+    )
+
+    assert apply_temporal_observation(agent, first).metadata is not None
+    fused = apply_temporal_observation(agent, second)
+
+    assert fused.metadata is None
+    assert len(agent.state.temporal_buffer) == 2
+
+
+def test_temporal_fusion_resets_history_when_dimensionality_changes() -> None:
+    agent = Agent(
+        genome=Genome(
+            working_dim=8,
+            temporal_memory_depth=2,
+            temporal_fusion_mode=TemporalFusionMode.EMA,
+        )
+    )
+    first = ObservationPacket(data=np.ones(2), metadata=_metadata(2))
+    second = ObservationPacket(data=np.ones(3), metadata=_metadata(3))
+
+    apply_temporal_observation(agent, first)
+    fused = apply_temporal_observation(agent, second)
+
+    assert fused.data.size == 3
+    assert fused.metadata is None
+    assert len(agent.state.temporal_buffer) == 1
+
+
+def test_temporal_status_preserves_alternating_missing_signal() -> None:
+    agent = Agent(
+        genome=Genome(
+            working_dim=8,
+            temporal_memory_depth=2,
+            temporal_fusion_mode=TemporalFusionMode.EMA,
+        )
+    )
+    metadata = _metadata(2)
+    observed = ObservationPacket(
+        data=np.ones(2),
+        metadata=metadata,
+        status=np.array(["observed", "observed"], dtype="<U8"),
+    )
+    missing = ObservationPacket(
+        data=np.ones(2),
+        metadata=metadata,
+        status=np.array(["missing", "observed"], dtype="<U8"),
+    )
+
+    apply_temporal_observation(agent, observed)
+    fused = apply_temporal_observation(agent, missing)
+
+    assert fused.metadata == metadata
+    assert fused.status is not None
+    assert list(fused.status) == ["missing", "observed"]
+
+
+def test_window_stack_drops_geometry_if_fused_feature_count_changes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    agent = Agent(
+        genome=Genome(
+            working_dim=8,
+            temporal_memory_depth=2,
+            temporal_fusion_mode=TemporalFusionMode.WINDOW_STACK,
+        )
+    )
+    observation = ObservationPacket(data=np.ones(2), metadata=_metadata(2))
+
+    def stack_with_extra_features(
+        buffer: list[ObservationPacket],
+    ) -> np.ndarray:
+        return np.concatenate([sample.data for sample in buffer])
+
+    monkeypatch.setattr(temporal, "_fuse_window_stack", stack_with_extra_features)
+    apply_temporal_observation(agent, observation)
+    fused = apply_temporal_observation(agent, observation)
+
+    assert fused.data.size == 4
+    assert fused.metadata is None
 
 
 def test_numeric_only_streams_remain_metadata_free() -> None:

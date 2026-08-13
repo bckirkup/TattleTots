@@ -7,28 +7,28 @@ from numpy.typing import NDArray
 
 from tattletots.models.agent import Agent
 from tattletots.models.genome import TemporalFusionMode
-from tattletots.models.observation import ObservationPacket
+from tattletots.models.observation import ObservationPacket, ObservationStatus, StreamMetadata
 
 
-def _fuse_ema(buffer: list[NDArray[np.float64]]) -> NDArray[np.float64]:
+def _fuse_ema(buffer: list[ObservationPacket]) -> NDArray[np.float64]:
     alpha = 2.0 / (len(buffer) + 1)
-    ema = buffer[0].copy()
+    ema = buffer[0].data.copy()
     for sample in buffer[1:]:
-        ema = (1 - alpha) * ema + alpha * sample
+        ema = (1 - alpha) * ema + alpha * sample.data
     return ema
 
 
-def _fuse_window_stack(buffer: list[NDArray[np.float64]]) -> NDArray[np.float64]:
-    window = np.stack(buffer, axis=0)
+def _fuse_window_stack(buffer: list[ObservationPacket]) -> NDArray[np.float64]:
+    window = np.stack([sample.data for sample in buffer], axis=0)
     result: NDArray[np.float64] = window.mean(axis=0)
     return result
 
 
 def _fuse_ar_lag(
-    buffer: list[NDArray[np.float64]],
+    buffer: list[ObservationPacket],
     current: NDArray[np.float64],
 ) -> NDArray[np.float64]:
-    prev = buffer[-2]
+    prev = buffer[-2].data
     if prev.shape != current.shape:
         return current
     denom = float(np.dot(prev, prev))
@@ -39,15 +39,27 @@ def _fuse_ar_lag(
     return 0.5 * current + 0.5 * (current - predicted)
 
 
-def apply_temporal_fusion(
-    agent: Agent,
-    current: NDArray[np.float64],
-) -> NDArray[np.float64]:
-    """Fuse current sensing output with temporal history buffer.
+def _append_sample(agent: Agent, current: ObservationPacket) -> list[ObservationPacket]:
+    sample = ObservationPacket(
+        data=current.data.copy(),
+        metadata=current.metadata,
+        status=None if current.status is None else current.status.copy(),
+    )
+    buffer = agent.state.temporal_buffer
+    buffer.append(sample)
+    depth = agent.genome.temporal_memory_depth
+    if len(buffer) > depth:
+        agent.state.temporal_buffer = buffer[-depth:]
+        return agent.state.temporal_buffer
+    return buffer
 
-    Updates agent.state.temporal_buffer in place.
-    """
-    if current.size == 0:
+
+def _has_shape_change(buffer: list[ObservationPacket], current: ObservationPacket) -> bool:
+    return any(sample.data.shape != current.data.shape for sample in buffer)
+
+
+def _fuse_packet(agent: Agent, current: ObservationPacket) -> ObservationPacket:
+    if current.data.size == 0:
         return current
 
     genome = agent.genome
@@ -57,40 +69,80 @@ def apply_temporal_fusion(
     if depth <= 0 or mode == TemporalFusionMode.NONE:
         return current
 
-    buffer = agent.state.temporal_buffer
-    buffer.append(current.copy())
-    if len(buffer) > depth:
-        agent.state.temporal_buffer = buffer[-depth:]
-        buffer = agent.state.temporal_buffer
+    shape_changed = _has_shape_change(agent.state.temporal_buffer, current)
+    if shape_changed:
+        agent.state.temporal_buffer = []
+    buffer = _append_sample(agent, current)
+    if shape_changed:
+        return ObservationPacket(data=current.data)
 
     if mode == TemporalFusionMode.EMA:
-        return _fuse_ema(buffer)
+        fused = _fuse_ema(buffer)
+    elif mode == TemporalFusionMode.WINDOW_STACK:
+        fused = current.data if len(buffer) < 2 else _fuse_window_stack(buffer)
+    elif mode == TemporalFusionMode.AR_LAG:
+        fused = current.data if len(buffer) < 2 else _fuse_ar_lag(buffer, current.data)
+    else:
+        fused = current.data
+    return ObservationPacket(
+        data=fused,
+        metadata=_shared_metadata(buffer, fused.size),
+        status=_fused_status(buffer, fused.size),
+    )
 
-    if mode == TemporalFusionMode.WINDOW_STACK:
-        if len(buffer) < 2:
-            return current
-        return _fuse_window_stack(buffer)
 
-    if mode == TemporalFusionMode.AR_LAG:
-        if len(buffer) < 2:
-            return current
-        return _fuse_ar_lag(buffer, current)
+def apply_temporal_fusion(
+    agent: Agent,
+    current: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    """Fuse current sensing output with temporal history buffer.
 
-    return current
+    Updates agent.state.temporal_buffer in place while preserving the legacy
+    numeric-only API.
+    """
+    return _fuse_packet(agent, ObservationPacket(data=current)).data
+
+
+def _shared_metadata(
+    buffer: list[ObservationPacket],
+    dimensionality: int,
+) -> StreamMetadata | None:
+    metadata = buffer[0].metadata
+    if metadata is None or metadata.feature_count != dimensionality:
+        return None
+    if any(sample.metadata != metadata for sample in buffer[1:]):
+        return None
+    return metadata
+
+
+def _sample_status(sample: ObservationPacket) -> NDArray[np.str_] | None:
+    if sample.status is None or sample.status.size == 0:
+        return None
+    return sample.status
+
+
+def _fused_status(
+    buffer: list[ObservationPacket],
+    dimensionality: int,
+) -> NDArray[np.str_] | None:
+    statuses = [_sample_status(sample) for sample in buffer]
+    if any(status is None or status.size != dimensionality for status in statuses):
+        return None
+    result = np.full(dimensionality, ObservationStatus.OBSERVED.value, dtype="<U8")
+    missing = np.zeros(dimensionality, dtype=bool)
+    masked = np.zeros(dimensionality, dtype=bool)
+    for status in statuses:
+        assert status is not None
+        missing |= status == ObservationStatus.MISSING.value
+        masked |= status == ObservationStatus.MASKED.value
+    result[missing] = ObservationStatus.MISSING.value
+    result[masked] = ObservationStatus.MASKED.value
+    return result
 
 
 def apply_temporal_observation(agent: Agent, current: ObservationPacket) -> ObservationPacket:
-    """Fuse an observation while retaining geometry only when it is stable."""
-    if current.data.size == 0:
-        return current
-    if current.metadata is None:
-        return ObservationPacket(apply_temporal_fusion(agent, current.data))
-
-    # The runtime history stores numeric arrays only.  Geometry is valid after
-    # fusion only when every retained sample has the same feature schema.
-    fused = apply_temporal_fusion(agent, current.data)
-    if len(agent.state.temporal_buffer) > 1:
-        # Consequently temporal accumulation of spatial evidence is not yet
-        # expressible; a later slice must carry feature schema in the history.
-        return ObservationPacket(fused)
-    return ObservationPacket(fused, current.metadata, current.status)
+    """Fuse an observation while retaining only genuinely stable geometry."""
+    fused = _fuse_packet(agent, current)
+    if current.metadata is None and current.status is None:
+        return ObservationPacket(fused.data)
+    return fused
