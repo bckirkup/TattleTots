@@ -133,6 +133,13 @@ class SimulationConfig(BaseModel):
     n_spatial_blocks: int = Field(
         default=10, ge=1, description="Uniform blocks for high-dim streams"
     )
+    require_grounded_report_locations: bool = Field(
+        default=False,
+        description=(
+            "Suppress reports when the agent has no coordinate-bearing evidence "
+            "for the current step."
+        ),
+    )
     initiation_min_grounded_yield_share: float = Field(
         default=0.5,
         ge=0.0,

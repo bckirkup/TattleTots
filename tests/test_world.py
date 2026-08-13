@@ -336,6 +336,83 @@ class TestMaybeEscalate:
         assert report is not None
         assert report.agent_id == agent.id
 
+    def test_grounded_report_requirement_suppresses_metadata_free_report(self) -> None:
+        world = _minimal_world(require_grounded_report_locations=True)
+        s = _add_raw_stream(world, dim=5, data=np.zeros(5))
+        user = User(name="u1")
+        world.add_user(user)
+        agent = Agent(
+            genome=Genome(
+                compression_type=CompressionType.THRESHOLD,
+                escalation_threshold=0.01,
+            ),
+            state=AgentState(
+                lifecycle=LifecycleStage.ADULT,
+                input_stream_ids=[s.id],
+            ),
+        )
+        world.agents[agent.id] = agent
+        world._init_agent_model(agent)
+        for _ in range(10):
+            world._compress(agent)
+            world._maybe_escalate(agent)
+
+        s.current_data = np.ones(5) * 100.0
+        world._compress(agent)
+        assert world._maybe_escalate(agent) is None
+        assert agent.state.reports_issued == 0
+
+    def test_default_report_location_requirement_preserves_existing_fallback(self) -> None:
+        world = _minimal_world()
+        s = _add_raw_stream(world, dim=5, data=np.zeros(5))
+        user = User(name="u1")
+        world.add_user(user)
+        agent = Agent(
+            genome=Genome(
+                compression_type=CompressionType.THRESHOLD,
+                escalation_threshold=0.01,
+            ),
+            state=AgentState(
+                lifecycle=LifecycleStage.ADULT,
+                input_stream_ids=[s.id],
+            ),
+        )
+        world.agents[agent.id] = agent
+        world._init_agent_model(agent)
+        for _ in range(10):
+            world._compress(agent)
+            world._maybe_escalate(agent)
+
+        s.current_data = np.ones(5) * 100.0
+        world._compress(agent)
+        assert world._maybe_escalate(agent) is not None
+
+    def test_grounded_report_requirement_allows_coordinate_bearing_report(self) -> None:
+        world = _minimal_world(require_grounded_report_locations=True)
+        s = _add_raw_stream(world, dim=5, data=np.zeros(5))
+        user = User(name="u1")
+        world.add_user(user)
+        agent = Agent(
+            genome=Genome(
+                compression_type=CompressionType.THRESHOLD,
+                escalation_threshold=0.01,
+            ),
+            state=AgentState(
+                lifecycle=LifecycleStage.ADULT,
+                input_stream_ids=[s.id],
+            ),
+        )
+        world.agents[agent.id] = agent
+        world._init_agent_model(agent)
+        for _ in range(10):
+            world._compress(agent)
+            world._maybe_escalate(agent)
+
+        s.current_data = np.ones(5) * 100.0
+        world._compress(agent)
+        agent.state.last_geometry_location = (1, 1)
+        assert world._maybe_escalate(agent) is not None
+
     def test_no_report_without_users(self) -> None:
         world = _minimal_world()
         s = _add_raw_stream(world, dim=5, data=np.zeros(5))
