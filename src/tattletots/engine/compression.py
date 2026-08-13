@@ -85,11 +85,10 @@ class PCACompression(CompressionModel):
         centered = window - mean
 
         if centered.shape[0] < 2:
-            magnitude = float(xp.linalg.norm(flat))
             self._signal = to_numpy(flat[: self.n_components])
-            self._explained_var = magnitude * self.efficiency
+            self._explained_var = self.efficiency
             self._components = None
-            return to_numpy(flat), self._explained_var
+            return to_numpy(flat), self.efficiency
 
         # SVD for PCA
         n_comp = min(self.n_components, min(centered.shape))
@@ -105,7 +104,7 @@ class PCACompression(CompressionModel):
 
         total_var = float(xp.sum(s**2))
         explained_var = float(xp.sum(s[:n_comp] ** 2))
-        info_yield = (explained_var / max(total_var, 1e-10)) * self.efficiency
+        info_yield = (explained_var / max(total_var, np.finfo(float).tiny)) * self.efficiency
 
         self._signal = to_numpy(projected.flatten()[:n_comp])
         self._explained_var = info_yield
@@ -153,17 +152,28 @@ class AR1Compression(CompressionModel):
 
         # Simple AR(1): predict current from previous
         if len(flat) == len(self._prev) and len(flat) > 0:
-            # Least-squares coefficient
-            denom = float(xp.dot(self._prev, self._prev))
-            if denom > 1e-10:
-                coeff = float(xp.dot(flat, self._prev)) / denom
+            # Preserve raw observations for the detector and residual stream.
+            raw_denom = float(xp.dot(self._prev, self._prev))
+            if raw_denom > 1e-10:
+                raw_coeff = float(xp.dot(flat, self._prev)) / raw_denom
+            else:
+                raw_coeff = 0.0
+            residual = flat - raw_coeff * self._prev
+
+            # Compute currency from centered variance ratios only. This keeps
+            # level and amplitude available to perception without charging
+            # their units to information income.
+            centered = flat - xp.mean(flat)
+            previous_centered = self._prev - xp.mean(self._prev)
+            centered_denom = float(xp.dot(previous_centered, previous_centered))
+            if centered_denom > np.finfo(float).tiny:
+                coeff = float(xp.dot(centered, previous_centered)) / centered_denom
             else:
                 coeff = 0.0
-            predicted = coeff * self._prev
-            residual = flat - predicted
-            var_residual = float(xp.var(residual))
-            var_flat = float(xp.var(flat))
-            info_yield = float(1.0 - var_residual / max(var_flat, 1e-10))
+            accounting_residual = centered - coeff * previous_centered
+            var_residual = float(xp.var(accounting_residual))
+            var_flat = float(xp.var(centered))
+            info_yield = float(1.0 - var_residual / max(var_flat, np.finfo(float).tiny))
             info_yield = max(0.0, info_yield) * self.efficiency
         else:
             residual = flat
@@ -213,7 +223,8 @@ class ThresholdCompression(CompressionModel):
 
         if self._running_mean is None or len(flat) != len(self._running_mean):
             self._running_mean = flat.copy()
-            self._running_var = xp.ones_like(flat)
+            variance = float(xp.var(flat))
+            self._running_var = xp.full_like(flat, max(variance, np.finfo(float).tiny))
             self._count = 1
             self._signal = to_numpy(flat[: self.n_components])
             return to_numpy(flat), 0.0
@@ -226,7 +237,7 @@ class ThresholdCompression(CompressionModel):
         self._running_var = (1 - self._alpha) * self._running_var + self._alpha * diff**2
 
         # Residual is the z-scored deviation
-        std = xp.sqrt(xp.maximum(self._running_var, 1e-10))
+        std = xp.sqrt(xp.maximum(self._running_var, np.finfo(float).tiny))
         z_scores = diff / std
         # "Compression" = identifying which dimensions are anomalous
         residual = flat - self._running_mean
@@ -246,7 +257,7 @@ class ThresholdCompression(CompressionModel):
         xp = self._xp
         diff = flat - self._running_mean
         assert self._running_var is not None
-        std = xp.sqrt(xp.maximum(self._running_var, 1e-10))
+        std = xp.sqrt(xp.maximum(self._running_var, np.finfo(float).tiny))
         z_scores = diff / std
         return float(xp.max(xp.abs(z_scores)))
 
@@ -291,7 +302,9 @@ class WaveletCompression(CompressionModel):
         self._signal = to_numpy(approx[: self.n_components])
         input_var = float(xp.var(flat))
         residual_var = float(xp.var(residual))
-        info_yield = max(0.0, 1.0 - residual_var / max(input_var, 1e-10)) * self.efficiency
+        info_yield = (
+            max(0.0, 1.0 - residual_var / max(input_var, np.finfo(float).tiny)) * self.efficiency
+        )
         return to_numpy(residual[: flat.size]), info_yield
 
     def anomaly_score(self, data: NDArray[np.float64]) -> float:
