@@ -215,6 +215,7 @@ class World:
             agent.state.last_step_info_subsidy = 0.0
             agent.state.last_step_grounded_yield = 0.0
             agent.state.last_step_ungrounded_yield = 0.0
+            agent.state.policy_report_location = None
             agent.state.last_observed_dispatch = False
             agent.state.last_observed_outcome_necessary = None
 
@@ -624,10 +625,6 @@ class World:
         if policy is None:
             if not ordinary_fire:
                 return None
-            if self.config.require_grounded_report_locations and (
-                agent.state.last_geometry_location is None
-            ):
-                return None
         else:
             observation = combined.copy()
             observation.setflags(write=False)
@@ -635,7 +632,6 @@ class World:
             signal_vector.setflags(write=False)
             context = ReporterPolicyContext(
                 observation=observation,
-                projected_input=observation,
                 signal_vector=signal_vector,
                 anomaly_score=anomaly,
                 escalation_threshold=threshold,
@@ -649,12 +645,21 @@ class World:
                 ),
             )
             decision = policy.decide(context)
-            if not decision.escalate or decision.location is None:
+            if not decision.escalate:
                 return None
+            if decision.location is None:
+                raise ValueError(
+                    f"reporter policy for agent {agent.id!r} escalated without a location"
+                )
             location = decision.location
             if self._location_frame is not None:
                 location = project_location_to_frame(location, self._location_frame)
-            agent.state.last_geometry_location = location
+            agent.state.policy_report_location = location
+        if self.config.require_grounded_report_locations and (
+            agent.state.last_geometry_location is None
+            and agent.state.policy_report_location is None
+        ):
+            return None
 
         user_ids = list(self.users.keys())
         if not user_ids:

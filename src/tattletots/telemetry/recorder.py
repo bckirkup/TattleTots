@@ -44,6 +44,9 @@ class TelemetrySummary(TypedDict):
     total_responses_judged_unnecessary: int
     responder_necessity_rate: float
     unnecessary_dispatch_rate: float
+    designed_population_share: float
+    designed_precision: float
+    ordinary_precision: float
 
 
 @dataclass
@@ -349,6 +352,30 @@ class TelemetryRecorder:
         capacities = [r.attention_carrying_capacity for r in self.history if r.population > 0]
         return sum(capacities) / len(capacities) if capacities else 0.0
 
+    def _reporter_group_summary(self) -> dict[str, float]:
+        designed_reports = sum(
+            int(groups["designed_reports"]) for groups in self.reporter_group_history
+        )
+        ordinary_reports = sum(
+            int(groups["ordinary_reports"]) for groups in self.reporter_group_history
+        )
+        designed_correct = sum(
+            int(groups["designed_correct_reports"]) for groups in self.reporter_group_history
+        )
+        ordinary_correct = sum(
+            int(groups["ordinary_correct_reports"]) for groups in self.reporter_group_history
+        )
+        population_shares = [
+            float(groups["designed_population_share"]) for groups in self.reporter_group_history
+        ]
+        return {
+            "designed_population_share": (
+                sum(population_shares) / len(population_shares) if population_shares else 0.0
+            ),
+            "designed_precision": designed_correct / max(designed_reports, 1),
+            "ordinary_precision": ordinary_correct / max(ordinary_reports, 1),
+        }
+
     def initiation_degeneracy(self) -> tuple[bool, list[str]]:
         """Return whether configured initiation degeneracies occurred."""
         if not self.history:
@@ -398,6 +425,7 @@ class TelemetryRecorder:
     def summary(self) -> TelemetrySummary:
         """Summary statistics for the entire run."""
         degenerate, reasons = self.initiation_degeneracy()
+        reporter_groups = self._reporter_group_summary()
         return {
             "total_steps": self.total_steps,
             "peak_population": self.peak_population,
@@ -427,4 +455,7 @@ class TelemetryRecorder:
             "unnecessary_dispatch_rate": (
                 self.total_responses_judged_unnecessary / max(self.total_responses_dispatched, 1)
             ),
+            "designed_population_share": reporter_groups["designed_population_share"],
+            "designed_precision": reporter_groups["designed_precision"],
+            "ordinary_precision": reporter_groups["ordinary_precision"],
         }

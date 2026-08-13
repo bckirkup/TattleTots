@@ -92,7 +92,6 @@ def test_policy_context_contains_only_read_only_published_evidence() -> None:
     context = _EvidencePolicy.contexts[-1]
     assert {field.name for field in fields(context)} == {
         "observation",
-        "projected_input",
         "signal_vector",
         "anomaly_score",
         "escalation_threshold",
@@ -127,7 +126,23 @@ def test_policy_location_is_projected_and_passes_grounded_gate() -> None:
 
     assert report is not None
     assert report.location == (5, 0)
-    assert agent.state.last_geometry_location == (5, 0)
+    assert agent.state.last_geometry_location == (1, 2)
+    assert agent.state.policy_report_location == (5, 0)
+
+
+def test_escalating_policy_must_name_a_location() -> None:
+    class _MissingLocationPolicy:
+        def decide(self, context: ReporterPolicyContext) -> ReporterDecision:
+            return ReporterDecision(escalate=True)
+
+    register_reporter_policy("missing-location-policy", _MissingLocationPolicy)
+    world, agent = _world()
+    agent.genome.reporter_policy = "missing-location-policy"
+    world._init_agent_model(agent)
+
+    world._compress(agent)
+    with pytest.raises(ValueError, match="escalated without a location"):
+        world._maybe_escalate(agent, raw_anomaly=1.0)
 
 
 def test_reporter_policy_tag_is_inherited_not_mutated_or_randomized() -> None:

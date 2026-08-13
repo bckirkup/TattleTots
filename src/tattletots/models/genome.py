@@ -257,8 +257,6 @@ def _recombine_field(
     data_b: dict[str, Any],
     rng: np.random.Generator,
 ) -> object:
-    if key == "reporter_policy" and data_a[key] == data_b[key]:
-        return data_a[key]
     if key in _ARRAY_RECOMBINATION_KEYS:
         arr_a = np.array(data_a[key], dtype=np.float64)
         arr_b = np.array(data_b[key], dtype=np.float64)
@@ -544,7 +542,10 @@ class Genome(BaseModel):
         child_data: dict[str, object] = {}
 
         for key in data_a:
-            child_data[key] = _recombine_field(key, data_a, data_b, rng)
+            if key == "reporter_policy" and data_a[key] == data_b[key]:
+                child_data[key] = data_a[key]
+            else:
+                child_data[key] = _recombine_field(key, data_a, data_b, rng)
 
         return cls.model_validate(child_data)
 

@@ -55,6 +55,9 @@ class EcologyMetrics(BaseModel):
     total_responses_judged_unnecessary: int = Field(default=0, ge=0)
     responder_necessity_rate: float = Field(default=0.0, ge=0.0, le=1.0)
     unnecessary_dispatch_rate: float = Field(default=0.0, ge=0.0, le=1.0)
+    designed_population_share: float = Field(default=0.0, ge=0.0, le=1.0)
+    designed_precision: float = Field(default=0.0, ge=0.0, le=1.0)
+    ordinary_precision: float = Field(default=0.0, ge=0.0, le=1.0)
 
 
 class CostMetrics(BaseModel):
@@ -94,6 +97,11 @@ class TimeSeries(BaseModel):
     deaths: list[int] = Field(default_factory=list)
     n_compression_types: list[int] = Field(default_factory=list)
     max_trophic_level: list[float] = Field(default_factory=list)
+    designed_population_share: list[float] = Field(default_factory=list)
+    designed_reports: list[int] = Field(default_factory=list)
+    ordinary_reports: list[int] = Field(default_factory=list)
+    designed_correct_reports: list[int] = Field(default_factory=list)
+    ordinary_correct_reports: list[int] = Field(default_factory=list)
 
     @classmethod
     def from_telemetry(cls, telemetry: TelemetryRecorder, cost_per_step: list[float]) -> TimeSeries:

@@ -65,7 +65,6 @@ class ReporterPolicyContext:
     """Only the observations and public declarations available to a reporter."""
 
     observation: NDArray[np.float64]
-    projected_input: NDArray[np.float64]
     signal_vector: NDArray[np.float64]
     anomaly_score: float
     escalation_threshold: float

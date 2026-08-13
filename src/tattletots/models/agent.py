@@ -108,6 +108,10 @@ class AgentState(BaseModel):
         default=None,
         description="Genome-derived location from coordinate-bearing observations",
     )
+    policy_report_location: tuple[int, int] | None = Field(
+        default=None,
+        description="Location supplied by the selected reporter policy",
+    )
     last_anomaly_score: float = Field(default=0.0, ge=0.0)
     last_escalated: bool = Field(default=False)
     last_published_output: bool = Field(default=False)
