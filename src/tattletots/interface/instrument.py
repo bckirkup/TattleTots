@@ -156,7 +156,8 @@ def validate_instrument(
             message=(
                 "Static-prior precision is "
                 f"{static_prior_baseline:.2%} versus uniform precision "
-                f"{chance_baseline:.2%}; compare reports against the static prior."
+                f"{chance_baseline:.2%}; static prior is the localization "
+                "competence null, while uniform is the inferability null."
             ),
             measured=static_prior_baseline,
             threshold=chance_baseline,
@@ -179,23 +180,16 @@ def validate_instrument(
     findings.append(
         InstrumentFinding(
             check=InstrumentCheck.INFERABILITY,
-            passed=localization_vacuous
-            or (
-                reportable_events > 0
-                and support_precision > static_prior_baseline + inferability_margin
-            ),
+            passed=reportable_events > 0
+            and support_precision > chance_baseline + inferability_margin,
             message=(
-                "Inferability is not assessed because localization is vacuous."
-                if localization_vacuous
-                else (
-                    "Published evidence carries event locations above the static prior."
-                    if reportable_events > 0
-                    and support_precision > static_prior_baseline + inferability_margin
-                    else "Published evidence does not carry event locations above the static prior."
-                )
+                "Published evidence carries event locations above uniform chance."
+                if reportable_events > 0
+                and support_precision > chance_baseline + inferability_margin
+                else "Published evidence does not carry event locations above uniform chance."
             ),
             measured=support_precision,
-            threshold=static_prior_baseline + inferability_margin,
+            threshold=chance_baseline + inferability_margin,
         )
     )
 

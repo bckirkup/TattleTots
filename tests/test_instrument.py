@@ -40,8 +40,8 @@ def test_gaussian_shift_instrument_rejects_unobservable_location_label() -> None
     inferability = next(
         finding for finding in report.findings if finding.check == InstrumentCheck.INFERABILITY
     )
-    assert inferability.passed
-    assert "not assessed" in inferability.message
+    assert not inferability.passed
+    assert "does not carry" in inferability.message
     localization = next(
         finding for finding in report.findings if finding.check == InstrumentCheck.LOCALIZATION
     )
