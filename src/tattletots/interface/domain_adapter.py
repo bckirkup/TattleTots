@@ -79,8 +79,8 @@ class DomainAdapter(ABC):
         self,
         stream_data: list[NDArray[np.float64]],
         stream_labels: list[str],
-    ) -> EventLocation:
-        """Infer the location an agent is reporting from its input streams."""
+    ) -> EventLocation | None:
+        """Infer a location, or abstain when the input has no usable evidence."""
 
     @abstractmethod
     def score_relevance(self, signal_vector: NDArray[np.float64], user: User) -> float:

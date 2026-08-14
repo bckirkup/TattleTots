@@ -762,6 +762,27 @@ class TestRandomGenome:
 
 
 class TestEventState:
+    def test_abstaining_location_inference_preserves_spatial_fallback(self) -> None:
+        world = _minimal_world()
+        _add_raw_stream(world, dim=5)
+        user = User(name="test_user", attention_budget=1.0)
+        world.add_user(user)
+        agent = Agent(
+            genome=Genome(escalation_threshold=0.01),
+            state=AgentState(
+                lifecycle=LifecycleStage.ADULT,
+                energy=EnergyReserves(information=2.0, attention=2.0),
+            ),
+        )
+        world.agents[agent.id] = agent
+        world._init_agent_model(agent)
+        agent.state.input_stream_ids = [next(iter(world.streams.keys()))]
+
+        agent.state.last_inferred_location = (3, 4)
+        world.set_location_inference(lambda _data, _labels: None)
+
+        assert world._resolve_report_location(agent, np.ones(5)) == (3, 4)
+
     def test_wrong_location_counts_as_missed(self) -> None:
         """Agents reporting wrong location during active event get missed penalty."""
         world = _minimal_world(trust_delta_miss=0.15)

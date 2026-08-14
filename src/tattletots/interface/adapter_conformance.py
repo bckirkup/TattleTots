@@ -227,9 +227,10 @@ def validate_adapter_conformance(
                         [stream.current_data for stream in streams],
                         [stream.label for stream in streams],
                     )
-                    frame_failures.extend(
-                        _outside_frame(frame, [report], f"decoded report at step {time_step}")
-                    )
+                    if report is not None:
+                        frame_failures.extend(
+                            _outside_frame(frame, [report], f"decoded report at step {time_step}")
+                        )
                 except Exception as error:  # noqa: BLE001 - report frame checks structurally
                     frame_failures.append(
                         f"Frame check at step {time_step} raised {type(error).__name__}: {error}"
