@@ -27,5 +27,5 @@ repos:
         name: Sonar mechanical guards
         entry: python scripts/sonar_guard.py
         language: system
-        files: ^(src|tests|Large Experiments)/.*\.py$
+        files: ^(src|tests|scripts|Large Experiments)/.*\.py$
         types: [python]

@@ -61,8 +61,21 @@ def _assert_float_comparisons(tree: ast.AST, path: Path) -> list[Finding]:
     return findings
 
 
-def _random_call_name(call: ast.Call) -> str | None:
+def _numpy_random_imports(tree: ast.AST) -> set[str]:
+    imported_names: set[str] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ImportFrom) or node.level != 0 or node.module != "numpy.random":
+            continue
+        imported_names.update(
+            alias.asname or alias.name for alias in node.names if alias.name != "*"
+        )
+    return imported_names
+
+
+def _random_call_name(call: ast.Call, imported_names: set[str]) -> str | None:
     function = call.func
+    if isinstance(function, ast.Name) and function.id in imported_names:
+        return function.id
     if not isinstance(function, ast.Attribute):
         return None
     random_module = function.value
@@ -78,10 +91,11 @@ def _random_call_name(call: ast.Call) -> str | None:
 
 def _bare_random_calls(tree: ast.AST, path: Path) -> list[Finding]:
     findings: list[Finding] = []
+    imported_names = _numpy_random_imports(tree)
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
-        name = _random_call_name(node)
+        name = _random_call_name(node, imported_names)
         if name is None:
             continue
         if name == "default_rng":
@@ -93,7 +107,7 @@ def _bare_random_calls(tree: ast.AST, path: Path) -> list[Finding]:
                 path,
                 node.lineno,
                 "S6709",
-                f"bare np.random.{name} call; use a seeded Generator",
+                f"bare NumPy random call {name!r}; use a seeded Generator",
             )
         )
     return findings
@@ -105,7 +119,7 @@ def _comment_lines(source: str) -> set[int]:
         tokens = tokenize.generate_tokens(io.StringIO(source).readline)
         comments.update(token.start[0] for token in tokens if token.type == tokenize.COMMENT)
     except tokenize.TokenError:
-        return comments
+        comments.update(())
     return comments
 
 
@@ -153,10 +167,15 @@ def main() -> int:
         "paths",
         nargs="*",
         type=Path,
-        help="Python files or directories (defaults to src, tests, and Large Experiments)",
+        help="Python files or directories (defaults to src, tests, scripts, and Large Experiments)",
     )
     args = parser.parse_args()
-    paths = args.paths or [Path("src"), Path("tests"), Path("Large Experiments")]
+    paths = args.paths or [
+        Path("src"),
+        Path("tests"),
+        Path("scripts"),
+        Path("Large Experiments"),
+    ]
     findings = [finding for path in _python_files(paths) for finding in _check_file(path)]
     for finding in findings:
         print(f"{finding.path}:{finding.line}:1: {finding.rule} {finding.message}")

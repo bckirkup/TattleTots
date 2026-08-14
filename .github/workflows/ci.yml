@@ -44,7 +44,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Run Sonar mechanical guard
-        run: python scripts/sonar_guard.py src tests "Large Experiments"
+        run: python scripts/sonar_guard.py src tests scripts "Large Experiments"
 
   typecheck:
     runs-on: ubuntu-latest
@@ -156,7 +156,8 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install workflow linter
-        run: pip install zizmor==1.29.0
+        run: |
+          pip install --only-binary ":all:" zizmor==1.29.0
       - name: Lint workflows
         run: zizmor --no-progress .github/workflows/ci.yml
 
