@@ -177,8 +177,17 @@ def validate_adapter_conformance(
     steps: int,
     *,
     state_independence_factory: StateIndependenceFactory | None = None,
+    strict_state_independence: bool = False,
 ) -> AdapterConformanceReport:
-    """Run domain-neutral publication, sensing, decoding, and state checks."""
+    """Run domain-neutral publication, sensing, decoding, and state checks.
+
+    Static sensor declarations are always required to be independent of hidden
+    state.  Dynamic coordinates and statuses describe observations and may
+    legitimately differ; those differences are reported informationally unless
+    ``strict_state_independence`` is enabled.  Use the strict form for fixed
+    coverage instruments whose dynamic fields are also expected to depend only
+    on placement, cadence, and geometry.
+    """
     if steps <= 0:
         return _invalid_steps_report(steps)
 
@@ -328,6 +337,7 @@ def validate_adapter_conformance(
     state_finding, exercised = _state_independence_finding(
         state_independence_factory,
         steps,
+        strict=strict_state_independence,
     )
     findings.append(state_finding)
 
@@ -364,12 +374,14 @@ def assert_adapter_conformance(
     steps: int,
     *,
     state_independence_factory: StateIndependenceFactory | None = None,
+    strict_state_independence: bool = False,
 ) -> AdapterConformanceReport:
     """Run conformance checks and raise a readable pytest assertion on failure."""
     report = validate_adapter_conformance(
         adapter,
         steps,
         state_independence_factory=state_independence_factory,
+        strict_state_independence=strict_state_independence,
     )
     failures = [
         finding for finding in report.findings if not finding.passed or not finding.exercised
@@ -611,6 +623,8 @@ def _coordinate_to_location(
 def _state_independence_finding(
     factory: StateIndependenceFactory | None,
     steps: int,
+    *,
+    strict: bool,
 ) -> tuple[AdapterConformanceFinding, bool]:
     if factory is None:
         return (
@@ -624,19 +638,21 @@ def _state_independence_finding(
         )
     try:
         first, second = factory()
+        observation_differences: set[tuple[str, str]] = set()
         for time_step in range(steps):
             first.step(time_step)
             second.step(time_step)
-            mismatch = _state_metadata_mismatch(first, second)
-            if mismatch is not None:
+            static_mismatch, dynamic_differences = _state_metadata_mismatch(first, second)
+            if static_mismatch is not None:
                 return (
                     AdapterConformanceFinding(
                         AdapterConformanceCheck.STATE_INDEPENDENCE,
                         False,
-                        mismatch,
+                        static_mismatch,
                     ),
                     True,
                 )
+            observation_differences.update(dynamic_differences)
     except Exception as error:  # noqa: BLE001 - report hook failures structurally
         return (
             AdapterConformanceFinding(
@@ -646,11 +662,36 @@ def _state_independence_finding(
             ),
             True,
         )
+    if observation_differences:
+        details = ", ".join(f"{label}.{field}" for label, field in sorted(observation_differences))
+        message = (
+            "Observation-dependent fields differed for "
+            f"{details} across {steps} steps; this is informational because "
+            "reported coordinates and statuses may legitimately depend on hidden "
+            "observations."
+        )
+        if strict:
+            message = (
+                "Strict state-independence failed: "
+                + message
+                + " Pass strict_state_independence=False for mobile or "
+                "self-reporting instruments."
+            )
+        return (
+            AdapterConformanceFinding(
+                AdapterConformanceCheck.STATE_INDEPENDENCE,
+                not strict,
+                message,
+                measured=steps,
+                threshold=steps,
+            ),
+            True,
+        )
     return (
         AdapterConformanceFinding(
             AdapterConformanceCheck.STATE_INDEPENDENCE,
             True,
-            f"Coordinates, footprints, and statuses matched across {steps} steps.",
+            f"Static sensor declarations, coordinates, and statuses matched across {steps} steps.",
             measured=steps,
             threshold=steps,
         ),
@@ -658,18 +699,64 @@ def _state_independence_finding(
     )
 
 
-def _state_metadata_mismatch(first: DomainAdapter, second: DomainAdapter) -> str | None:
+def _state_metadata_mismatch(
+    first: DomainAdapter,
+    second: DomainAdapter,
+) -> tuple[str | None, set[tuple[str, str]]]:
     first_streams = {stream.label: stream for stream in first.get_streams()}
     second_streams = {stream.label: stream for stream in second.get_streams()}
     if first_streams.keys() != second_streams.keys():
-        return "State-independence streams differ by label."
+        return "State-independence streams differ by label.", set()
+    observation_differences: set[tuple[str, str]] = set()
     for label, first_stream in first_streams.items():
         second_stream = second_streams[label]
-        if first_stream.metadata != second_stream.metadata:
-            return f"Stream {label!r} metadata changes with hidden state."
+        first_metadata = first_stream.metadata
+        second_metadata = second_stream.metadata
+        static_fields = (
+            (
+                "sensor_coordinates",
+                None if first_metadata is None else first_metadata.sensor_coordinates,
+                None if second_metadata is None else second_metadata.sensor_coordinates,
+            ),
+            (
+                "footprints",
+                None if first_metadata is None else first_metadata.footprints,
+                None if second_metadata is None else second_metadata.footprints,
+            ),
+            (
+                "resolution",
+                None if first_metadata is None else first_metadata.resolution,
+                None if second_metadata is None else second_metadata.resolution,
+            ),
+            (
+                "modality",
+                None if first_metadata is None else first_metadata.modality,
+                None if second_metadata is None else second_metadata.modality,
+            ),
+        )
+        for field_name, first_value, second_value in static_fields:
+            if first_value != second_value:
+                return (
+                    f"Stream {label!r} {field_name} declaration changes with hidden state.",
+                    set(),
+                )
+        first_coordinates = None if first_metadata is None else first_metadata.coordinates
+        second_coordinates = None if second_metadata is None else second_metadata.coordinates
+        if first_coordinates != second_coordinates:
+            observation_differences.add((label, "coordinates"))
+        first_identity = None if first_metadata is None else first_metadata.identity
+        second_identity = None if second_metadata is None else second_metadata.identity
+        if first_identity != second_identity:
+            if first_coordinates != second_coordinates:
+                observation_differences.add((label, "identity"))
+            else:
+                return (
+                    f"Stream {label!r} identity declaration changes with hidden state.",
+                    set(),
+                )
         if not np.array_equal(first_stream.current_status, second_stream.current_status):
-            return f"Stream {label!r} status changes with hidden state."
-    return None
+            observation_differences.add((label, "status"))
+    return None, observation_differences
 
 
 def _frame_containment_finding(
