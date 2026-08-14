@@ -96,6 +96,11 @@ ignore = ["E501", "SIM108"]
 [tool.ruff.lint.isort]
 known-first-party = ["tattletots"]
 
+[tool.ruff.lint.per-file-ignores]
+# Conformance fixtures intentionally implement protocol methods with unused
+# parameters so the test exercises the published adapter signature.
+"tests/test_adapter_conformance.py" = ["ARG002"]
+
 [tool.ruff.lint.mccabe]
 max-complexity = 15
 

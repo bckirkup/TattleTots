@@ -152,7 +152,9 @@ def expand_validation_runs(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Quick validation runner for TattleTots integration")
+    parser = argparse.ArgumentParser(
+        description="Quick validation runner for TattleTots integration"
+    )
     parser.add_argument(
         "--config",
         type=Path,
@@ -210,7 +212,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.verbose:
         cmd.append("--verbose")
 
-    return subprocess.call(cmd)
+    return subprocess.call(  # noqa: S603 - fixed local scripts and parsed CLI flags.
+        cmd
+    )
 
 
 if __name__ == "__main__":

@@ -124,7 +124,7 @@ def run_single_simulation(
             log_file.flush()
 
             # Run subprocess
-            subprocess.run(
+            subprocess.run(  # noqa: S603 - fixed local scripts and parsed CLI flags.
                 cmd,
                 stdout=log_file,
                 stderr=subprocess.STDOUT,

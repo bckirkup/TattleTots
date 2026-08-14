@@ -19,8 +19,8 @@ Run these before committing:
 ```bash
 pre-commit run --all-files
 python scripts/sonar_guard.py src tests "Large Experiments"
-ruff check src/ tests/
-ruff format --check src/ tests/
+ruff check src/ tests/ scripts/ "Large Experiments/"
+ruff format --check src/ tests/ scripts/ "Large Experiments/"
 mypy src/
 pytest
 ```

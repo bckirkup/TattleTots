@@ -9,6 +9,7 @@ from pathlib import Path
 
 from domain_runner.types import RunContext
 from fire_ecology.runner import FireDomainHooks
+
 from tattletots.engine.cop import fuse_reports_into_cops, select_dispatch_targets
 from tattletots.integration.tattletots_layer import TattleTotsLayer
 
@@ -116,11 +117,7 @@ def main() -> int:
                 r = world.last_reports[0]
                 u = world.users[r.target_user_id]
                 rel = u.compute_relevance(r.signal_vector)
-                scale = (
-                    1.0
-                    if r.target_user_id == responder
-                    else sim.cop_non_target_weight_scale
-                )
+                scale = 1.0 if r.target_user_id == responder else sim.cop_non_target_weight_scale
                 weight = u.get_trust(r.agent_id) * rel * r.confidence * scale
                 contrib = weight * r.anomaly_score
                 extra = (
