@@ -64,7 +64,9 @@ class GaussianShiftScenario(DomainAdapter):
 
         # Post-shift: rotated basis + changed amplitudes
         rotation = self.rng.standard_normal((dimensionality, dimensionality))
-        q, _ = np.linalg.qr(rotation)
+        q, r = np.linalg.qr(rotation)
+        # QR column signs are ambiguous; positive diagonal R makes the basis stable.
+        q *= np.where(np.diag(r) < 0.0, -1.0, 1.0)
         # Rotate each basis vector: (n_components, D) @ (D, D) → (n_components, D)
         self._basis_post = self._basis_pre @ q.T
         self._amplitudes_post = self.rng.uniform(0.5, 2.5, size=n_components)
