@@ -292,14 +292,6 @@ def validate_adapter_conformance(
         )
     )
 
-    silenced_finding = _silenced_sensor_probe(
-        adapter,
-        targets,
-        recorder.return_specs,
-        steps,
-    )
-    findings.append(silenced_finding)
-
     declaration_findings = _declaration_findings(streams)
     declaration_failures = [finding for finding in declaration_findings if not finding.passed]
     findings.append(
@@ -345,6 +337,16 @@ def validate_adapter_conformance(
         frame_failures,
     )
     findings.append(frame_finding)
+
+    # Runs last: silencing steps the adapter further and mutates published streams.
+    findings.append(
+        _silenced_sensor_probe(
+            adapter,
+            targets,
+            recorder.return_specs,
+            steps,
+        )
+    )
 
     return AdapterConformanceReport(
         findings=tuple(findings),
