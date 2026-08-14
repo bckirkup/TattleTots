@@ -209,7 +209,13 @@ def validate_instrument(
 def _validate_stream_declarations(
     stream: Stream, time_step: int, findings: list[InstrumentFinding]
 ) -> None:
+    """Append shared stream declaration findings for one stream."""
+    findings.extend(validate_stream_declarations(stream, time_step))
+
+
+def validate_stream_declarations(stream: Stream, time_step: int) -> tuple[InstrumentFinding, ...]:
     """Validate lengths and status/metadata consistency for one stream."""
+    findings: list[InstrumentFinding] = []
     dimensionality = stream.current_data.size
     status = stream.current_status
     metadata = stream.metadata
@@ -228,7 +234,7 @@ def _validate_stream_declarations(
         except ValueError as error:
             findings.append(InstrumentFinding(InstrumentCheck.DECLARATIONS, False, str(error)))
     if status.size != dimensionality or metadata is None:
-        return
+        return tuple(findings)
     for index, state in enumerate(status):
         if state not in {item.value for item in ObservationStatus}:
             findings.append(
@@ -270,6 +276,7 @@ def _validate_stream_declarations(
                     "has no declared static sensor geometry; its absence is less localizable.",
                 )
             )
+    return tuple(findings)
 
 
 def _collect_stream_coordinates(
