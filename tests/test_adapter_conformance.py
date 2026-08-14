@@ -541,9 +541,9 @@ def test_declaration_consistency_failure_is_reported_structurally() -> None:
 
 def test_declared_features_beyond_engine_cap_are_reported() -> None:
     report = validate_adapter_conformance(
-        _DimensionalityFixtureAdapter(4),
+        _DimensionalityFixtureAdapter(10),
         steps=1,
-        config=SimulationConfig(max_stream_dim=3),
+        config=SimulationConfig(max_stream_dim=10, max_working_dim=8),
         state_independence_factory=_matching_dimensionality_state_factory,
     )
     finding = next(
@@ -553,7 +553,7 @@ def test_declared_features_beyond_engine_cap_are_reported() -> None:
     )
     assert not finding.passed
     assert "published_signal" in finding.message
-    assert "1 declared geometry/features cannot be received by agents" in finding.message
+    assert "2 declared geometry/features are structurally unreachable" in finding.message
 
 
 def test_declared_features_at_engine_cap_pass() -> None:

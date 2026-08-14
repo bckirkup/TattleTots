@@ -323,9 +323,10 @@ def validate_adapter_conformance(
         )
     )
 
+    engine_config = config or SimulationConfig()
     delivered_findings = _declared_vs_delivered_findings(
         streams,
-        (config or SimulationConfig()).max_stream_dim,
+        min(engine_config.max_stream_dim, engine_config.max_working_dim),
     )
     unreachable = [finding for finding in delivered_findings if not finding.passed]
     findings.append(
@@ -333,10 +334,13 @@ def validate_adapter_conformance(
             AdapterConformanceCheck.DECLARED_VS_DELIVERED,
             not unreachable,
             (
-                "Every declared stream feature and metadata entry is deliverable under "
-                "the configured engine stream cap."
+                "Every declared stream feature and metadata entry is structurally "
+                "reachable for at least one possible agent under the configured "
+                "engine ceilings; individual genomes and CONCAT ordering may still "
+                "limit practical reach."
                 if not unreachable
-                else "Declared stream features exceed what agents receive: "
+                else "Declared stream features exceed the best-case structural "
+                "ceiling for what agents can receive: "
                 + "; ".join(finding.message for finding in unreachable)
             ),
             measured=sum(int(finding.measured or 0) for finding in unreachable),
@@ -613,28 +617,29 @@ def _declaration_findings(streams: list[Stream]) -> tuple[InstrumentFinding, ...
 
 def _declared_vs_delivered_findings(
     streams: list[Stream],
-    max_stream_dim: int,
+    structural_ceiling: int,
 ) -> tuple[AdapterConformanceFinding, ...]:
     findings: list[AdapterConformanceFinding] = []
-    metadata_fields = (
-        "coordinates",
-        "sensor_coordinates",
-        "modality",
-        "identity",
-        "footprints",
-        "resolution",
-    )
     for stream in streams:
         metadata = stream.metadata
         declared_lengths = [stream.dimensionality]
         if metadata is not None:
-            declared_lengths.extend(
-                len(values)
-                for field in metadata_fields
-                if (values := getattr(metadata, field)) is not None
-            )
+            if metadata.coordinates is not None:
+                declared_lengths.append(len(metadata.coordinates))
+            if metadata.sensor_coordinates is not None:
+                declared_lengths.append(len(metadata.sensor_coordinates))
+            if metadata.modality is not None:
+                declared_lengths.append(len(metadata.modality))
+            if metadata.identity is not None:
+                declared_lengths.append(len(metadata.identity))
+            if metadata.footprints is not None:
+                declared_lengths.append(len(metadata.footprints))
+            if metadata.resolution is not None:
+                declared_lengths.append(len(metadata.resolution))
         declared_count = max(declared_lengths)
-        delivered_count = min(stream.dimensionality, max_stream_dim)
+        # This is a best-case ceiling: genome.working_dim and CONCAT ordering
+        # can make individual high-index features unreachable in practice.
+        delivered_count = min(stream.dimensionality, structural_ceiling)
         unreachable = max(0, declared_count - delivered_count)
         if unreachable:
             findings.append(
@@ -642,8 +647,9 @@ def _declared_vs_delivered_findings(
                     AdapterConformanceCheck.DECLARED_VS_DELIVERED,
                     False,
                     f"Stream '{stream.label}' declares {declared_count} features but "
-                    f"agents receive {delivered_count}; {unreachable} declared "
-                    "geometry/features cannot be received by agents.",
+                    f"the best-case structural ceiling is {delivered_count}; "
+                    f"{unreachable} declared geometry/features are structurally "
+                    "unreachable for every possible agent.",
                     measured=unreachable,
                     threshold=0,
                 )
