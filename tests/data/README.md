@@ -16,6 +16,11 @@ attention trace for the same seeded runs. It is tolerance-based diagnostic
 reference data, not a correctness golden: the test uses `pytest.approx(rel=1e-9)`
 and reports the first divergence plus its per-step growth curve.
 
+All three reference files below were deliberately regenerated after
+deterministic sign canonicalization was added for PCA SVD components and the
+Gaussian-shift scenario's QR basis. Their current values therefore describe the
+post-canonicalization behavior.
+
 To deliberately regenerate the file, run `_run_payload(42)` for both the
 default configuration and the legacy configuration
 (`reproduction_coupling_strength=0.0`, `grounding_quality_strength=0.0`), then

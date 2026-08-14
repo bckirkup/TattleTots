@@ -94,6 +94,11 @@ class PCACompression(CompressionModel):
         n_comp = min(self.n_components, min(centered.shape))
         _u, s, vt = xp.linalg.svd(centered, full_matrices=False)
         components = vt[:n_comp]
+        pivot_indices = xp.argmax(xp.abs(components), axis=1)
+        component_indices = xp.arange(n_comp)
+        pivot_values = components[component_indices, pivot_indices]
+        signs = xp.where(pivot_values < 0.0, -1.0, 1.0)
+        components = components * signs[:, None]
         self._components = components
 
         # Project and reconstruct the *current* sample only

@@ -167,6 +167,46 @@ class TestCompression:
         residual, _ = model.fit_transform(data)
         assert np.var(residual) <= np.var(data) + 1e-10
 
+    def test_pca_is_invariant_to_singular_vector_signs(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        data = np.array(
+            [
+                [0.0, 1.0, 2.0, 3.0],
+                [1.0, 3.0, 5.0, 7.0],
+                [2.0, 5.0, 8.0, 11.0],
+            ]
+        )
+        reference = PCACompression(n_components=2)
+        flipped = PCACompression(n_components=2)
+        for row in data[:-1]:
+            reference.fit_transform(row)
+            flipped.fit_transform(row)
+        reference.fit_transform(data[-1])
+
+        original_svd = np.linalg.svd
+
+        def sign_flipped_svd(
+            matrix: np.ndarray,
+            *,
+            full_matrices: bool,
+        ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+            u, singular_values, vt = original_svd(
+                matrix,
+                full_matrices=full_matrices,
+            )
+            signs = np.where(np.arange(vt.shape[0]) % 2 == 0, -1.0, 1.0)
+            return u * signs, singular_values, vt * signs[:, None]
+
+        monkeypatch.setattr(np.linalg, "svd", sign_flipped_svd)
+        flipped.fit_transform(data[-1])
+
+        assert flipped.get_signal_vector() == pytest.approx(reference.get_signal_vector())
+        assert flipped._components is not None
+        assert reference._components is not None
+        assert flipped._components == pytest.approx(reference._components)
+
     def test_ar1_learns_autocorrelation(self) -> None:
         model = AR1Compression(n_components=3)
         prev = np.array([1.0, 2.0, 3.0])

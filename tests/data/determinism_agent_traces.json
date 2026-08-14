@@ -620,10 +620,10 @@
       "time_step": 3,
       "agents": {
         "018b6e1e-f0ef-4e47-b67a-6e3efaebcfa8": {
-          "attention_energy": -0.017097912155698114,
+          "attention_energy": 0.12754706046537245,
           "information_energy": 2.089296531042088,
-          "attention_income": 0.2804457268996126,
-          "attention_delta": 0.21371788938659375
+          "attention_income": 0.4250906995206832,
+          "attention_delta": 0.3583628620076643
         },
         "36a3c1d3-d7a6-4e54-9f1c-7e14fa7ae0d5": {
           "attention_energy": 0.6394370169848757,
@@ -632,10 +632,10 @@
           "attention_delta": 0.0
         },
         "4e0b8bd9-5f80-4c70-9fdb-d848885e8805": {
-          "attention_energy": 1.151746986204404,
+          "attention_energy": 1.243464722697012,
           "information_energy": 0.503225910876311,
-          "attention_income": 0.41648125449931206,
-          "attention_delta": 0.34329318597194947
+          "attention_income": 0.5081989909919198,
+          "attention_delta": 0.4350109224645572
         },
         "5db7f68a-425d-4723-a09f-5b4d0d50d58d": {
           "attention_energy": 0.5005394266912052,
@@ -644,10 +644,10 @@
           "attention_delta": 0.0
         },
         "7761bd50-a67f-4b71-bb70-1803101d4b4d": {
-          "attention_energy": 1.177979802330035,
+          "attention_energy": 1.2640686328159747,
           "information_energy": 0.4628983603595549,
-          "attention_income": 0.5751368196088407,
-          "attention_delta": 0.5385427853451594
+          "attention_income": 0.6612256500947804,
+          "attention_delta": 0.6246316158310992
         },
         "8a4aa0a6-d37e-40e7-bb35-dc8391877fb8": {
           "attention_energy": 0.6186924755830575,
@@ -662,22 +662,22 @@
           "attention_delta": -0.033363918756509424
         },
         "afbc31c5-dc7a-4f54-8222-e3751f411289": {
-          "attention_energy": 1.7492300088256303,
+          "attention_energy": 1.3604059881938997,
           "information_energy": 2.278840004118176,
-          "attention_income": 0.38882402063173066,
-          "attention_delta": 0.35546010187522126
+          "attention_income": 0.0,
+          "attention_delta": -0.033363918756509424
         },
         "d2bcca3a-e4fc-4025-a331-4ca25a3f3ed7": {
-          "attention_energy": 1.3753692721115789,
+          "attention_energy": 1.4187721290868658,
           "information_energy": 1.200217573843109,
-          "attention_income": 0.23249312754338694,
-          "attention_delta": 0.19359875351952893
+          "attention_income": 0.2758959845186738,
+          "attention_delta": 0.2370016104948158
         },
         "f08bd08a-f499-4679-bab4-bece5d845844": {
-          "attention_energy": 1.2951639060592814,
+          "attention_energy": 1.318133530116107,
           "information_energy": 0.4583536199627152,
-          "attention_income": 0.10661905081711692,
-          "attention_delta": 0.03608589888735174
+          "attention_income": 0.1295886748739426,
+          "attention_delta": 0.059055522944177416
         }
       }
     },
@@ -685,22 +685,22 @@
       "time_step": 4,
       "agents": {
         "018b6e1e-f0ef-4e47-b67a-6e3efaebcfa8": {
-          "attention_energy": -0.017097912155698114,
-          "information_energy": 2.089296531042088,
-          "attention_income": 0.2804457268996126,
-          "attention_delta": 0.0
+          "attention_energy": -0.40007416926449063,
+          "information_energy": 2.4406472890163196,
+          "attention_income": 0.15779908336621326,
+          "attention_delta": 0.09107124585319441
         },
         "36a3c1d3-d7a6-4e54-9f1c-7e14fa7ae0d5": {
-          "attention_energy": 0.9267535969140985,
+          "attention_energy": 0.9034389602653266,
           "information_energy": 0.4628983603595549,
-          "attention_income": 0.32391061419290423,
-          "attention_delta": 0.28731657992922294
+          "attention_income": 0.30059597754413225,
+          "attention_delta": 0.26400194328045096
         },
         "4e0b8bd9-5f80-4c70-9fdb-d848885e8805": {
-          "attention_energy": 1.7669393129603557,
-          "information_energy": 0.42671192028100613,
-          "attention_income": 0.6883803952833142,
-          "attention_delta": 0.6151923267559516
+          "attention_energy": 1.6003359251053308,
+          "information_energy": 0.5267119202810062,
+          "attention_income": 0.4300592709356814,
+          "attention_delta": 0.3568712024083188
         },
         "5db7f68a-425d-4723-a09f-5b4d0d50d58d": {
           "attention_energy": 0.5005394266912052,
@@ -709,40 +709,46 @@
           "attention_delta": 0.0
         },
         "7761bd50-a67f-4b71-bb70-1803101d4b4d": {
-          "attention_energy": 1.1443699084978274,
-          "information_energy": 0.7544988243511019,
-          "attention_income": 0.002984140431473794,
-          "attention_delta": -0.0336098938322075
+          "attention_energy": 1.291403717052089,
+          "information_energy": 1.1292639877438746,
+          "attention_income": 0.06392911849979559,
+          "attention_delta": 0.027335084236114297
         },
         "8a4aa0a6-d37e-40e7-bb35-dc8391877fb8": {
-          "attention_energy": 0.7553667537106805,
+          "attention_energy": 0.7431276401927613,
           "information_energy": 1.617050890583957,
-          "attention_income": 0.1700381968841325,
-          "attention_delta": 0.13667427812762306
+          "attention_income": 0.15779908336621326,
+          "attention_delta": 0.12443516460970383
         },
         "94f70bcd-85e2-428b-ae87-b9c8c5b72541": {
-          "attention_energy": 0.5519646380700386,
+          "attention_energy": 1.2072726673919867,
           "information_energy": 2.5587789426976357,
+          "attention_income": 0.655308029321948,
+          "attention_delta": 0.6219441105654385
+        },
+        "a6156706-2662-444c-aef9-c7da368fca3d": {
+          "attention_energy": 0.6186924755830575,
+          "information_energy": 0.6186924755830575,
+          "attention_income": 0.0,
+          "attention_delta": 0.0
+        },
+        "afbc31c5-dc7a-4f54-8222-e3751f411289": {
+          "attention_energy": 1.3270420694373903,
+          "information_energy": 2.6348117877136,
           "attention_income": 0.0,
           "attention_delta": -0.033363918756509424
         },
-        "afbc31c5-dc7a-4f54-8222-e3751f411289": {
-          "attention_energy": 2.2161549801702467,
-          "information_energy": 2.6348117877136,
-          "attention_income": 0.5002888901011258,
-          "attention_delta": 0.46692497134461636
-        },
         "d2bcca3a-e4fc-4025-a331-4ca25a3f3ed7": {
-          "attention_energy": 1.4654087905549091,
-          "information_energy": 1.5084528156846653,
-          "attention_income": 0.12893389246718825,
-          "attention_delta": 0.09003951844333025
+          "attention_energy": 1.4995311648202527,
+          "information_energy": 1.4922122349404303,
+          "attention_income": 0.11965340975724506,
+          "attention_delta": 0.08075903573338705
         },
         "f08bd08a-f499-4679-bab4-bece5d845844": {
-          "attention_energy": 1.4100946247693775,
-          "information_energy": 0.4645664736357033,
-          "attention_income": 0.18546387063986122,
-          "attention_delta": 0.11493071871009604
+          "attention_energy": 1.362456405395113,
+          "information_energy": 0.36456647363570327,
+          "attention_income": 0.11485602720877111,
+          "attention_delta": 0.04432287527900593
         }
       }
     },
@@ -750,22 +756,22 @@
       "time_step": 5,
       "agents": {
         "018b6e1e-f0ef-4e47-b67a-6e3efaebcfa8": {
-          "attention_energy": -0.017097912155698114,
-          "information_energy": 2.089296531042088,
-          "attention_income": 0.2804457268996126,
+          "attention_energy": -0.40007416926449063,
+          "information_energy": 2.4406472890163196,
+          "attention_income": 0.15779908336621326,
           "attention_delta": 0.0
         },
         "36a3c1d3-d7a6-4e54-9f1c-7e14fa7ae0d5": {
-          "attention_energy": 0.8901595626504173,
-          "information_energy": 0.9230651927070679,
+          "attention_energy": 0.8668449260016453,
+          "information_energy": 0.8868869334200589,
           "attention_income": 0.0,
           "attention_delta": -0.03659403426368129
         },
         "4e0b8bd9-5f80-4c70-9fdb-d848885e8805": {
-          "attention_energy": 1.7273935525254853,
-          "information_energy": 0.4543054207742857,
-          "attention_income": 0.3336423080924922,
-          "attention_delta": -0.0395457604348704
+          "attention_energy": 1.5518047657459393,
+          "information_energy": 0.35230762526124615,
+          "attention_income": 0.3246569091679709,
+          "attention_delta": -0.04853115935939167
         },
         "5db7f68a-425d-4723-a09f-5b4d0d50d58d": {
           "attention_energy": 0.5005394266912052,
@@ -774,46 +780,52 @@
           "attention_delta": 0.0
         },
         "7761bd50-a67f-4b71-bb70-1803101d4b4d": {
-          "attention_energy": 1.1077758742341461,
-          "information_energy": 1.0208644517354217,
-          "attention_income": 0.0,
-          "attention_delta": -0.03659403426368129
+          "attention_energy": 1.307531571264167,
+          "information_energy": 1.9274904945113267,
+          "attention_income": 0.05272188847575948,
+          "attention_delta": 0.016127854212078192
         },
-        "8a4aa0a6-d37e-40e7-bb35-dc8391877fb8": {
-          "attention_energy": 0.7220028349541711,
-          "information_energy": 2.615409305584856,
-          "attention_income": 0.0,
-          "attention_delta": -0.033363918756509424
-        },
-        "94f70bcd-85e2-428b-ae87-b9c8c5b72541": {
-          "attention_energy": 0.6937476085677386,
-          "information_energy": 3.528822176254925,
-          "attention_income": 0.1751468892542095,
-          "attention_delta": 0.14178297049770006
-        },
-        "afbc31c5-dc7a-4f54-8222-e3751f411289": {
-          "attention_energy": 1.9958814016626163,
-          "information_energy": 2.3622260315795782,
-          "attention_income": 0.39465822034965875,
-          "attention_delta": 0.3279303828366399
-        },
-        "d2bcca3a-e4fc-4025-a331-4ca25a3f3ed7": {
-          "attention_energy": 1.5955155739728817,
-          "information_energy": 1.8991414145109613,
-          "attention_income": 0.16900115744183053,
-          "attention_delta": 0.13010678341797252
-        },
-        "dfad2c4b-d228-440a-a09f-1e0db138fe3e": {
+        "7936521c-daa9-43bc-bdd3-b2580b3a2262": {
           "attention_energy": 0.5482039613442703,
           "information_energy": 0.5482039613442703,
           "attention_income": 0.0,
           "attention_delta": 0.0
         },
+        "8a4aa0a6-d37e-40e7-bb35-dc8391877fb8": {
+          "attention_energy": 1.0419280738132333,
+          "information_energy": 2.615409305584856,
+          "attention_income": 0.33216435237698133,
+          "attention_delta": 0.29880043362047193
+        },
+        "94f70bcd-85e2-428b-ae87-b9c8c5b72541": {
+          "attention_energy": 1.3145459086154447,
+          "information_energy": 3.528822176254925,
+          "attention_income": 0.14063715997996756,
+          "attention_delta": 0.10727324122345813
+        },
+        "a6156706-2662-444c-aef9-c7da368fca3d": {
+          "attention_energy": 0.9546490460940715,
+          "information_energy": 1.0116659293090189,
+          "attention_income": 0.36932048926752337,
+          "attention_delta": 0.33595657051101396
+        },
+        "afbc31c5-dc7a-4f54-8222-e3751f411289": {
+          "attention_energy": 1.1338727548141176,
+          "information_energy": 2.392321365344225,
+          "attention_income": 0.42176248423401647,
+          "attention_delta": 0.3550346467209976
+        },
+        "d2bcca3a-e4fc-4025-a331-4ca25a3f3ed7": {
+          "attention_energy": 1.6165418525981476,
+          "information_energy": 1.866338543258167,
+          "attention_income": 0.15590506180175298,
+          "attention_delta": 0.11701068777789497
+        },
         "f08bd08a-f499-4679-bab4-bece5d845844": {
-          "attention_energy": 2.2671128977014217,
-          "information_energy": 0.29063685678056683,
-          "attention_income": 0.9275514248618091,
-          "attention_delta": 0.8570182729320439
+          "attention_energy": 1.4947549081613756,
+          "information_energy": 0.1707793273086914,
+          "attention_income": 0.20283165469602787,
+          "attention_delta": 0.1322985027662627
         }
       }
     },
@@ -821,22 +833,22 @@
       "time_step": 6,
       "agents": {
         "018b6e1e-f0ef-4e47-b67a-6e3efaebcfa8": {
-          "attention_energy": -0.017097912155698114,
-          "information_energy": 2.089296531042088,
-          "attention_income": 0.2804457268996126,
+          "attention_energy": -0.40007416926449063,
+          "information_energy": 2.4406472890163196,
+          "attention_income": 0.15779908336621326,
           "attention_delta": 0.0
         },
         "36a3c1d3-d7a6-4e54-9f1c-7e14fa7ae0d5": {
-          "attention_energy": 0.8629196084878711,
-          "information_energy": 1.4456705835122432,
-          "attention_income": 0.009354080101135106,
-          "attention_delta": -0.02723995416254618
+          "attention_energy": 0.9280764871960329,
+          "information_energy": 1.1217623081828758,
+          "attention_income": 0.09782559545806889,
+          "attention_delta": 0.0612315611943876
         },
         "4e0b8bd9-5f80-4c70-9fdb-d848885e8805": {
-          "attention_energy": 1.4862633811837318,
-          "information_energy": 0.20557642775309648,
-          "attention_income": 0.47149491417048506,
-          "attention_delta": 0.39830684564312246
+          "attention_energy": 0.43884952020823265,
+          "information_energy": -0.27838342459035614,
+          "attention_income": 0.19349032913910474,
+          "attention_delta": 0.12030226061174217
         },
         "5db7f68a-425d-4723-a09f-5b4d0d50d58d": {
           "attention_energy": 0.5005394266912052,
@@ -845,64 +857,70 @@
           "attention_delta": 0.0
         },
         "7761bd50-a67f-4b71-bb70-1803101d4b4d": {
-          "attention_energy": 1.077780226110475,
-          "information_energy": 1.2487431569607041,
-          "attention_income": 0.006598386140010083,
-          "attention_delta": -0.029995648123671205
+          "attention_energy": 1.2955447843267385,
+          "information_energy": 2.321299639428175,
+          "attention_income": 0.02460724732625269,
+          "attention_delta": -0.0119867869374286
         },
-        "78b6f114-cc59-4540-8133-4f7478350a29": {
-          "attention_energy": 0.6186924755830575,
-          "information_energy": 0.6186924755830575,
-          "attention_income": 0.0,
-          "attention_delta": 0.0
+        "7936521c-daa9-43bc-bdd3-b2580b3a2262": {
+          "attention_energy": 0.6280538539525256,
+          "information_energy": 0.9041757449396944,
+          "attention_income": 0.11321381136476474,
+          "attention_delta": 0.07984989260825531
         },
         "8a4aa0a6-d37e-40e7-bb35-dc8391877fb8": {
-          "attention_energy": 0.8853107286128563,
+          "attention_energy": 1.008564155056724,
           "information_energy": 3.6137677205857557,
-          "attention_income": 0.1966718124151947,
-          "attention_delta": 0.16330789365868528
+          "attention_income": 0.0,
+          "attention_delta": -0.033363918756509424
         },
         "94f70bcd-85e2-428b-ae87-b9c8c5b72541": {
-          "attention_energy": 0.20499910788685705,
-          "information_energy": 3.880172934229156,
-          "attention_income": 0.1966718124151947,
-          "attention_delta": 0.12994397490217585
+          "attention_energy": 0.8616729663984174,
+          "information_energy": 3.91541719134855,
+          "attention_income": 0.19730311375965534,
+          "attention_delta": 0.1305752762466365
         },
-        "afbc31c5-dc7a-4f54-8222-e3751f411289": {
-          "attention_energy": 1.3809496028053272,
-          "information_energy": 2.0354886351845956,
-          "attention_income": 0.0,
-          "attention_delta": -0.06672783751301885
+        "a6156706-2662-444c-aef9-c7da368fca3d": {
+          "attention_energy": 1.6864665517219901,
+          "information_energy": 1.40163938303498,
+          "attention_income": 0.7651814243844282,
+          "attention_delta": 0.7318175056279187
         },
-        "d2bcca3a-e4fc-4025-a331-4ca25a3f3ed7": {
-          "attention_energy": 1.7796554743044335,
-          "information_energy": 2.2153179130281546,
-          "attention_income": 0.22303427435540993,
-          "attention_delta": 0.18413990033155192
-        },
-        "da675d2a-3784-4217-b59a-60e1157d406a": {
+        "a8fad85c-f931-4464-82cc-d7c4dc569021": {
           "attention_energy": 0.6394370169848757,
           "information_energy": 0.6394370169848757,
           "attention_income": 0.0,
           "attention_delta": 0.0
         },
-        "dfad2c4b-d228-440a-a09f-1e0db138fe3e": {
-          "attention_energy": 1.2664929640049376,
-          "information_energy": 0.9041757449396944,
-          "attention_income": 0.7516529214171768,
-          "attention_delta": 0.7182890026606673
+        "afbc31c5-dc7a-4f54-8222-e3751f411289": {
+          "attention_energy": 0.2435852755355452,
+          "information_energy": 1.446922226930154,
+          "attention_income": 0.35370906586268336,
+          "attention_delta": 0.2869812283496645
         },
-        "f08bd08a-f499-4679-bab4-bece5d845844": {
-          "attention_energy": 2.3411015447570502,
-          "information_energy": 0.11670723992543036,
-          "attention_income": 0.1445217989853936,
-          "attention_delta": 0.07398864705562842
-        },
-        "f385c0e3-a7c5-4f74-9d82-ec05d834d935": {
-          "attention_energy": 0.5482039613442703,
-          "information_energy": 0.5482039613442703,
+        "c5753faf-6fea-4ff8-89f9-83666b615487": {
+          "attention_energy": 1.187640978329146,
+          "information_energy": 1.187640978329146,
           "attention_income": 0.0,
           "attention_delta": 0.0
+        },
+        "d2bcca3a-e4fc-4025-a331-4ca25a3f3ed7": {
+          "attention_energy": 1.7335122962575087,
+          "information_energy": 2.36202968253436,
+          "attention_income": 0.1558648176832191,
+          "attention_delta": 0.1169704436593611
+        },
+        "e9929853-ecb6-428b-aa3e-f205eda10b8a": {
+          "attention_energy": 1.1668964369273278,
+          "information_energy": 1.1668964369273278,
+          "attention_income": 0.0,
+          "attention_delta": 0.0
+        },
+        "f08bd08a-f499-4679-bab4-bece5d845844": {
+          "attention_energy": 1.5230263512534334,
+          "information_energy": -0.003150289546445084,
+          "attention_income": 0.09880459502182314,
+          "attention_delta": 0.028271443092057952
         }
       }
     },
@@ -910,28 +928,34 @@
       "time_step": 7,
       "agents": {
         "018b6e1e-f0ef-4e47-b67a-6e3efaebcfa8": {
-          "attention_energy": -0.017097912155698114,
-          "information_energy": 2.089296531042088,
-          "attention_income": 0.2804457268996126,
+          "attention_energy": -0.40007416926449063,
+          "information_energy": 2.4406472890163196,
+          "attention_income": 0.15779908336621326,
           "attention_delta": 0.0
         },
         "36a3c1d3-d7a6-4e54-9f1c-7e14fa7ae0d5": {
-          "attention_energy": 1.0607411305464878,
-          "information_energy": 1.4691429679672412,
-          "attention_income": 0.23441555632229805,
-          "attention_delta": 0.19782152205861675
+          "attention_energy": 0.8914824529323516,
+          "information_energy": 1.648700947892388,
+          "attention_income": 0.0,
+          "attention_delta": -0.03659403426368129
         },
-        "4b6d6a66-9db9-4aff-823b-c1c33f52b13b": {
-          "attention_energy": 0.5482039613442703,
-          "information_energy": 0.5482039613442703,
+        "39fef8cc-9610-46a2-b339-096143c240ed": {
+          "attention_energy": 0.6186924755830575,
+          "information_energy": 0.6186924755830575,
+          "attention_income": 0.0,
+          "attention_delta": 0.0
+        },
+        "45ed2fae-c753-4194-98de-dc5ffb87061e": {
+          "attention_energy": 0.6186924755830575,
+          "information_energy": 0.6186924755830575,
           "attention_income": 0.0,
           "attention_delta": 0.0
         },
         "4e0b8bd9-5f80-4c70-9fdb-d848885e8805": {
-          "attention_energy": 1.4130753126563693,
-          "information_energy": 0.5457760976841713,
-          "attention_income": 0.0,
-          "attention_delta": -0.07318806852736258
+          "attention_energy": 0.43884952020823265,
+          "information_energy": -0.27838342459035614,
+          "attention_income": 0.19349032913910474,
+          "attention_delta": 0.0
         },
         "5db7f68a-425d-4723-a09f-5b4d0d50d58d": {
           "attention_energy": 0.5005394266912052,
@@ -939,83 +963,83 @@
           "attention_income": 0.7099803545468555,
           "attention_delta": 0.0
         },
-        "6888655e-9285-49ac-a1db-59c3d456745a": {
-          "attention_energy": 0.6186924755830575,
-          "information_energy": 0.6186924755830575,
-          "attention_income": 0.0,
-          "attention_delta": 0.0
-        },
         "7761bd50-a67f-4b71-bb70-1803101d4b4d": {
-          "attention_energy": 1.115271486753507,
-          "information_energy": 2.08103922403659,
-          "attention_income": 0.07408529490671326,
-          "attention_delta": 0.037491260643031966
+          "attention_energy": 1.2589507500630572,
+          "information_energy": 2.7151087843450235,
+          "attention_income": 0.0,
+          "attention_delta": -0.03659403426368129
         },
-        "78b6f114-cc59-4540-8133-4f7478350a29": {
-          "attention_energy": 0.7962587399470957,
-          "information_energy": 1.5887357091403467,
-          "attention_income": 0.21093018312054762,
-          "attention_delta": 0.1775662643640382
+        "7936521c-daa9-43bc-bdd3-b2580b3a2262": {
+          "attention_energy": 0.5946899351960161,
+          "information_energy": 1.8601475285351188,
+          "attention_income": 0.0,
+          "attention_delta": -0.033363918756509424
         },
         "8a4aa0a6-d37e-40e7-bb35-dc8391877fb8": {
-          "attention_energy": 1.0424866318866788,
+          "attention_energy": 0.5238966994580289,
           "information_energy": 3.993433660003597,
-          "attention_income": 0.8425962163698989,
-          "attention_delta": 0.7758683788568801
+          "attention_income": 0.20075285749738125,
+          "attention_delta": 0.1340250199843624
         },
         "94f70bcd-85e2-428b-ae87-b9c8c5b72541": {
-          "attention_energy": -0.415695309164934,
-          "information_energy": 4.231523692203388,
-          "attention_income": 0.0647258960442853,
-          "attention_delta": -0.002001941468733545
+          "attention_energy": 0.8900322434359914,
+          "information_energy": 4.266767949322781,
+          "attention_income": 0.7137795901336503,
+          "attention_delta": 0.6470517526206315
         },
-        "97eeed96-3182-4982-896e-a0b93ccf36e8": {
+        "a05aa90c-869a-4379-9585-3a0fefb00d57": {
           "attention_energy": 0.5482039613442703,
           "information_energy": 0.5482039613442703,
           "attention_income": 0.0,
           "attention_delta": 0.0
         },
-        "a2bdfc64-ed6b-4974-879e-3a3182f9fd9d": {
-          "attention_energy": 0.6186924755830575,
-          "information_energy": 0.6186924755830575,
+        "a33cee89-896e-41c0-a0ee-dfb6a73ef576": {
+          "attention_energy": 0.5482039613442703,
+          "information_energy": 0.5482039613442703,
           "attention_income": 0.0,
           "attention_delta": 0.0
         },
-        "afbc31c5-dc7a-4f54-8222-e3751f411289": {
-          "attention_energy": 0.766017803948038,
-          "information_energy": 1.6700575845416026,
+        "a6156706-2662-444c-aef9-c7da368fca3d": {
+          "attention_energy": 1.7867220273922757,
+          "information_energy": 1.7886128367609413,
+          "attention_income": 0.13361939442679494,
+          "attention_delta": 0.1002554756702855
+        },
+        "a8fad85c-f931-4464-82cc-d7c4dc569021": {
+          "attention_energy": 0.6057324532615826,
+          "information_energy": 0.4528983603595549,
           "attention_income": 0.0,
-          "attention_delta": -0.06672783751301885
+          "attention_delta": -0.03370456372329301
+        },
+        "afbc31c5-dc7a-4f54-8222-e3751f411289": {
+          "attention_energy": 0.09674948892099677,
+          "information_energy": 1.1006786332747822,
+          "attention_income": 0.4680960122427407,
+          "attention_delta": 0.40136817472972186
+        },
+        "c5753faf-6fea-4ff8-89f9-83666b615487": {
+          "attention_energy": 1.1542770595726366,
+          "information_energy": 1.5586127619245702,
+          "attention_income": 8.945698919243355e-17,
+          "attention_delta": -0.033363918756509334
         },
         "d2bcca3a-e4fc-4025-a331-4ca25a3f3ed7": {
-          "attention_energy": 1.333623436201814,
-          "information_energy": 2.0445738321473623,
-          "attention_income": 0.17996067128936669,
-          "attention_delta": 0.10217192324165066
+          "attention_energy": 1.5912717325649548,
+          "information_energy": 2.3231912275724875,
+          "attention_income": 0.48375214569943276,
+          "attention_delta": 0.40596339765171674
         },
-        "da675d2a-3784-4217-b59a-60e1157d406a": {
-          "attention_energy": 0.6109423426931532,
-          "information_energy": 0.43734301257785635,
+        "e9929853-ecb6-428b-aa3e-f205eda10b8a": {
+          "attention_energy": 1.1335325181708185,
+          "information_energy": 2.1169396704846166,
           "attention_income": 0.0,
-          "attention_delta": -0.028494674291722442
-        },
-        "dfad2c4b-d228-440a-a09f-1e0db138fe3e": {
-          "attention_energy": 1.516731253656372,
-          "information_energy": 1.8601475285351188,
-          "attention_income": 0.28360220840794365,
-          "attention_delta": 0.25023828965143424
+          "attention_delta": -0.033363918756509424
         },
         "f08bd08a-f499-4679-bab4-bece5d845844": {
-          "attention_energy": 2.3802523663662316,
-          "information_energy": 0.1427776230702939,
-          "attention_income": 0.10968397353894663,
-          "attention_delta": 0.039150821609181444
-        },
-        "f385c0e3-a7c5-4f74-9d82-ec05d834d935": {
-          "attention_energy": 0.5148400425877608,
-          "information_energy": 0.9041757449396944,
-          "attention_income": 2.4154750641080034e-19,
-          "attention_delta": -0.033363918756509424
+          "attention_energy": 1.5230263512534334,
+          "information_energy": -0.003150289546445084,
+          "attention_income": 0.09880459502182314,
+          "attention_delta": 0.0
         }
       }
     },
@@ -1023,28 +1047,52 @@
       "time_step": 8,
       "agents": {
         "018b6e1e-f0ef-4e47-b67a-6e3efaebcfa8": {
-          "attention_energy": -0.017097912155698114,
-          "information_energy": 2.089296531042088,
-          "attention_income": 0.2804457268996126,
+          "attention_energy": -0.40007416926449063,
+          "information_energy": 2.4406472890163196,
+          "attention_income": 0.15779908336621326,
           "attention_delta": 0.0
         },
         "36a3c1d3-d7a6-4e54-9f1c-7e14fa7ae0d5": {
-          "attention_energy": 1.0241470962828065,
-          "information_energy": 1.7931228149068716,
-          "attention_income": 0.0,
-          "attention_delta": -0.03659403426368129
+          "attention_energy": 0.9453907846508041,
+          "information_energy": 2.1228012813466517,
+          "attention_income": 0.09050236598213372,
+          "attention_delta": 0.05390833171845243
         },
-        "4b6d6a66-9db9-4aff-823b-c1c33f52b13b": {
-          "attention_energy": 0.7302702551079154,
-          "information_energy": 0.8923757449396944,
-          "attention_income": 0.2187806087311655,
-          "attention_delta": 0.18206629376364514
+        "37d50b04-5433-48fa-8b25-c4435ad1dceb": {
+          "attention_energy": 1.237384951166115,
+          "information_energy": 1.237384951166115,
+          "attention_income": 0.0,
+          "attention_delta": 0.0
+        },
+        "39fef8cc-9610-46a2-b339-096143c240ed": {
+          "attention_energy": 0.7797165858517484,
+          "information_energy": 1.4564815958111788,
+          "attention_income": 0.1943880290252003,
+          "attention_delta": 0.16102411026869087
+        },
+        "42967cd2-ba61-4d88-8ab0-2a37aa651499": {
+          "attention_energy": 0.6186924755830575,
+          "information_energy": 0.6186924755830575,
+          "attention_income": 0.0,
+          "attention_delta": 0.0
+        },
+        "45ed2fae-c753-4194-98de-dc5ffb87061e": {
+          "attention_energy": 0.585328556826548,
+          "information_energy": 1.5970508905839569,
+          "attention_income": 0.0,
+          "attention_delta": -0.033363918756509424
+        },
+        "4bf7b71c-6e30-4017-b222-d178ed7ad639": {
+          "attention_energy": 0.5482039613442703,
+          "information_energy": 0.5482039613442703,
+          "attention_income": 0.0,
+          "attention_delta": 0.0
         },
         "4e0b8bd9-5f80-4c70-9fdb-d848885e8805": {
-          "attention_energy": 1.453176868163922,
-          "information_energy": 0.7755163839634955,
-          "attention_income": 0.11328962403491531,
-          "attention_delta": 0.04010155550755273
+          "attention_energy": 0.43884952020823265,
+          "information_energy": -0.27838342459035614,
+          "attention_income": 0.19349032913910474,
+          "attention_delta": 0.0
         },
         "5db7f68a-425d-4723-a09f-5b4d0d50d58d": {
           "attention_energy": 0.5005394266912052,
@@ -1052,101 +1100,89 @@
           "attention_income": 0.7099803545468555,
           "attention_delta": 0.0
         },
-        "5e875953-b164-41c5-91ad-a71f35ae5c8a": {
-          "attention_energy": 1.1668964369273278,
-          "information_energy": 1.1668964369273278,
-          "attention_income": 0.0,
-          "attention_delta": 0.0
-        },
-        "6888655e-9285-49ac-a1db-59c3d456745a": {
-          "attention_energy": 0.585328556826548,
-          "information_energy": 1.5687357091403467,
-          "attention_income": 0.0,
-          "attention_delta": -0.033363918756509424
-        },
-        "72e3dd09-d30b-46ee-9a18-de363bb78472": {
-          "attention_energy": 0.5482039613442703,
-          "information_energy": 0.5482039613442703,
-          "attention_income": 0.0,
-          "attention_delta": 0.0
-        },
         "7761bd50-a67f-4b71-bb70-1803101d4b4d": {
-          "attention_energy": 1.0786774524898257,
-          "information_energy": 2.911126610187174,
+          "attention_energy": 1.222356715799376,
+          "information_energy": 3.211126610187174,
           "attention_income": 0.0,
           "attention_delta": -0.03659403426368129
         },
-        "78b6f114-cc59-4540-8133-4f7478350a29": {
-          "attention_energy": 1.089391729586929,
-          "information_energy": 2.5587789426976357,
-          "attention_income": 0.3264969083963429,
-          "attention_delta": 0.2931329896398335
+        "7936521c-daa9-43bc-bdd3-b2580b3a2262": {
+          "attention_energy": 0.5613260164395066,
+          "information_energy": 2.008025854294396,
+          "attention_income": 0.0,
+          "attention_delta": -0.033363918756509424
         },
         "8a4aa0a6-d37e-40e7-bb35-dc8391877fb8": {
-          "attention_energy": 0.44105145447550276,
-          "information_energy": 4.408343856540832,
-          "attention_income": 0.04874087856550675,
-          "attention_delta": -0.0179869589475121
+          "attention_energy": -0.39624925601378735,
+          "information_energy": 3.754407123838381,
+          "attention_income": 0.38396683320731767,
+          "attention_delta": 0.3172389956942988
         },
         "94f70bcd-85e2-428b-ae87-b9c8c5b72541": {
-          "attention_energy": -0.415695309164934,
-          "information_energy": 4.231523692203388,
-          "attention_income": 0.0647258960442853,
-          "attention_delta": 0.0
+          "attention_energy": 0.40638036966853786,
+          "information_energy": 4.618118707297012,
+          "attention_income": 0.20176843932862287,
+          "attention_delta": 0.135040601815604
         },
-        "97eeed96-3182-4982-896e-a0b93ccf36e8": {
+        "a05aa90c-869a-4379-9585-3a0fefb00d57": {
+          "attention_energy": 0.5148400425877608,
+          "information_energy": 0.8918606631973058,
+          "attention_income": 0.0,
+          "attention_delta": -0.033363918756509424
+        },
+        "a33cee89-896e-41c0-a0ee-dfb6a73ef576": {
           "attention_energy": 0.5093095873204123,
-          "information_energy": 0.45969678222792404,
+          "information_energy": 0.44969678222792403,
           "attention_income": 0.0,
           "attention_delta": -0.038894374023858015
         },
-        "a2bdfc64-ed6b-4974-879e-3a3182f9fd9d": {
-          "attention_energy": 0.6872680420648392,
-          "information_energy": 1.617050890583957,
-          "attention_income": 0.10193948523829104,
-          "attention_delta": 0.06857556648178162
+        "a6156706-2662-444c-aef9-c7da368fca3d": {
+          "attention_energy": 0.8665760719204593,
+          "information_energy": 0.9352013393207873,
+          "attention_income": 0.38396683320731767,
+          "attention_delta": 0.3172389956942988
+        },
+        "a8fad85c-f931-4464-82cc-d7c4dc569021": {
+          "attention_energy": 0.5720278895382896,
+          "information_energy": 1.6827685834294681,
+          "attention_income": 0.0,
+          "attention_delta": -0.03370456372329301
         },
         "afbc31c5-dc7a-4f54-8222-e3751f411289": {
-          "attention_energy": 0.70949034202823,
-          "information_energy": 1.3453643119428214,
-          "attention_income": 0.5584043369374813,
-          "attention_delta": 0.4916764994244624
+          "attention_energy": 0.5433628170720208,
+          "information_energy": 1.4591690194207645,
+          "attention_income": 0.513341165664043,
+          "attention_delta": 0.4466133281510241
+        },
+        "c5753faf-6fea-4ff8-89f9-83666b615487": {
+          "attention_energy": 1.1209131408161273,
+          "information_energy": 1.9295845455199943,
+          "attention_income": 0.0,
+          "attention_delta": -0.033363918756509424
         },
         "d2bcca3a-e4fc-4025-a331-4ca25a3f3ed7": {
-          "attention_energy": 0.21331917333584105,
-          "information_energy": 1.2637449051295717,
-          "attention_income": 0.08913666498967729,
-          "attention_delta": 0.011347916941961259
+          "attention_energy": 1.1973453567583334,
+          "information_energy": 2.1591110873147765,
+          "attention_income": 0.23206633358536477,
+          "attention_delta": 0.15427758553764875
         },
-        "da675d2a-3784-4217-b59a-60e1157d406a": {
-          "attention_energy": 0.7863847449438397,
-          "information_energy": 0.43981119153912274,
-          "attention_income": 0.203937076542409,
-          "attention_delta": 0.17544240225068655
-        },
-        "dfad2c4b-d228-440a-a09f-1e0db138fe3e": {
-          "attention_energy": 1.7424015466355114,
-          "information_energy": 2.2161193121305427,
-          "attention_income": 0.25903421173564883,
-          "attention_delta": 0.2256702929791394
-        },
-        "ef13e1d8-29e1-4964-aea0-9a1a95bc84ec": {
-          "attention_energy": 0.5482039613442703,
-          "information_energy": 0.5482039613442703,
+        "dd7f06d5-acb6-41c9-9283-04f6b571c4e9": {
+          "attention_energy": 1.237384951166115,
+          "information_energy": 1.237384951166115,
           "attention_income": 0.0,
           "attention_delta": 0.0
         },
-        "f08bd08a-f499-4679-bab4-bece5d845844": {
-          "attention_energy": 2.342330500740219,
-          "information_energy": -0.05100952325671798,
-          "attention_income": 0.03261128630375252,
-          "attention_delta": -0.037921865626012664
+        "e9929853-ecb6-428b-aa3e-f205eda10b8a": {
+          "attention_energy": 1.1001685994143091,
+          "information_energy": 3.0669829040419057,
+          "attention_income": 0.0,
+          "attention_delta": -0.033363918756509424
         },
-        "f385c0e3-a7c5-4f74-9d82-ec05d834d935": {
-          "attention_energy": 0.529105042356061,
-          "information_energy": 1.2601475285351187,
-          "attention_income": 0.047628918524809605,
-          "attention_delta": 0.01426499976830018
+        "f08bd08a-f499-4679-bab4-bece5d845844": {
+          "attention_energy": 1.5230263512534334,
+          "information_energy": -0.003150289546445084,
+          "attention_income": 0.09880459502182314,
+          "attention_delta": 0.0
         }
       }
     }
