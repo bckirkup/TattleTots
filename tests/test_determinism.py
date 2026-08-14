@@ -80,7 +80,6 @@ def _run_payload(
     reproduction_information_scale: float = 1.0,
     reproduction_attention_scale: float = 1.0,
     grounding_quality_strength: float = 0.5,
-    attention_trace: dict[int, dict[str, float]] | None = None,
 ) -> dict[str, object]:
     scenario = GaussianShiftScenario(seed=seed, total_steps=steps)
     config = SimulationConfig(
@@ -106,8 +105,6 @@ def _run_payload(
         scenario.step(step)
         world.set_event_state(scenario.get_active_locations(step))
         world.step()
-        if attention_trace is not None:
-            attention_trace[step + 1] = dict(world._attention_deltas)
 
     return {
         "agents": sorted(world.agents),
