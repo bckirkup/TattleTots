@@ -78,10 +78,10 @@ def _sum_metric(payload: dict[str, object], key: str) -> int:
     return sum(int(record[key]) for record in _records(payload))
 
 
-# Change-detector only, not a correctness check. Re-derive it from these IDs and
-# integer telemetry fields if a structural change intentionally updates it.
+# Optional structure-only diagnostic: this intentionally ignores float telemetry
+# and has no pinned expected value or correctness claim.
 def _structural_fingerprint(payload: dict[str, object]) -> str:
-    """Hash stable IDs and integer telemetry as a change-detector only."""
+    """Summarize stable IDs and integer telemetry for structural debugging."""
     structural = {
         "agents": payload["agents"],
         "streams": payload["streams"],
@@ -109,22 +109,26 @@ def _structural_fingerprint(payload: dict[str, object]) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-# Invariants: seeded runs must reproduce stable structure and integer outcomes.
-def test_same_seed_reproduces_the_complete_run() -> None:
-    first = _structural_fingerprint(_run_payload(42))
-    second = _structural_fingerprint(_run_payload(42))
+# Invariants: seeded runs must reproduce the complete float-valued payload.
+def _serialized_payload(payload: dict[str, object]) -> str:
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"))
+
+
+def test_same_seed_reproduces_the_complete_float_payload() -> None:
+    first = _run_payload(42)
+    second = _run_payload(42)
 
     assert first == second
 
 
-def test_same_seed_has_zero_fingerprint_spread_across_repeated_runs() -> None:
-    fingerprints = {_structural_fingerprint(_run_payload(42)) for _ in range(10)}
+def test_same_seed_has_zero_full_payload_spread_across_repeated_runs() -> None:
+    payloads = {_serialized_payload(_run_payload(42)) for _ in range(10)}
 
-    assert len(fingerprints) == 1
+    assert len(payloads) == 1
 
 
-def test_different_seed_changes_the_complete_run() -> None:
-    assert _structural_fingerprint(_run_payload(42)) != _structural_fingerprint(_run_payload(43))
+def test_different_seed_changes_the_complete_float_payload() -> None:
+    assert _run_payload(42) != _run_payload(43)
 
 
 def test_stable_id_digest_has_a_process_independent_golden_value() -> None:
@@ -172,31 +176,9 @@ payload = {
     "users": sorted(world.users),
     "records": [asdict(record) for record in world.telemetry.history],
 }
-structural = {
-    "agents": payload["agents"],
-    "streams": payload["streams"],
-    "users": payload["users"],
-    "records": [
-        {
-            key: record[key]
-            for key in (
-                "time_step",
-                "population",
-                "births",
-                "deaths",
-                "reports_issued",
-                "correct_reports",
-                "false_alarms",
-                "active_location_count",
-                "n_streams",
-            )
-        }
-        for record in payload["records"]
-    ],
-}
-print(hashlib.sha256(json.dumps(structural, sort_keys=True, separators=(",", ":")).encode()).hexdigest())
+print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
 """
-    fingerprints: list[str] = []
+    payloads: list[str] = []
     for hash_seed in ("0", "1"):
         env = os.environ.copy()
         env["PYTHONHASHSEED"] = hash_seed
@@ -209,9 +191,9 @@ print(hashlib.sha256(json.dumps(structural, sort_keys=True, separators=(",", ":"
             capture_output=True,
             text=True,
         )
-        fingerprints.append(result.stdout.strip())
+        payloads.append(result.stdout.strip())
 
-    assert fingerprints[0] == fingerprints[1]
+    assert payloads[0] == payloads[1]
 
 
 # Sensitivity: mechanism-driven telemetry must move in the expected direction.
@@ -243,32 +225,46 @@ def test_grounding_quality_strength_increases_effective_grounded_share() -> None
     assert shares[-1] - shares[0] >= 0.1
 
 
-def test_information_requirement_scale_reduces_population() -> None:
+def test_information_requirement_scale_reduces_mean_information_energy() -> None:
+    # Ten seeds average out trajectory noise while keeping this sweep fast.
+    seeds = range(42, 52)
     values = (0.5, 1.0, 2.0)
-    populations = [
-        _mean_metric(
-            _run_payload(42, steps=40, reproduction_information_scale=value),
-            "population",
+    mean_energies = [
+        sum(
+            _mean_metric(
+                _run_payload(seed, steps=40, reproduction_information_scale=value),
+                "mean_info_energy",
+            )
+            for seed in seeds
         )
+        / len(seeds)
         for value in values
     ]
 
-    assert populations[0] > populations[-1]
-    assert populations[0] - populations[-1] >= 0.5
+    assert mean_energies[0] > mean_energies[1] > mean_energies[2]
+    span_fraction = (mean_energies[0] - mean_energies[-1]) / mean_energies[0]
+    assert span_fraction >= 0.05
 
 
-def test_attention_requirement_scale_reduces_population() -> None:
-    values = (1.0, 1.5, 2.0)
-    populations = [
-        _mean_metric(
-            _run_payload(42, steps=40, reproduction_attention_scale=value),
-            "population",
+def test_attention_requirement_scale_increases_mean_attention_energy() -> None:
+    # Ten seeds use the same trajectory-noise control as the information sweep.
+    seeds = range(42, 52)
+    values = (0.5, 1.0, 2.0)
+    mean_energies = [
+        sum(
+            _mean_metric(
+                _run_payload(seed, steps=40, reproduction_attention_scale=value),
+                "mean_attn_energy",
+            )
+            for seed in seeds
         )
+        / len(seeds)
         for value in values
     ]
 
-    assert populations[0] > populations[1] > populations[2]
-    assert populations[0] - populations[-1] >= 1.0
+    assert mean_energies[0] < mean_energies[1] < mean_energies[2]
+    span_fraction = (mean_energies[-1] - mean_energies[0]) / mean_energies[0]
+    assert span_fraction >= 0.05
 
 
 def test_unrelated_reproduction_knob_does_not_change_event_locations() -> None:
