@@ -128,10 +128,22 @@ in-process with another test using the same sensor class.
 
 State-independence requires an optional
 `state_independence_factory` returning two adapters with matching sensor
-configuration and different hidden state. Without that hook the report
-explicitly records the check as **not exercised** rather than passing it.
-`assert_adapter_conformance(...)` is a thin pytest-friendly wrapper that
-raises an assertion containing all failed findings.
+configuration and different hidden state. Static sensor-inventory declarations
+(`sensor_coordinates`, `footprints`, `resolution`, and `modality`) must always
+match: instrument placement and capability cannot depend on what an instrument
+observes. `identity` is also treated as static when it identifies a fixed
+instrument. For a mobile or cooperative stream, an identity paired with a
+changing reported coordinate is part of the observation and is reported with
+the dynamic fields. Dynamic `coordinates` and status vectors describe
+observations, so differences are reported informationally by default. This
+allows cooperative or mobile instruments to report a moving vessel or to go
+missing when it goes dark; those changes are evidence, not declaration leaks.
+Pass `strict_state_independence=True` to require dynamic coordinates and
+statuses to match too, which is appropriate for fixed-coverage instruments.
+Without the factory the report explicitly records the check as **not
+exercised** rather than passing it. `assert_adapter_conformance(...)` accepts
+the same strict flag and is a thin pytest-friendly wrapper that raises an
+assertion containing all failed findings.
 
 ### Available Domain Adapters
 

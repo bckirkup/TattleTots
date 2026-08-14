@@ -40,6 +40,8 @@ class _FixtureAdapter(DomainAdapter):
         wrong_decoder: bool = False,
         bypass_stream: bool = False,
         unpublished_sensor: bool = False,
+        leak_geometry: bool = False,
+        leak_identity: bool = False,
     ) -> None:
         self._probe = _Probe()
         self._unpublished_probe = _Probe() if unpublished_sensor else None
@@ -47,6 +49,10 @@ class _FixtureAdapter(DomainAdapter):
         self._leak_status = leak_status
         self._wrong_decoder = wrong_decoder
         self._bypass_stream = bypass_stream
+        self._leak_geometry = leak_geometry
+        self._leak_identity = leak_identity
+        coordinate = (2.0, 2.0) if leak_geometry and hidden_state else (1.0, 1.0)
+        identity = "hidden" if leak_identity and hidden_state else "fixed"
         self._stream = Stream(
             stream_type=StreamType.RAW,
             dimensionality=1,
@@ -54,11 +60,11 @@ class _FixtureAdapter(DomainAdapter):
             current_data=np.zeros(1, dtype=np.float64),
             current_status=np.array([ObservationStatus.OBSERVED.value]),
             metadata=StreamMetadata(
-                coordinates=[(1.0, 1.0)],
-                sensor_coordinates=[(1.0, 1.0)],
+                coordinates=[coordinate],
+                sensor_coordinates=[coordinate],
                 modality=["signal"],
-                identity=[None],
-                footprints=[(1.0, 1.0)],
+                identity=[identity],
+                footprints=[coordinate],
                 resolution=[1.0],
             ),
         )
@@ -255,6 +261,20 @@ def _leaking_state_factory() -> tuple[DomainAdapter, DomainAdapter]:
     )
 
 
+def _leaking_geometry_factory() -> tuple[DomainAdapter, DomainAdapter]:
+    return (
+        _FixtureAdapter(),
+        _FixtureAdapter(hidden_state=True, leak_geometry=True),
+    )
+
+
+def _leaking_identity_factory() -> tuple[DomainAdapter, DomainAdapter]:
+    return (
+        _FixtureAdapter(),
+        _FixtureAdapter(hidden_state=True, leak_identity=True),
+    )
+
+
 def _finding_checks(report) -> set[AdapterConformanceCheck]:
     return {finding.check for finding in report.findings if not finding.passed}
 
@@ -351,14 +371,77 @@ def test_wrong_field_arithmetic_decoder_is_caught_by_round_trip() -> None:
     assert report.decoder_failures
 
 
-def test_state_dependent_status_is_caught_by_state_check() -> None:
+def test_state_dependent_status_is_informational_by_default() -> None:
     report = validate_adapter_conformance(
         _FixtureAdapter(leak_status=True),
         steps=3,
         state_independence_factory=_leaking_state_factory,
     )
 
+    assert report.valid
+    finding = next(
+        finding
+        for finding in report.findings
+        if finding.check == AdapterConformanceCheck.STATE_INDEPENDENCE
+    )
+    assert finding.passed
+    assert "published_signal.status" in finding.message
+    assert "informational" in finding.message
+
+
+def test_state_dependent_status_fails_under_strict_state_check() -> None:
+    report = validate_adapter_conformance(
+        _FixtureAdapter(leak_status=True),
+        steps=3,
+        state_independence_factory=_leaking_state_factory,
+        strict_state_independence=True,
+    )
+
     assert _finding_checks(report) == {AdapterConformanceCheck.STATE_INDEPENDENCE}
+    assert (
+        "Strict state-independence failed"
+        in next(
+            finding
+            for finding in report.findings
+            if finding.check == AdapterConformanceCheck.STATE_INDEPENDENCE
+        ).message
+    )
+
+
+def test_state_dependent_static_geometry_fails_in_both_modes() -> None:
+    for strict in (False, True):
+        report = validate_adapter_conformance(
+            _FixtureAdapter(),
+            steps=3,
+            state_independence_factory=_leaking_geometry_factory,
+            strict_state_independence=strict,
+        )
+
+        assert _finding_checks(report) == {AdapterConformanceCheck.STATE_INDEPENDENCE}
+        finding = next(
+            finding
+            for finding in report.findings
+            if finding.check == AdapterConformanceCheck.STATE_INDEPENDENCE
+        )
+        assert "sensor_coordinates declaration" in finding.message
+
+
+def test_state_dependent_fixed_identity_fails_in_both_modes() -> None:
+    for strict in (False, True):
+        report = validate_adapter_conformance(
+            _FixtureAdapter(),
+            steps=3,
+            state_independence_factory=_leaking_identity_factory,
+            strict_state_independence=strict,
+        )
+
+        assert _finding_checks(report) == {AdapterConformanceCheck.STATE_INDEPENDENCE}
+        finding = next(
+            finding
+            for finding in report.findings
+            if finding.check == AdapterConformanceCheck.STATE_INDEPENDENCE
+        )
+        assert "identity declaration" in finding.message
 
 
 def test_missing_state_hook_is_explicitly_not_exercised() -> None:
