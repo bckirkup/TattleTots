@@ -330,7 +330,7 @@ def test_seeded_runs_have_structural_golden_change_detector() -> None:
     references = _load_structural_references()
     diagnostics = _structural_diagnostics(references, payloads)
     if diagnostics:
-        pytest.fail(diagnostics)
+        pytest.fail("\n".join([diagnostics, _environment_diagnostics()]))
 
 
 def test_float_telemetry_matches_both_run_references() -> None:
