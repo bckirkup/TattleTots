@@ -26,9 +26,9 @@ from tattletots.scenarios.gaussian_shift import GaussianShiftScenario
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FLOAT_REFERENCE_PATH = REPO_ROOT / "tests" / "data" / "determinism_float_references.json"
-# CHANGE DETECTOR, not a correctness check. This hash covers only the
-# float-free structure of both seeded runs; it does not validate float telemetry.
-EXPECTED_STRUCTURAL_FINGERPRINT = "aa1231053791820c27bc599370e56b51bf2148c1dc30e1550528344cb49207da"
+STRUCTURAL_REFERENCE_PATH = REPO_ROOT / "tests" / "data" / "determinism_structural_references.json"
+# CHANGE DETECTOR, not a correctness check. These references cover only the
+# float-free structure of both seeded runs; they do not validate float telemetry.
 
 
 def _canonicalize(value: object) -> object:
@@ -55,13 +55,46 @@ def _structural_projection(value: object) -> object:
     if isinstance(value, list):
         return [_structural_projection(item) for item in value if not isinstance(item, float)]
     if isinstance(value, tuple):
-        return tuple(_structural_projection(item) for item in value if not isinstance(item, float))
+        return [_structural_projection(item) for item in value if not isinstance(item, float)]
     return value
 
 
-def _structural_fingerprint(value: object) -> str:
-    encoded = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
-    return hashlib.sha256(encoded).hexdigest()
+def _load_structural_references() -> dict[str, object]:
+    return json.loads(STRUCTURAL_REFERENCE_PATH.read_text(encoding="utf-8"))
+
+
+def _structural_differences(
+    expected: object,
+    actual: object,
+    path: str,
+) -> list[tuple[str, object, object]]:
+    if isinstance(expected, dict) and isinstance(actual, dict):
+        differences = []
+        for key in sorted(set(expected) | set(actual)):
+            child_path = f"{path} {key}" if path in {"default", "legacy"} else f"{path}.{key}"
+            if key not in expected:
+                differences.append((child_path, "<missing>", actual[key]))
+            elif key not in actual:
+                differences.append((child_path, expected[key], "<missing>"))
+            else:
+                differences.extend(_structural_differences(expected[key], actual[key], child_path))
+        return differences
+    if isinstance(expected, list) and isinstance(actual, list):
+        differences = []
+        for index in range(max(len(expected), len(actual))):
+            child_path = f"{path}[{index}]"
+            if index >= len(expected):
+                differences.append((child_path, "<missing>", actual[index]))
+            elif index >= len(actual):
+                differences.append((child_path, expected[index], "<missing>"))
+            else:
+                differences.extend(
+                    _structural_differences(expected[index], actual[index], child_path)
+                )
+        return differences
+    if expected != actual:
+        return [(path, expected, actual)]
+    return []
 
 
 def _float_fields(record: dict[str, object]) -> dict[str, float]:
@@ -139,6 +172,10 @@ def _environment_diagnostics() -> str:
     config = io.StringIO()
     with redirect_stdout(config):
         np.show_config()
+    runtime = io.StringIO()
+    with redirect_stdout(runtime):
+        if hasattr(np, "show_runtime"):
+            np.show_runtime()
     return "\n".join(
         [
             f"python: {platform.python_version()} ({sys.executable})",
@@ -146,6 +183,8 @@ def _environment_diagnostics() -> str:
             f"scipy: {scipy.__version__}",
             "numpy.show_config():",
             config.getvalue().rstrip(),
+            "numpy.show_runtime():",
+            runtime.getvalue().rstrip() or "unavailable",
         ]
     )
 
@@ -174,6 +213,7 @@ def _assert_float_telemetry(
     records = payload["records"]
     assert isinstance(records, list)
     assert len(records) == len(references), f"{label} record count changed"
+    differences: list[tuple[float, str, float, float]] = []
     for index, (record, reference) in enumerate(zip(records, references, strict=True)):
         assert isinstance(record, dict)
         actual_fields = _float_fields(record)
@@ -188,26 +228,109 @@ def _assert_float_telemetry(
                 relative_difference = (
                     abs(actual - expected) / abs(expected) if expected else abs(actual)
                 )
-                pytest.fail(
-                    f"{label} record[{index}].{field} differs: "
-                    f"expected={expected!r} actual={actual!r} "
-                    f"relative difference={relative_difference:.17g}\n"
-                    f"{_environment_diagnostics()}"
+                differences.append(
+                    (
+                        relative_difference,
+                        f"{label} records[{index}].{field}",
+                        expected,
+                        actual,
+                    )
                 )
+    if differences:
+        differences.sort(reverse=True)
+        lines = [
+            f"float telemetry differences: showing {min(20, len(differences))} "
+            f"of {len(differences)}",
+        ]
+        lines.extend(
+            f"{path}: expected={expected!r} actual={actual!r} "
+            f"relative difference={relative_difference:.17g}"
+            for relative_difference, path, expected, actual in differences[:20]
+        )
+        pytest.fail("\n".join([*lines, _environment_diagnostics()]))
+
+
+def _step_summary(record: object) -> str:
+    if not isinstance(record, dict):
+        return "invalid"
+    return (
+        f"time_step={record.get('time_step')}, "
+        f"population={record.get('population')}, "
+        f"n_adults={record.get('n_adults')}, "
+        f"n_streams={record.get('n_streams')}"
+    )
+
+
+def _structural_diagnostics(
+    expected: dict[str, object],
+    actual_payloads: dict[str, dict[str, object]],
+) -> str:
+    actual = {label: _structural_projection(payload) for label, payload in actual_payloads.items()}
+    differences = [
+        difference
+        for label in ("default", "legacy")
+        for difference in _structural_differences(expected[label], actual[label], label)
+    ]
+    if not differences:
+        return ""
+    lines = [
+        f"structural differences: showing {min(40, len(differences))} of {len(differences)}",
+    ]
+    lines.extend(
+        f"{path}: expected={expected_value!r} actual={actual_value!r}"
+        for path, expected_value, actual_value in differences[:40]
+    )
+    lines.extend(
+        [
+            "",
+            "id-list lengths:",
+            "run      | expected agents/streams/users | actual agents/streams/users",
+        ]
+    )
+    for label in ("default", "legacy"):
+        expected_run = expected[label]
+        actual_run = actual[label]
+        expected_lengths = "/".join(
+            str(len(expected_run[key])) for key in ("agents", "streams", "users")
+        )
+        actual_lengths = "/".join(
+            str(len(actual_run[key])) for key in ("agents", "streams", "users")
+        )
+        lines.append(f"{label:<8} | {expected_lengths:<29} | {actual_lengths}")
+    lines.extend(
+        [
+            "",
+            "per-step records:",
+            "run      step | expected time_step/population/n_adults/n_streams "
+            "| actual time_step/population/n_adults/n_streams",
+        ]
+    )
+    for label in ("default", "legacy"):
+        expected_records = expected[label]["records"]
+        actual_records = actual_payloads[label]["records"]
+        for index in range(max(len(expected_records), len(actual_records))):
+            expected_record = expected_records[index] if index < len(expected_records) else None
+            actual_record = actual_records[index] if index < len(actual_records) else None
+            lines.append(
+                f"{label:<8} {index:>4} | {_step_summary(expected_record)} "
+                f"| {_step_summary(actual_record)}"
+            )
+    return "\n".join(lines)
 
 
 def test_seeded_runs_have_structural_golden_change_detector() -> None:
-    default_payload = _run_payload(42)
-    legacy_payload = _run_payload(
-        42,
-        reproduction_coupling_strength=0.0,
-        grounding_quality_strength=0.0,
-    )
-    projection = {
-        "default": _structural_projection(default_payload),
-        "legacy": _structural_projection(legacy_payload),
+    payloads = {
+        "default": _run_payload(42),
+        "legacy": _run_payload(
+            42,
+            reproduction_coupling_strength=0.0,
+            grounding_quality_strength=0.0,
+        ),
     }
-    assert _structural_fingerprint(projection) == EXPECTED_STRUCTURAL_FINGERPRINT
+    references = _load_structural_references()
+    diagnostics = _structural_diagnostics(references, payloads)
+    if diagnostics:
+        pytest.fail(diagnostics)
 
 
 def test_float_telemetry_matches_both_run_references() -> None:
