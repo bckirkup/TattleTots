@@ -7,6 +7,7 @@ import argparse
 import ast
 import io
 import tokenize
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -115,11 +116,9 @@ def _bare_random_calls(tree: ast.AST, path: Path) -> list[Finding]:
 
 def _comment_lines(source: str) -> set[int]:
     comments: set[int] = set()
-    try:
-        tokens = tokenize.generate_tokens(io.StringIO(source).readline)
+    tokens = tokenize.generate_tokens(io.StringIO(source).readline)
+    with suppress(tokenize.TokenError):
         comments.update(token.start[0] for token in tokens if token.type == tokenize.COMMENT)
-    except tokenize.TokenError:
-        comments.update(())
     return comments
 
 
