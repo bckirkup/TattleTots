@@ -21,6 +21,9 @@ import scipy
 from tattletots.cli import _load_scenario
 from tattletots.engine.config import SimulationConfig
 from tattletots.engine.world import World
+from tattletots.models.agent import Agent, AgentState
+from tattletots.models.energy import EnergyReserves
+from tattletots.models.genome import Genome
 from tattletots.models.identity import stable_id_digest
 from tattletots.scenarios.gaussian_shift import GaussianShiftScenario
 
@@ -197,6 +200,17 @@ def _run_fingerprint(
     )
     encoded = json.dumps(_canonicalize(payload), sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _records(payload: dict[str, object]) -> list[dict[str, object]]:
+    records = payload["records"]
+    assert isinstance(records, list)
+    return [record for record in records if isinstance(record, dict)]
+
+
+def _mean_metric(payload: dict[str, object], key: str) -> float:
+    values = [record[key] for record in _records(payload)]
+    return sum(float(value) for value in values) / len(values)
 
 
 def _environment_diagnostics() -> str:
@@ -479,6 +493,7 @@ def _structural_diagnostics(
     return "\n".join(lines)
 
 
+# Change-detectors: environment-stable structural and tolerance-based references.
 def test_seeded_runs_have_structural_golden_change_detector() -> None:
     payloads = {
         "default": _run_payload(42),
@@ -524,6 +539,110 @@ def test_seeded_agent_traces_match_references() -> None:
         _assert_agent_trace(label, payload, references[label])
 
 
+# Sensitivity: mechanism-driven telemetry must move in the expected direction.
+def _reproduction_factor(
+    *,
+    information: float,
+    attention: float,
+    coupling: float = 1.0,
+    information_scale: float = 1.0,
+    attention_scale: float = 1.0,
+) -> float:
+    agent = Agent(
+        genome=Genome(
+            reproduction_threshold=10.0,
+            information_requirement=0.5,
+            attention_requirement=0.5,
+        ),
+        state=AgentState(energy=EnergyReserves(information=information, attention=attention)),
+    )
+    return agent.reproduction_limiting_factor(coupling, information_scale, attention_scale)
+
+
+# Population-level births over seeds 42–61 moved only 2–5 births against
+# per-seed SD 7–15, so these three knobs are graded at their mechanism.
+def test_reproduction_coupling_strength_grades_limiting_factor() -> None:
+    values = (0.0, 0.5, 1.0)
+    factors = [
+        _reproduction_factor(information=2.5, attention=5.0, coupling=value) for value in values
+    ]
+
+    assert factors == pytest.approx((1.0, 0.75, 0.5))
+    assert factors[0] > factors[1] > factors[2]
+    assert factors[0] - factors[-1] >= 0.4
+
+
+def test_information_requirement_scale_grades_limiting_factor() -> None:
+    values = (0.5, 1.0, 2.0)
+    factors = [
+        _reproduction_factor(information=2.5, attention=5.0, information_scale=value)
+        for value in values
+    ]
+
+    assert factors == pytest.approx((1.0, 0.5, 0.25))
+    assert factors[0] > factors[1] > factors[2]
+    assert factors[0] - factors[-1] >= 0.5
+
+
+def test_attention_requirement_scale_grades_limiting_factor() -> None:
+    values = (0.5, 1.0, 2.0)
+    factors = [
+        _reproduction_factor(information=10.0, attention=2.5, attention_scale=value)
+        for value in values
+    ]
+
+    assert factors == pytest.approx((1.0, 0.5, 0.25))
+    assert factors[0] > factors[1] > factors[2]
+    assert factors[0] - factors[-1] >= 0.5
+
+
+def test_coupling_disables_information_scale() -> None:
+    values = (0.5, 1.0, 2.0)
+    factors = [
+        _reproduction_factor(
+            information=2.5,
+            attention=5.0,
+            coupling=0.0,
+            information_scale=value,
+        )
+        for value in values
+    ]
+
+    assert factors == pytest.approx((1.0, 1.0, 1.0))
+
+
+def test_non_limiting_attention_scale_does_not_change_factor() -> None:
+    values = (0.5, 1.0, 2.0)
+    factors = [
+        _reproduction_factor(information=2.5, attention=100.0, attention_scale=value)
+        for value in values
+    ]
+
+    assert factors == pytest.approx((0.5, 0.5, 0.5))
+
+
+def test_grounding_quality_strength_increases_effective_grounded_share() -> None:
+    # Twenty seeds average trajectory noise while preserving a short sweep.
+    seeds = range(42, 62)
+    values = (0.0, 0.25, 0.5)
+    shares = [
+        sum(
+            _mean_metric(
+                _run_payload(seed, steps=40, grounding_quality_strength=value),
+                "effective_grounded_yield_share",
+            )
+            for seed in seeds
+        )
+        / len(seeds)
+        for value in values
+    ]
+
+    assert shares[0] < shares[1] < shares[2]
+    assert shares[-1] - shares[0] >= 0.05
+
+
+# End-to-end liveness only: these checks prove each knob reaches a run at all;
+# the mechanism sweeps above prove the direction and magnitude.
 def test_reproduction_coupling_config_changes_run_fingerprint() -> None:
     legacy = _run_fingerprint(42, reproduction_coupling_strength=0.0)
     coupled = _run_fingerprint(42, reproduction_coupling_strength=1.0)
@@ -552,6 +671,7 @@ def test_attention_requirement_scale_changes_run_fingerprint() -> None:
     assert baseline != scaled
 
 
+# Invariants: complete seeded runs remain reproducible across all telemetry.
 def test_same_seed_reproduces_the_complete_run() -> None:
     first = _run_fingerprint(42)
     second = _run_fingerprint(42)
