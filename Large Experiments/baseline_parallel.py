@@ -9,9 +9,10 @@ that show up as distinct jobs in Task Manager and use CPU in parallel.
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Tuple, TypeVar
+from typing import Any, TypeVar
 
 R = TypeVar("R")
 
@@ -50,12 +51,12 @@ def resolve_worker_count(requested: int | None, n_jobs: int) -> int:
 
 def run_process_pool(
     worker_fn: Callable[..., R],
-    job_args: List[Tuple[Any, ...]],
-    runs: List[Dict[str, Any]],
+    job_args: list[tuple[Any, ...]],
+    runs: list[dict[str, Any]],
     *,
     max_workers: int,
-    on_success: Callable[[Dict[str, Any], R], None],
-    on_failure: Callable[[Dict[str, Any], Exception], None],
+    on_success: Callable[[dict[str, Any], R], None],
+    on_failure: Callable[[dict[str, Any], Exception], None],
 ) -> None:
     """Execute jobs in a ProcessPoolExecutor with per-job progress logging."""
     total = len(job_args)
@@ -63,8 +64,7 @@ def run_process_pool(
 
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         futures = {
-            executor.submit(worker_fn, *args): run
-            for run, args in zip(runs, job_args, strict=True)
+            executor.submit(worker_fn, *args): run for run, args in zip(runs, job_args, strict=True)
         }
         for future in as_completed(futures):
             run = futures[future]

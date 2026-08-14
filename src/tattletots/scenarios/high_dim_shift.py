@@ -93,7 +93,7 @@ class HighDimShiftScenario(DomainAdapter):
     def infer_report_location(
         self,
         stream_data: list[NDArray[np.float64]],
-        stream_labels: list[str],
+        _stream_labels: list[str],
     ) -> EventLocation:
         if not stream_data:
             return (0, 0)
@@ -133,8 +133,8 @@ class HighDimShiftScenario(DomainAdapter):
 
     def dispatch_and_judge_responses(
         self,
-        targets: list[DispatchTarget],
-        time_step: int,
+        _targets: list[DispatchTarget],
+        _time_step: int,
     ) -> list[ResponseOutcome]:
         """Built-in scenario has no physical response actions."""
         return []

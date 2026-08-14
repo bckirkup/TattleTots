@@ -68,7 +68,10 @@ def _run_domain(
     print(f"[*] Command: {' '.join(cmd)}")
     print("=" * 60)
 
-    return subprocess.call(cmd, cwd=_WORKSPACE_ROOT)
+    return subprocess.call(  # noqa: S603 - fixed local scripts and parsed CLI flags.
+        cmd,
+        cwd=_WORKSPACE_ROOT,
+    )
 
 
 def main(argv: list[str] | None = None) -> int:

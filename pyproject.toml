@@ -54,11 +54,55 @@ line-length = 100
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+select = [
+    "E",
+    "F",
+    "W",
+    "I",
+    "UP",
+    "B",
+    "SIM",
+    "ARG",
+    "C90",
+    "NPY",
+    # Keep mechanical Bandit checks while excluding S101, which flags every
+    # pytest assertion and does not map to the Sonar findings in this repo.
+    "S105",
+    "S106",
+    "S107",
+    "S108",
+    "S110",
+    "S112",
+    "S113",
+    "S201",
+    "S301",
+    "S307",
+    "S310",
+    "S311",
+    "S324",
+    "S501",
+    "S506",
+    "S602",
+    "S603",
+    "S604",
+    "S605",
+    "S606",
+    "S607",
+    "S608",
+    "S609",
+]
 ignore = ["E501", "SIM108"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["tattletots"]
+
+[tool.ruff.lint.per-file-ignores]
+# Conformance fixtures intentionally implement protocol methods with unused
+# parameters so the test exercises the published adapter signature.
+"tests/test_adapter_conformance.py" = ["ARG002"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 15
 
 [tool.mypy]
 python_version = "3.11"

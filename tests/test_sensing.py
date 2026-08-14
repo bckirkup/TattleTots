@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from tattletots.engine.config import SimulationConfig
 from tattletots.engine.sensing import prepare_agent_input, prepare_agent_input_with_attribution
@@ -87,5 +88,5 @@ class TestSensing:
             {raw.id: raw, residual.id: residual},
             SimulationConfig(),
         )
-        assert grounded == 4.0
-        assert ungrounded == 4.0
+        assert grounded == pytest.approx(4.0)
+        assert ungrounded == pytest.approx(4.0)

@@ -313,7 +313,7 @@ print(hashlib.sha256(json.dumps(canonical, sort_keys=True, separators=(",", ":")
         env = os.environ.copy()
         env["PYTHONHASHSEED"] = hash_seed
         env["PYTHONPATH"] = str(REPO_ROOT / "src")
-        result = subprocess.run(
+        result = subprocess.run(  # noqa: S603 - fixed argv invokes the local test interpreter.
             [sys.executable, "-c", script],
             cwd=REPO_ROOT,
             env=env,

@@ -261,7 +261,7 @@ def run_single_run(
             log_file.write(f"=== Execution Command ===\n{' '.join(cmd)}\n\n")
             log_file.flush()
 
-            subprocess.run(
+            subprocess.run(  # noqa: S603 - fixed local scripts and parsed CLI flags.
                 cmd,
                 stdout=log_file,
                 stderr=subprocess.STDOUT,
