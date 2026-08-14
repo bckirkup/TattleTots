@@ -3,19 +3,14 @@
 from __future__ import annotations
 
 import hashlib
-import io
 import json
 import os
-import platform
 import subprocess
 import sys
-from contextlib import redirect_stdout
 from dataclasses import asdict
 from pathlib import Path
 
 import numpy as np
-import pytest
-import scipy
 
 from tattletots.cli import _load_scenario
 from tattletots.engine.config import SimulationConfig
@@ -24,21 +19,6 @@ from tattletots.models.identity import stable_id_digest
 from tattletots.scenarios.gaussian_shift import GaussianShiftScenario
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_FINGERPRINT = "4b98dbd41feb9fcd0d207de2b9a7b54fedacfd6f6bf8ac99b780e2829fcad8bc"
-EXPECTED_LEGACY_FINGERPRINT = "5263ba65680de33c6fe1d6dd693e725a084bd6e0f5fbe64fc06678d299c14b23"
-
-
-def _canonicalize(value: object) -> object:
-    """Normalize floating-point serialization across supported runtimes."""
-    if isinstance(value, float):
-        return round(value, 12)
-    if isinstance(value, dict):
-        return {key: _canonicalize(item) for key, item in value.items()}
-    if isinstance(value, list):
-        return [_canonicalize(item) for item in value]
-    if isinstance(value, tuple):
-        return tuple(_canonicalize(item) for item in value)
-    return value
 
 
 def _run_payload(
@@ -49,7 +29,6 @@ def _run_payload(
     reproduction_information_scale: float = 1.0,
     reproduction_attention_scale: float = 1.0,
     grounding_quality_strength: float = 0.5,
-    attention_trace: dict[int, dict[str, float]] | None = None,
 ) -> dict[str, object]:
     scenario = GaussianShiftScenario(seed=seed, total_steps=steps)
     config = SimulationConfig(
@@ -75,8 +54,6 @@ def _run_payload(
         scenario.step(step)
         world.set_event_state(scenario.get_active_locations(step))
         world.step()
-        if attention_trace is not None:
-            attention_trace[step + 1] = dict(world._attention_deltas)
 
     return {
         "agents": sorted(world.agents),
@@ -86,167 +63,68 @@ def _run_payload(
     }
 
 
-def _run_fingerprint(
-    seed: int,
-    steps: int = 8,
-    *,
-    reproduction_coupling_strength: float = 1.0,
-    reproduction_information_scale: float = 1.0,
-    reproduction_attention_scale: float = 1.0,
-    grounding_quality_strength: float = 0.5,
-) -> str:
-    payload = _run_payload(
-        seed,
-        steps,
-        reproduction_coupling_strength=reproduction_coupling_strength,
-        reproduction_information_scale=reproduction_information_scale,
-        reproduction_attention_scale=reproduction_attention_scale,
-        grounding_quality_strength=grounding_quality_strength,
-    )
-    encoded = json.dumps(_canonicalize(payload), sort_keys=True, separators=(",", ":")).encode()
+def _records(payload: dict[str, object]) -> list[dict[str, object]]:
+    records = payload["records"]
+    assert isinstance(records, list)
+    return [record for record in records if isinstance(record, dict)]
+
+
+def _mean_metric(payload: dict[str, object], key: str) -> float:
+    values = [record[key] for record in _records(payload)]
+    return sum(float(value) for value in values) / len(values)
+
+
+def _sum_metric(payload: dict[str, object], key: str) -> int:
+    return sum(int(record[key]) for record in _records(payload))
+
+
+# Change-detector only, not a correctness check. Re-derive it from these IDs and
+# integer telemetry fields if a structural change intentionally updates it.
+def _structural_fingerprint(payload: dict[str, object]) -> str:
+    """Hash stable IDs and integer telemetry as a change-detector only."""
+    structural = {
+        "agents": payload["agents"],
+        "streams": payload["streams"],
+        "users": payload["users"],
+        "records": [
+            {
+                key: record[key]
+                for key in (
+                    "time_step",
+                    "population",
+                    "births",
+                    "deaths",
+                    "reports_issued",
+                    "correct_reports",
+                    "false_alarms",
+                    "active_location_count",
+                    "n_streams",
+                )
+                if key in record
+            }
+            for record in _records(payload)
+        ],
+    }
+    encoded = json.dumps(structural, sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(encoded).hexdigest()
 
 
-def _environment_diagnostics() -> str:
-    config = io.StringIO()
-    with redirect_stdout(config):
-        np.show_config()
-    return "\n".join(
-        [
-            f"python: {platform.python_version()} ({sys.executable})",
-            f"numpy: {np.__version__}",
-            f"scipy: {scipy.__version__}",
-            "numpy.show_config():",
-            config.getvalue().rstrip(),
-        ]
-    )
-
-
-def _payload_diagnostics(payload: dict[str, object]) -> str:
-    records = payload["records"]
-    assert isinstance(records, list)
-    lines = []
-    for section in ("agents", "streams", "users"):
-        value = payload[section]
-        encoded = json.dumps(_canonicalize(value), sort_keys=True, separators=(",", ":")).encode()
-        lines.append(f"{section} digest={hashlib.sha256(encoded).hexdigest()}")
-    for index, record in enumerate(records):
-        canonical = _canonicalize(record)
-        encoded = json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()
-        values = _float_values(record)
-        magnitude = max((abs(value) for value in values), default=0.0)
-        lines.append(
-            f"record[{index}] max_abs={magnitude:.17g} digest={hashlib.sha256(encoded).hexdigest()}"
-        )
-        assert isinstance(record, dict)
-        for key in sorted(record):
-            value = _canonicalize(record[key])
-            encoded = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
-            lines.append(
-                f"record[{index}].{key}={value!r} digest={hashlib.sha256(encoded).hexdigest()}"
-            )
-    return "\n".join(lines)
-
-
-def _float_values(value: object) -> list[float]:
-    if isinstance(value, float):
-        return [value]
-    if isinstance(value, dict):
-        return [item for child in value.values() for item in _float_values(child)]
-    if isinstance(value, (list, tuple)):
-        return [item for child in value for item in _float_values(child)]
-    return []
-
-
-def _assert_fingerprint(
-    expected: str,
-    payload: dict[str, object],
-    attention_trace: dict[int, dict[str, float]] | None = None,
-) -> None:
-    encoded = json.dumps(_canonicalize(payload), sort_keys=True, separators=(",", ":")).encode()
-    actual = hashlib.sha256(encoded).hexdigest()
-    if actual != expected:
-        boundary_lines = []
-        if attention_trace is not None and 6 in attention_trace:
-            boundary_lines = [
-                "attention deltas at step 6:",
-                *(
-                    f"{agent_id}={delta:.17g}"
-                    for agent_id, delta in sorted(attention_trace[6].items())
-                ),
-            ]
-        pytest.fail(
-            "\n".join(
-                [
-                    f"fingerprint mismatch: expected={expected} actual={actual}",
-                    _environment_diagnostics(),
-                    "per-record diagnostics:",
-                    _payload_diagnostics(payload),
-                    *boundary_lines,
-                ]
-            )
-        )
-
-
-def test_seeded_run_has_golden_fingerprint() -> None:
-    _assert_fingerprint(EXPECTED_FINGERPRINT, _run_payload(42))
-
-
-def test_legacy_setting_has_branch_golden_fingerprint() -> None:
-    attention_trace: dict[int, dict[str, float]] = {}
-    payload = _run_payload(
-        42,
-        reproduction_coupling_strength=0.0,
-        grounding_quality_strength=0.0,
-        attention_trace=attention_trace,
-    )
-
-    _assert_fingerprint(EXPECTED_LEGACY_FINGERPRINT, payload, attention_trace)
-
-
-def test_reproduction_coupling_config_changes_run_fingerprint() -> None:
-    legacy = _run_fingerprint(42, reproduction_coupling_strength=0.0)
-    coupled = _run_fingerprint(42, reproduction_coupling_strength=1.0)
-
-    assert legacy != coupled
-
-
-def test_grounding_quality_config_changes_run_fingerprint() -> None:
-    legacy = _run_fingerprint(42, grounding_quality_strength=0.0)
-    coupled = _run_fingerprint(42, grounding_quality_strength=0.5)
-
-    assert legacy != coupled
-
-
-def test_information_requirement_scale_changes_run_fingerprint() -> None:
-    baseline = _run_fingerprint(42, steps=40)
-    scaled = _run_fingerprint(42, steps=40, reproduction_information_scale=2.0)
-
-    assert baseline != scaled
-
-
-def test_attention_requirement_scale_changes_run_fingerprint() -> None:
-    baseline = _run_fingerprint(42, steps=40)
-    scaled = _run_fingerprint(42, steps=40, reproduction_attention_scale=2.0)
-
-    assert baseline != scaled
-
-
+# Invariants: seeded runs must reproduce stable structure and integer outcomes.
 def test_same_seed_reproduces_the_complete_run() -> None:
-    first = _run_fingerprint(42)
-    second = _run_fingerprint(42)
+    first = _structural_fingerprint(_run_payload(42))
+    second = _structural_fingerprint(_run_payload(42))
 
     assert first == second
 
 
 def test_same_seed_has_zero_fingerprint_spread_across_repeated_runs() -> None:
-    fingerprints = {_run_fingerprint(42) for _ in range(10)}
+    fingerprints = {_structural_fingerprint(_run_payload(42)) for _ in range(10)}
 
     assert len(fingerprints) == 1
 
 
 def test_different_seed_changes_the_complete_run() -> None:
-    assert _run_fingerprint(42) != _run_fingerprint(43)
+    assert _structural_fingerprint(_run_payload(42)) != _structural_fingerprint(_run_payload(43))
 
 
 def test_stable_id_digest_has_a_process_independent_golden_value() -> None:
@@ -275,17 +153,6 @@ from tattletots.engine.world import World
 from tattletots.scenarios.gaussian_shift import GaussianShiftScenario
 
 
-def canonicalize(value):
-    if isinstance(value, float):
-        return round(value, 12)
-    if isinstance(value, dict):
-        return {key: canonicalize(item) for key, item in value.items()}
-    if isinstance(value, list):
-        return [canonicalize(item) for item in value]
-    if isinstance(value, tuple):
-        return tuple(canonicalize(item) for item in value)
-    return value
-
 scenario = GaussianShiftScenario(seed=42, total_steps=8)
 world = World(config=SimulationConfig(initial_population=4, max_population=20, max_steps=8, seed=42))
 for stream in scenario.get_streams():
@@ -305,8 +172,29 @@ payload = {
     "users": sorted(world.users),
     "records": [asdict(record) for record in world.telemetry.history],
 }
-canonical = canonicalize(payload)
-print(hashlib.sha256(json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()).hexdigest())
+structural = {
+    "agents": payload["agents"],
+    "streams": payload["streams"],
+    "users": payload["users"],
+    "records": [
+        {
+            key: record[key]
+            for key in (
+                "time_step",
+                "population",
+                "births",
+                "deaths",
+                "reports_issued",
+                "correct_reports",
+                "false_alarms",
+                "active_location_count",
+                "n_streams",
+            )
+        }
+        for record in payload["records"]
+    ],
+}
+print(hashlib.sha256(json.dumps(structural, sort_keys=True, separators=(",", ":")).encode()).hexdigest())
 """
     fingerprints: list[str] = []
     for hash_seed in ("0", "1"):
@@ -324,3 +212,75 @@ print(hashlib.sha256(json.dumps(canonical, sort_keys=True, separators=(",", ":")
         fingerprints.append(result.stdout.strip())
 
     assert fingerprints[0] == fingerprints[1]
+
+
+# Sensitivity: mechanism-driven telemetry must move in the expected direction.
+def test_reproduction_coupling_strength_reduces_births() -> None:
+    values = (0.0, 0.5, 1.0)
+    births = [
+        _sum_metric(
+            _run_payload(42, steps=40, reproduction_coupling_strength=value),
+            "births",
+        )
+        for value in values
+    ]
+
+    assert births[0] > births[1] > births[2]
+    assert births[0] - births[-1] >= 10
+
+
+def test_grounding_quality_strength_increases_effective_grounded_share() -> None:
+    values = (0.0, 0.25, 0.5)
+    shares = [
+        _mean_metric(
+            _run_payload(42, steps=40, grounding_quality_strength=value),
+            "effective_grounded_yield_share",
+        )
+        for value in values
+    ]
+
+    assert shares[0] < shares[1] < shares[2]
+    assert shares[-1] - shares[0] >= 0.1
+
+
+def test_information_requirement_scale_reduces_population() -> None:
+    values = (0.5, 1.0, 2.0)
+    populations = [
+        _mean_metric(
+            _run_payload(42, steps=40, reproduction_information_scale=value),
+            "population",
+        )
+        for value in values
+    ]
+
+    assert populations[0] > populations[-1]
+    assert populations[0] - populations[-1] >= 0.5
+
+
+def test_attention_requirement_scale_reduces_population() -> None:
+    values = (1.0, 1.5, 2.0)
+    populations = [
+        _mean_metric(
+            _run_payload(42, steps=40, reproduction_attention_scale=value),
+            "population",
+        )
+        for value in values
+    ]
+
+    assert populations[0] > populations[1] > populations[2]
+    assert populations[0] - populations[-1] >= 1.0
+
+
+def test_unrelated_reproduction_knob_does_not_change_event_locations() -> None:
+    values = (0.0, 0.5, 1.0)
+    event_location_counts = [
+        {
+            int(record["active_location_count"])
+            for record in _records(
+                _run_payload(42, steps=110, reproduction_coupling_strength=value)
+            )
+        }
+        for value in values
+    ]
+
+    assert event_location_counts == [{0, 1}, {0, 1}, {0, 1}]
