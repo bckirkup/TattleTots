@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
+from tattletots.engine.config import SimulationConfig
 from tattletots.interface.adapter_conformance import (
     AdapterConformanceCheck,
     assert_adapter_conformance,
@@ -131,6 +132,40 @@ class _FixtureAdapter(DomainAdapter):
         time_step: int,
     ) -> list[ResponseOutcome]:
         return []
+
+
+class _DimensionalityFixtureAdapter(_FixtureAdapter):
+    """Fixture whose declared stream dimension can be compared with the cap."""
+
+    def __init__(self, dimensionality: int) -> None:
+        super().__init__()
+        coordinate = (1.0, 1.0)
+        self._stream = Stream(
+            stream_type=StreamType.RAW,
+            dimensionality=dimensionality,
+            label="published_signal",
+            current_data=np.zeros(dimensionality, dtype=np.float64),
+            current_status=np.full(dimensionality, ObservationStatus.OBSERVED.value),
+            metadata=StreamMetadata(
+                coordinates=[coordinate] * dimensionality,
+                sensor_coordinates=[coordinate] * dimensionality,
+                modality=["signal"] * dimensionality,
+                identity=["fixed"] * dimensionality,
+                footprints=[coordinate] * dimensionality,
+                resolution=[1.0] * dimensionality,
+            ),
+        )
+
+    def step(self, time_step: int) -> None:
+        observed = float(self._probe.observe(float(time_step + 1))[0])
+        self._stream.update(
+            np.full(self._stream.dimensionality, observed),
+            [ObservationStatus.OBSERVED.value] * self._stream.dimensionality,
+        )
+
+
+def _matching_dimensionality_state_factory() -> tuple[DomainAdapter, DomainAdapter]:
+    return _DimensionalityFixtureAdapter(4), _DimensionalityFixtureAdapter(4)
 
 
 class _NestedFixtureAdapter(_FixtureAdapter):
@@ -502,6 +537,33 @@ def test_declaration_consistency_failure_is_reported_structurally() -> None:
     )
 
     assert _finding_checks(report) == {AdapterConformanceCheck.DECLARATIONS}
+
+
+def test_declared_features_beyond_engine_cap_are_reported() -> None:
+    report = validate_adapter_conformance(
+        _DimensionalityFixtureAdapter(10),
+        steps=1,
+        config=SimulationConfig(max_stream_dim=10, max_working_dim=8),
+        state_independence_factory=_matching_dimensionality_state_factory,
+    )
+    finding = next(
+        finding
+        for finding in report.findings
+        if finding.check == AdapterConformanceCheck.DECLARED_VS_DELIVERED
+    )
+    assert not finding.passed
+    assert "published_signal" in finding.message
+    assert "2 declared geometry/features are structurally unreachable" in finding.message
+
+
+def test_declared_features_at_engine_cap_pass() -> None:
+    report = validate_adapter_conformance(
+        _DimensionalityFixtureAdapter(4),
+        steps=1,
+        config=SimulationConfig(max_stream_dim=4),
+        state_independence_factory=_matching_dimensionality_state_factory,
+    )
+    assert report.valid
 
 
 def test_frame_containment_checks_declared_and_measured_locations() -> None:

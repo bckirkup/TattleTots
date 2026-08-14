@@ -13,6 +13,7 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
+from tattletots.engine.config import SimulationConfig
 from tattletots.interface.domain_adapter import DomainAdapter
 from tattletots.interface.instrument import (
     InstrumentFinding,
@@ -31,6 +32,7 @@ class AdapterConformanceCheck(StrEnum):
     SILENCED_SENSOR_PROBE = "silenced_sensor_probe"
     DECODER_ROUND_TRIP = "decoder_round_trip"
     DECLARATIONS = "declarations"
+    DECLARED_VS_DELIVERED = "declared_vs_delivered"
     STATE_INDEPENDENCE = "state_independence"
     FRAME_CONTAINMENT = "frame_containment"
 
@@ -178,6 +180,7 @@ def validate_adapter_conformance(
     *,
     state_independence_factory: StateIndependenceFactory | None = None,
     strict_state_independence: bool = False,
+    config: SimulationConfig | None = None,
 ) -> AdapterConformanceReport:
     """Run domain-neutral publication, sensing, decoding, and state checks.
 
@@ -320,6 +323,31 @@ def validate_adapter_conformance(
         )
     )
 
+    engine_config = config or SimulationConfig()
+    delivered_findings = _declared_vs_delivered_findings(
+        streams,
+        min(engine_config.max_stream_dim, engine_config.max_working_dim),
+    )
+    unreachable = [finding for finding in delivered_findings if not finding.passed]
+    findings.append(
+        AdapterConformanceFinding(
+            AdapterConformanceCheck.DECLARED_VS_DELIVERED,
+            not unreachable,
+            (
+                "Every declared stream feature and metadata entry is structurally "
+                "reachable for at least one possible agent under the configured "
+                "engine ceilings; individual genomes and CONCAT ordering may still "
+                "limit practical reach."
+                if not unreachable
+                else "Declared stream features exceed the best-case structural "
+                "ceiling for what agents can receive: "
+                + "; ".join(finding.message for finding in unreachable)
+            ),
+            measured=sum(int(finding.measured or 0) for finding in unreachable),
+            threshold=0,
+        )
+    )
+
     decoder_failures = _decoder_round_trip_failures(adapter, streams)
     findings.append(
         AdapterConformanceFinding(
@@ -376,6 +404,7 @@ def assert_adapter_conformance(
     *,
     state_independence_factory: StateIndependenceFactory | None = None,
     strict_state_independence: bool = False,
+    config: SimulationConfig | None = None,
 ) -> AdapterConformanceReport:
     """Run conformance checks and raise a readable pytest assertion on failure."""
     report = validate_adapter_conformance(
@@ -383,6 +412,7 @@ def assert_adapter_conformance(
         steps,
         state_independence_factory=state_independence_factory,
         strict_state_independence=strict_state_independence,
+        config=config,
     )
     failures = [
         finding for finding in report.findings if not finding.passed or not finding.exercised
@@ -582,6 +612,48 @@ def _declaration_findings(streams: list[Stream]) -> tuple[InstrumentFinding, ...
     findings: list[InstrumentFinding] = []
     for stream in streams:
         findings.extend(validate_stream_declarations(stream, 0))
+    return tuple(findings)
+
+
+def _declared_vs_delivered_findings(
+    streams: list[Stream],
+    structural_ceiling: int,
+) -> tuple[AdapterConformanceFinding, ...]:
+    findings: list[AdapterConformanceFinding] = []
+    for stream in streams:
+        metadata = stream.metadata
+        declared_lengths = [stream.dimensionality]
+        if metadata is not None:
+            if metadata.coordinates is not None:
+                declared_lengths.append(len(metadata.coordinates))
+            if metadata.sensor_coordinates is not None:
+                declared_lengths.append(len(metadata.sensor_coordinates))
+            if metadata.modality is not None:
+                declared_lengths.append(len(metadata.modality))
+            if metadata.identity is not None:
+                declared_lengths.append(len(metadata.identity))
+            if metadata.footprints is not None:
+                declared_lengths.append(len(metadata.footprints))
+            if metadata.resolution is not None:
+                declared_lengths.append(len(metadata.resolution))
+        declared_count = max(declared_lengths)
+        # This is a best-case ceiling: genome.working_dim and CONCAT ordering
+        # can make individual high-index features unreachable in practice.
+        delivered_count = min(stream.dimensionality, structural_ceiling)
+        unreachable = max(0, declared_count - delivered_count)
+        if unreachable:
+            findings.append(
+                AdapterConformanceFinding(
+                    AdapterConformanceCheck.DECLARED_VS_DELIVERED,
+                    False,
+                    f"Stream '{stream.label}' declares {declared_count} features but "
+                    f"the best-case structural ceiling is {delivered_count}; "
+                    f"{unreachable} declared geometry/features are structurally "
+                    "unreachable for every possible agent.",
+                    measured=unreachable,
+                    threshold=0,
+                )
+            )
     return tuple(findings)
 
 
