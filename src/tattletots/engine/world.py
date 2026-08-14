@@ -68,7 +68,7 @@ from tattletots.models.user_cop import UserCOP
 from tattletots.models.whistleblower_report import WhistleblowerReport
 from tattletots.telemetry.recorder import StepRecord, TelemetryRecorder
 
-LocationInferenceFn = Callable[[list[NDArray[np.float64]], list[str]], EventLocation]
+LocationInferenceFn = Callable[[list[NDArray[np.float64]], list[str]], EventLocation | None]
 DimToLocationFn = Callable[[int], EventLocation]
 
 
@@ -586,7 +586,9 @@ class World:
             ):
                 raw_data, raw_labels = gather_raw_stream_data(agent, self.streams)
                 if raw_data:
-                    location = self._location_inference(raw_data, raw_labels)
+                    inferred = self._location_inference(raw_data, raw_labels)
+                    if inferred is not None:
+                        location = inferred
         if self._location_frame is not None:
             location = project_location_to_frame(location, self._location_frame)
         return location

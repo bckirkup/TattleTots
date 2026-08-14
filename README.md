@@ -72,6 +72,16 @@ Simulations are parameterized via JSON:
 
 Run with config: `tattletots --config configs/gaussian_shift_default.json --verbose`
 
+### Gaussian Shift instrument exemption
+
+`gaussian_shift` is a built-in smoke scenario rather than a domain instrument.
+Its streams are generated internally from synthetic Gaussian components and it
+has no modeled sensor methods. Consequently, the adapter-conformance
+sensor-bypass and silenced-sensor checks are an explicit exemption for this
+scenario; adding fake instruments would misrepresent its contract. The
+scenario does declare its component-index location frame, so declarations and
+frame containment remain checkable.
+
 ## Development Lifecycle (Ontogeny)
 
 New agents boot through a juvenile phase:
@@ -97,12 +107,19 @@ class FireEcologyAdapter(DomainAdapter):
     def step(self, time_step: int) -> None: ...
     def get_ground_truth(self, time_step: int) -> bool: ...
     def get_active_locations(self, time_step: int) -> list[EventLocation]: ...
-    def infer_report_location(self, stream_data, stream_labels) -> EventLocation: ...
+    def infer_report_location(
+        self, stream_data, stream_labels
+    ) -> EventLocation | None: ...
     def score_relevance(self, signal, user) -> float: ...
     def compute_costs(self, ...) -> dict[str, float]: ...
 ```
 
-The engine uses `get_active_locations()` for spatial report verification — each agent report includes a location, and correctness is evaluated per-location (not just globally). The `infer_report_location()` callback maps agent input streams to a spatial coordinate.
+The engine uses `get_active_locations()` for spatial report verification — each
+agent report includes a location, and correctness is evaluated per-location
+(not just globally). The `infer_report_location()` callback maps agent input
+streams to a spatial coordinate. A decoder may return `None` when no usable
+declared geometry is present; the engine preserves its existing spatial
+fallback instead of treating abstention as the origin `(0, 0)`.
 
 ### Adapter Conformance
 

@@ -106,12 +106,13 @@ def validate_instrument(
         if is_event and any(location in evidence_locations for location in active):
             supported_events += 1
         report = adapter.infer_report_location(stream_data, stream_labels)
-        if is_event and report in active:
+        if is_event and report is not None and report in active:
             correct_reports += 1
 
         if frame is not None:
             _check_frame_location(frame, active, "ground truth", time_step, findings)
-            _check_frame_location(frame, [report], "report", time_step, findings)
+            if report is not None:
+                _check_frame_location(frame, [report], "report", time_step, findings)
 
     candidates = _candidate_locations(
         frame,

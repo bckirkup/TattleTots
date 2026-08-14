@@ -47,6 +47,10 @@ def test_gaussian_shift_instrument_rejects_unobservable_location_label() -> None
     )
     assert not localization.passed
     assert "vacuous" in localization.message
+    frame = next(
+        finding for finding in report.findings if finding.check == InstrumentCheck.COORDINATE_FRAME
+    )
+    assert frame.passed
     assert 0.0 <= report.decoder_precision <= 1.0
 
 
