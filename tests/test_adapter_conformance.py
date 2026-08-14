@@ -19,6 +19,7 @@ from tattletots.models.observation import ObservationStatus, StreamMetadata
 from tattletots.models.response_outcome import ResponseOutcome
 from tattletots.models.stream import Stream, StreamType
 from tattletots.models.user import User
+from tattletots.scenarios.gaussian_shift import GaussianShiftScenario
 
 
 @dataclass
@@ -524,3 +525,13 @@ def test_assertion_wrapper_includes_failed_check_details() -> None:
         assert "decoder_round_trip" in str(error)
     else:
         raise AssertionError("Expected the conformance assertion to fail")
+
+
+def test_gaussian_shift_documents_no_sensor_conformance_exemption() -> None:
+    report = validate_adapter_conformance(GaussianShiftScenario(seed=42), steps=6)
+    findings = {finding.check: finding for finding in report.findings}
+
+    assert findings[AdapterConformanceCheck.FRAME_CONTAINMENT].passed
+    assert findings[AdapterConformanceCheck.DECLARATIONS].passed
+    assert not findings[AdapterConformanceCheck.STREAM_BYPASS].passed
+    assert not findings[AdapterConformanceCheck.SILENCED_SENSOR_PROBE].exercised

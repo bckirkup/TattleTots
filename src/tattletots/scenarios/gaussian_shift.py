@@ -6,6 +6,10 @@ Requirements §8:
 - 2 synthetic users with different priority vectors
 - Expected: trophic hierarchy forms, agents specialize, shift triggers
   partial extinction and re-colonization, detection of shift is escalated.
+
+This scenario intentionally publishes internally generated streams without
+modeled instruments. Sensor-bypass and silenced-sensor checks are exempt:
+there are no honest sensor methods to call or silence.
 """
 
 from __future__ import annotations
@@ -31,6 +35,10 @@ class GaussianShiftScenario(DomainAdapter):
     space, plus isotropic noise. At step `shift_step`, the component structure
     changes (rotation + amplitude change), simulating a regime change that
     agents must detect and adapt to.
+
+    Conformance exemption: raw streams are synthetic generator outputs, not
+    instrument observations. The sensor-bypass and silenced-sensor checks do
+    not apply and must not be "fixed" by inventing sensors.
     """
 
     def __init__(
@@ -112,6 +120,10 @@ class GaussianShiftScenario(DomainAdapter):
 
     def get_users(self) -> list[User]:
         return self._users
+
+    def get_location_frame(self) -> tuple[tuple[int, int], tuple[int, int]]:
+        """Declare the component-index location frame used by event labels."""
+        return ((0, 0), (self.n_components - 1, 0))
 
     def step(self, time_step: int) -> None:
         """Generate data for this time step and update streams."""

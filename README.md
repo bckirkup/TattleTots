@@ -72,6 +72,16 @@ Simulations are parameterized via JSON:
 
 Run with config: `tattletots --config configs/gaussian_shift_default.json --verbose`
 
+### Gaussian Shift instrument exemption
+
+`gaussian_shift` is a built-in smoke scenario rather than a domain instrument.
+Its streams are generated internally from synthetic Gaussian components and it
+has no modeled sensor methods. Consequently, the adapter-conformance
+sensor-bypass and silenced-sensor checks are an explicit exemption for this
+scenario; adding fake instruments would misrepresent its contract. The
+scenario does declare its component-index location frame, so declarations and
+frame containment remain checkable.
+
 ## Development Lifecycle (Ontogeny)
 
 New agents boot through a juvenile phase:
