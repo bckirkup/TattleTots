@@ -27,8 +27,11 @@ from tattletots.scenarios.gaussian_shift import GaussianShiftScenario
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FLOAT_REFERENCE_PATH = REPO_ROOT / "tests" / "data" / "determinism_float_references.json"
 STRUCTURAL_REFERENCE_PATH = REPO_ROOT / "tests" / "data" / "determinism_structural_references.json"
+AGENT_TRACE_REFERENCE_PATH = REPO_ROOT / "tests" / "data" / "determinism_agent_traces.json"
 # CHANGE DETECTOR, not a correctness check. These references cover only the
 # float-free structure of both seeded runs; they do not validate float telemetry.
+# The agent trace is tolerance-based reference data for locating divergence,
+# not a correctness check or a replacement for the structural change detector.
 
 
 def _canonicalize(value: object) -> object:
@@ -105,6 +108,22 @@ def _load_float_references() -> dict[str, list[dict[str, float]]]:
     return json.loads(FLOAT_REFERENCE_PATH.read_text(encoding="utf-8"))
 
 
+def _load_agent_trace_references() -> dict[str, list[dict[str, object]]]:
+    return json.loads(AGENT_TRACE_REFERENCE_PATH.read_text(encoding="utf-8"))
+
+
+def _capture_agent_trace(world: World) -> dict[str, dict[str, float]]:
+    return {
+        agent_id: {
+            "attention_energy": world.agents[agent_id].state.energy.attention,
+            "information_energy": world.agents[agent_id].state.energy.information,
+            "attention_income": world.agents[agent_id].state.last_step_attention_income,
+            "attention_delta": world._attention_deltas.get(agent_id, 0.0),
+        }
+        for agent_id in sorted(world.agents)
+    }
+
+
 def _run_payload(
     seed: int,
     steps: int = 8,
@@ -113,6 +132,7 @@ def _run_payload(
     reproduction_information_scale: float = 1.0,
     reproduction_attention_scale: float = 1.0,
     grounding_quality_strength: float = 0.5,
+    capture_agent_trace: bool = False,
 ) -> dict[str, object]:
     scenario = GaussianShiftScenario(seed=seed, total_steps=steps)
     config = SimulationConfig(
@@ -134,17 +154,28 @@ def _run_payload(
     world.set_location_inference(scenario.infer_report_location)
     world.set_dim_to_location(scenario.dim_index_to_location)
 
+    agent_trace: list[dict[str, object]] = []
     for step in range(steps):
         scenario.step(step)
         world.set_event_state(scenario.get_active_locations(step))
         world.step()
+        if capture_agent_trace:
+            agent_trace.append(
+                {
+                    "time_step": world.time_step,
+                    "agents": _capture_agent_trace(world),
+                }
+            )
 
-    return {
+    payload: dict[str, object] = {
         "agents": sorted(world.agents),
         "streams": sorted(world.streams),
         "users": sorted(world.users),
         "records": [asdict(record) for record in world.telemetry.history],
     }
+    if capture_agent_trace:
+        payload["agent_trace"] = agent_trace
+    return payload
 
 
 def _run_fingerprint(
@@ -250,6 +281,136 @@ def _assert_float_telemetry(
         pytest.fail("\n".join([*lines, _environment_diagnostics()]))
 
 
+def _agent_trace_differences(
+    expected: list[dict[str, object]],
+    actual: list[dict[str, object]],
+) -> list[tuple[int, str, str, object, object, float]]:
+    fields = (
+        "attention_energy",
+        "information_energy",
+        "attention_income",
+        "attention_delta",
+    )
+    differences: list[tuple[int, str, str, object, object, float]] = []
+    for index in range(max(len(expected), len(actual))):
+        expected_step = expected[index] if index < len(expected) else None
+        actual_step = actual[index] if index < len(actual) else None
+        step = index + 1
+        if expected_step is None or actual_step is None:
+            differences.append(
+                (
+                    step,
+                    "<step>",
+                    "step_presence",
+                    expected_step if expected_step is not None else "<missing>",
+                    actual_step if actual_step is not None else "<missing>",
+                    math.inf,
+                )
+            )
+            continue
+        expected_step_number = expected_step.get("time_step", step)
+        actual_step_number = actual_step.get("time_step", step)
+        if expected_step_number != actual_step_number:
+            differences.append(
+                (step, "<step>", "time_step", expected_step_number, actual_step_number, math.inf)
+            )
+        expected_agents = expected_step.get("agents", {})
+        actual_agents = actual_step.get("agents", {})
+        if not isinstance(expected_agents, dict) or not isinstance(actual_agents, dict):
+            differences.append(
+                (step, "<step>", "agent_trace_shape", expected_agents, actual_agents, math.inf)
+            )
+            continue
+        for agent_id in sorted(set(expected_agents) | set(actual_agents)):
+            expected_agent = expected_agents.get(agent_id)
+            actual_agent = actual_agents.get(agent_id)
+            if not isinstance(expected_agent, dict) or not isinstance(actual_agent, dict):
+                differences.append(
+                    (
+                        step,
+                        agent_id,
+                        "agent_presence",
+                        "present" if isinstance(expected_agent, dict) else "<missing>",
+                        "present" if isinstance(actual_agent, dict) else "<missing>",
+                        math.inf,
+                    )
+                )
+                continue
+            for field in fields:
+                expected_value = expected_agent[field]
+                actual_value = actual_agent[field]
+                if not isinstance(expected_value, float) or not isinstance(actual_value, float):
+                    if expected_value != actual_value:
+                        differences.append(
+                            (step, agent_id, field, expected_value, actual_value, math.inf)
+                        )
+                    continue
+                if actual_value != pytest.approx(expected_value, rel=1e-9):
+                    relative_difference = (
+                        abs(actual_value - expected_value) / abs(expected_value)
+                        if expected_value
+                        else abs(actual_value)
+                    )
+                    differences.append(
+                        (
+                            step,
+                            agent_id,
+                            field,
+                            expected_value,
+                            actual_value,
+                            relative_difference,
+                        )
+                    )
+    return differences
+
+
+def _assert_agent_trace(
+    label: str,
+    actual_payload: dict[str, object],
+    references: list[dict[str, object]],
+) -> None:
+    actual_trace = actual_payload["agent_trace"]
+    assert isinstance(actual_trace, list)
+    differences = _agent_trace_differences(references, actual_trace)
+    if not differences:
+        return
+    first_step, first_agent, first_field, first_expected, first_actual, first_relative = (
+        differences[0]
+    )
+    lines = [
+        f"first agent-trace divergence: {label} step {first_step}, "
+        f"agent {first_agent}, field {first_field}, "
+        f"expected={first_expected!r} actual={first_actual!r} "
+        f"relative difference={first_relative:.17g}",
+        "",
+        "agent-trace divergence growth:",
+    ]
+    by_step: dict[int, list[tuple[int, str, str, object, object, float]]] = {}
+    for difference in differences:
+        by_step.setdefault(difference[0], []).append(difference)
+    for step, step_differences in sorted(by_step.items()):
+        worst_relative = max(difference[-1] for difference in step_differences)
+        lines.append(
+            f"step {step}: {len(step_differences)} fields, worst rel={worst_relative:.17g}"
+        )
+    lines.extend(
+        [
+            "",
+            f"worst agent-trace differences: showing {min(20, len(differences))} "
+            f"of {len(differences)}",
+        ]
+    )
+    for step, agent_id, field, expected, actual, relative_difference in sorted(
+        differences, key=lambda difference: difference[-1], reverse=True
+    )[:20]:
+        lines.append(
+            f"{label} step {step} agent {agent_id} {field}: "
+            f"expected={expected!r} actual={actual!r} "
+            f"relative difference={relative_difference:.17g}"
+        )
+    pytest.fail("\n".join([*lines, _environment_diagnostics()]))
+
+
 def _step_summary(record: object) -> str:
     if not isinstance(record, dict):
         return "invalid"
@@ -346,6 +507,21 @@ def test_float_telemetry_matches_both_run_references() -> None:
     for label, payload in payloads.items():
         _assert_float_telemetry_bounds(payload)
         _assert_float_telemetry(label, payload, references[label])
+
+
+def test_seeded_agent_traces_match_references() -> None:
+    payloads = {
+        "default": _run_payload(42, capture_agent_trace=True),
+        "legacy": _run_payload(
+            42,
+            reproduction_coupling_strength=0.0,
+            grounding_quality_strength=0.0,
+            capture_agent_trace=True,
+        ),
+    }
+    references = _load_agent_trace_references()
+    for label, payload in payloads.items():
+        _assert_agent_trace(label, payload, references[label])
 
 
 def test_reproduction_coupling_config_changes_run_fingerprint() -> None:

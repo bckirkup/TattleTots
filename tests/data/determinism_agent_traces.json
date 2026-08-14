@@ -1,0 +1,1154 @@
+{
+  "default": [
+    {
+      "time_step": 1,
+      "agents": {
+        "018b6e1e-f0ef-4e47-b67a-6e3efaebcfa8": {
+          "attention_energy": 0.6446189778102128,
+          "information_energy": 1.3513507579742314,
+          "attention_income": 0.3300392909062891,
+          "attention_delta": 0.2633114533932702
+        },
+        "4a3ce7f2-a02c-406a-b661-434802eb9b0c": {
+          "attention_energy": 0.6186924755830575,
+          "information_energy": 0.6186924755830575,
+          "attention_income": 0.0,
+          "attention_delta": 0.0
+        },
+        "4e0b8bd9-5f80-4c70-9fdb-d848885e8805": {
+          "attention_energy": 1.6367922860194928,
+          "information_energy": 0.8234613433746792,
+          "attention_income": 0.7099803545468555,
+          "attention_delta": 0.6367922860194929
+        },
+        "5db7f68a-425d-4723-a09f-5b4d0d50d58d": {
+          "attention_energy": 1.0839876451548691,
+          "information_energy": 0.3632888595393834,
+          "attention_income": 0.7099803545468555,
+          "attention_delta": 0.6321916064991394
+        },
+        "d2bcca3a-5a3f-4ed7-9d17-1c1b18ac2bb9": {
+          "attention_energy": 0.5482039613442703,
+          "information_energy": 0.5482039613442703,
+          "attention_income": 0.0,
+          "attention_delta": 0.0
+        },
+        "f08bd08a-f499-4679-bab4-bece5d845844": {
+          "attention_energy": 1.1794668480702348,
+          "information_energy": 0.7863553242011126,
+          "attention_income": 0.25,
+          "attention_delta": 0.17946684807023483
+        }
+      }
+    },
+    {
+      "time_step": 2,
+      "agents": {
+        "018b6e1e-f0ef-4e47-b67a-6e3efaebcfa8": {
+          "attention_energy": 0.577891140297194,
+          "information_energy": 1.7473242117001928,
+          "attention_income": 0.0,
+          "attention_delta": -0.06672783751301885
+        },
+        "4a3ce7f2-a02c-406a-b661-434802eb9b0c": {
+          "attention_energy": 0.5792992887221069,
+          "information_energy": 1.2213310500482968,
+          "attention_income": 0.0,
+          "attention_delta": -0.03939318686095059
+        },
+        "4e0b8bd9-5f80-4c70-9fdb-d848885e8805": {
+          "attention_energy": 1.5719196205153891,
+          "information_energy": 0.6630073720777371,
+          "attention_income": 0.6477524200081346,
+          "attention_delta": 0.574564351480772
+        },
+        "5db7f68a-425d-4723-a09f-5b4d0d50d58d": {
+          "attention_energy": 1.3300751071112205,
+          "information_energy": 1.0501407156229394,
+          "attention_income": 0.3238762100040673,
+          "attention_delta": 0.24608746195635128
+        },
+        "895004bb-bc48-4955-95ba-fcbc9c59fbe5": {
+          "attention_energy": 0.6394370169848757,
+          "information_energy": 0.6394370169848757,
+          "attention_income": 0.0,
+          "attention_delta": 0.0
+        },
+        "d2bcca3a-5a3f-4ed7-9d17-1c1b18ac2bb9": {
+          "attention_energy": 0.5093095873204123,
+          "information_energy": 0.45969678222792404,
+          "attention_income": 0.0,
+          "attention_delta": -0.038894374023858015
+        },
+        "f08bd08a-f499-4679-bab4-bece5d845844": {
+          "attention_energy": 2.1373050661282678,
+          "information_energy": 0.6092485026304761,
+          "attention_income": 1.028371369987798,
+          "attention_delta": 0.9578382180580329
+        }
+      }
+    },
+    {
+      "time_step": 3,
+      "agents": {
+        "018b6e1e-f0ef-4e47-b67a-6e3efaebcfa8": {
+          "attention_energy": 0.5111633027841752,
+          "information_energy": 2.143297665426154,
+          "attention_income": 0.0,
+          "attention_delta": -0.06672783751301885
+        },
+        "0efea733-0cb6-48df-8eab-8992d5725072": {
+          "attention_energy": 0.5482039613442703,
+          "information_energy": 0.5482039613442703,
+          "attention_income": 0.0,
+          "attention_delta": 0.0
+        },
+        "4a3ce7f2-a02c-406a-b661-434802eb9b0c": {
+          "attention_energy": 0.9331447490550681,
+          "information_energy": 2.0070340987486373,
+          "attention_income": 0.3932386471939118,
+          "attention_delta": 0.35384546033296116
+        },
+        "4e0b8bd9-5f80-4c70-9fdb-d848885e8805": {
+          "attention_energy": 1.6638322422988323,
+          "information_energy": 0.48693927766927214,
+          "attention_income": 0.46510069031080586,
+          "attention_delta": 0.09191262178344328
+        },
+        "5db7f68a-425d-4723-a09f-5b4d0d50d58d": {
+          "attention_energy": 0.9710590458735625,
+          "information_energy": 0.8394221612143237,
+          "attention_income": 0.2669766481543283,
+          "attention_delta": 0.1891879001066123
+        },
+        "895004bb-bc48-4955-95ba-fcbc9c59fbe5": {
+          "attention_energy": 0.930811998192846,
+          "information_energy": 0.2948597037342341,
+          "attention_income": 0.3279690154716517,
+          "attention_delta": 0.2913749812079704
+        },
+        "d2bcca3a-5a3f-4ed7-9d17-1c1b18ac2bb9": {
+          "attention_energy": 0.7983842287682059,
+          "information_energy": 1.1825450490241227,
+          "attention_income": 0.3279690154716517,
+          "attention_delta": 0.28907464144779366
+        },
+        "f08bd08a-f499-4679-bab4-bece5d845844": {
+          "attention_energy": 2.285517897596153,
+          "information_energy": 0.5353188857753397,
+          "attention_income": 0.21874598339765056,
+          "attention_delta": 0.1482128314678854
+        }
+      }
+    },
+    {
+      "time_step": 4,
+      "agents": {
+        "018b6e1e-f0ef-4e47-b67a-6e3efaebcfa8": {
+          "attention_energy": 0.5643213232312693,
+          "information_energy": 2.9290007141264947,
+          "attention_income": 0.11988585796011292,
+          "attention_delta": 0.05315802044709407
+        },
+        "0efea733-0cb6-48df-8eab-8992d5725072": {
+          "attention_energy": 0.6058721835580397,
+          "information_energy": 0.444696782227924,
+          "attention_income": 0.09656259623762747,
+          "attention_delta": 0.05766822221376946
+        },
+        "4a3ce7f2-a02c-406a-b661-434802eb9b0c": {
+          "attention_energy": 1.0136374201542304,
+          "information_energy": 2.9452949223498663,
+          "attention_income": 0.11988585796011292,
+          "attention_delta": 0.08049267109916233
+        },
+        "4e0b8bd9-5f80-4c70-9fdb-d848885e8805": {
+          "attention_energy": 1.5190181661830957,
+          "information_energy": 0.5123206323176431,
+          "attention_income": 0.22837399241162606,
+          "attention_delta": -0.1448140761157365
+        },
+        "5db7f68a-425d-4723-a09f-5b4d0d50d58d": {
+          "attention_energy": 0.999598055535746,
+          "information_energy": 1.2007444116732737,
+          "attention_income": 0.10632775770989948,
+          "attention_delta": 0.02853900966218345
+        },
+        "895004bb-bc48-4955-95ba-fcbc9c59fbe5": {
+          "attention_energy": 1.1225919563407907,
+          "information_energy": -0.044506465588187605,
+          "attention_income": 0.22837399241162606,
+          "attention_delta": 0.19177995814794477
+        },
+        "d2bcca3a-5a3f-4ed7-9d17-1c1b18ac2bb9": {
+          "attention_energy": 0.8900697673496255,
+          "information_energy": 1.3538852468387736,
+          "attention_income": 0.13057991260527763,
+          "attention_delta": 0.09168553858141962
+        },
+        "f08bd08a-f499-4679-bab4-bece5d845844": {
+          "attention_energy": 3.1849947783701054,
+          "information_energy": 0.5613892689202032,
+          "attention_income": 0.9700100327037174,
+          "attention_delta": 0.8994768807739523
+        }
+      }
+    },
+    {
+      "time_step": 5,
+      "agents": {
+        "018b6e1e-f0ef-4e47-b67a-6e3efaebcfa8": {
+          "attention_energy": 0.1869258721793281,
+          "information_energy": 3.228273848670187,
+          "attention_income": 0.328320075518614,
+          "attention_delta": 0.2615922380055951
+        },
+        "0efea733-0cb6-48df-8eab-8992d5725072": {
+          "attention_energy": 0.7034942537334792,
+          "information_energy": 0.9322664517415464,
+          "attention_income": 0.1365164441992975,
+          "attention_delta": 0.0976220701754395
+        },
+        "4a3ce7f2-a02c-406a-b661-434802eb9b0c": {
+          "attention_energy": 1.12184321554048,
+          "information_energy": 3.3412683760758277,
+          "attention_income": 0.18699216910815075,
+          "attention_delta": 0.10820579538624957
+        },
+        "4e0b8bd9-5f80-4c70-9fdb-d848885e8805": {
+          "attention_energy": 1.4458300976557332,
+          "information_energy": 0.6382479754164498,
+          "attention_income": 0.0,
+          "attention_delta": -0.07318806852736258
+        },
+        "5db7f68a-425d-4723-a09f-5b4d0d50d58d": {
+          "attention_energy": 1.149119231060835,
+          "information_energy": 1.5719075144241035,
+          "attention_income": 0.22730992357280502,
+          "attention_delta": 0.14952117552508898
+        },
+        "895004bb-bc48-4955-95ba-fcbc9c59fbe5": {
+          "attention_energy": 1.1225919563407907,
+          "information_energy": -0.044506465588187605,
+          "attention_income": 0.22837399241162606,
+          "attention_delta": 0.0
+        },
+        "cd434453-63c4-48fa-a0ea-ed3d7d0b5d69": {
+          "attention_energy": 1.2779753781150727,
+          "information_energy": 1.2779753781150727,
+          "attention_income": 0.0,
+          "attention_delta": 0.0
+        },
+        "d2bcca3a-5a3f-4ed7-9d17-1c1b18ac2bb9": {
+          "attention_energy": 1.6736779735416227,
+          "information_energy": 1.509917874878445,
+          "attention_income": 0.8225025802158552,
+          "attention_delta": 0.7836082061919972
+        },
+        "f08bd08a-f499-4679-bab4-bece5d845844": {
+          "attention_energy": 2.7738327447680815,
+          "information_energy": -0.271385566464345,
+          "attention_income": 0.2983588073852775,
+          "attention_delta": 0.2278256554555123
+        }
+      }
+    },
+    {
+      "time_step": 6,
+      "agents": {
+        "018b6e1e-f0ef-4e47-b67a-6e3efaebcfa8": {
+          "attention_energy": 0.40753197864477075,
+          "information_energy": 3.248041901813844,
+          "attention_income": 0.9060264195615189,
+          "attention_delta": 0.8392985820485
+        },
+        "0efea733-0cb6-48df-8eab-8992d5725072": {
+          "attention_energy": 0.6645998797096212,
+          "information_energy": 0.8291315489632369,
+          "attention_income": 0.0,
+          "attention_delta": -0.038894374023858015
+        },
+        "0fa9c395-63b2-48c8-8b50-89a2f3143a70": {
+          "attention_energy": 0.6394370169848757,
+          "information_energy": 0.6394370169848757,
+          "attention_income": 0.0,
+          "attention_delta": 0.0
+        },
+        "4a3ce7f2-a02c-406a-b661-434802eb9b0c": {
+          "attention_energy": 0.5982726212135924,
+          "information_energy": 3.38605228416972,
+          "attention_income": 0.17390825497807097,
+          "attention_delta": 0.09512188125616979
+        },
+        "4e0b8bd9-5f80-4c70-9fdb-d848885e8805": {
+          "attention_energy": 1.064487810452325,
+          "information_energy": 0.42373055856709263,
+          "attention_income": 0.33128279830882984,
+          "attention_delta": 0.25809472978146725
+        },
+        "58b8ef57-a411-43a9-ab99-09faf52914d6": {
+          "attention_energy": 0.6186924755830575,
+          "information_energy": 0.6186924755830575,
+          "attention_income": 0.0,
+          "attention_delta": 0.0
+        },
+        "5db7f68a-425d-4723-a09f-5b4d0d50d58d": {
+          "attention_energy": 0.5939615553418008,
+          "information_energy": 1.305618145854658,
+          "attention_income": 0.07083503367295231,
+          "attention_delta": -0.00695371437476372
+        },
+        "8000d2ee-72de-4530-bcee-09d140320208": {
+          "attention_energy": 0.5482039613442703,
+          "information_energy": 0.5482039613442703,
+          "attention_income": 0.0,
+          "attention_delta": 0.0
+        },
+        "895004bb-bc48-4955-95ba-fcbc9c59fbe5": {
+          "attention_energy": 1.1225919563407907,
+          "information_energy": -0.044506465588187605,
+          "attention_income": 0.22837399241162606,
+          "attention_delta": 0.0
+        },
+        "cd434453-63c4-48fa-a0ea-ed3d7d0b5d69": {
+          "attention_energy": 1.476961115324819,
+          "information_energy": 1.9079359068417867,
+          "attention_income": 0.23425231317462888,
+          "attention_delta": 0.1989857372097463
+        },
+        "d2bcca3a-5a3f-4ed7-9d17-1c1b18ac2bb9": {
+          "attention_energy": 1.9184787798217637,
+          "information_energy": 1.748421876403797,
+          "attention_income": 0.2836951803039991,
+          "attention_delta": 0.2448008062801411
+        },
+        "f08bd08a-f499-4679-bab4-bece5d845844": {
+          "attention_energy": 2.7738327447680815,
+          "information_energy": -0.271385566464345,
+          "attention_income": 0.2983588073852775,
+          "attention_delta": 0.0
+        },
+        "f385c0e3-5f30-4792-b7b8-bb94eb1b7a62": {
+          "attention_energy": 0.6186924755830575,
+          "information_energy": 0.6186924755830575,
+          "attention_income": 0.0,
+          "attention_delta": 0.0
+        }
+      }
+    },
+    {
+      "time_step": 7,
+      "agents": {
+        "018b6e1e-f0ef-4e47-b67a-6e3efaebcfa8": {
+          "attention_energy": 1.1658475788743166,
+          "information_energy": 3.886502430540558,
+          "attention_income": 0.8250434377425646,
+          "attention_delta": 0.7583156002295458
+        },
+        "0efea733-0cb6-48df-8eab-8992d5725072": {
+          "attention_energy": 0.6257055056857632,
+          "information_energy": 1.0260986070491043,
+          "attention_income": 0.0,
+          "attention_delta": -0.038894374023858015
+        },
+        "0fa9c395-63b2-48c8-8b50-89a2f3143a70": {
+          "attention_energy": 0.6028429827211944,
+          "information_energy": 0.4628983603595549,
+          "attention_income": 0.0,
+          "attention_delta": -0.03659403426368129
+        },
+        "4a3ce7f2-a02c-406a-b661-434802eb9b0c": {
+          "attention_energy": 0.6844375369511695,
+          "information_energy": 4.024512812896434,
+          "attention_income": 0.16495128945947826,
+          "attention_delta": 0.08616491573757708
+        },
+        "4e0b8bd9-5f80-4c70-9fdb-d848885e8805": {
+          "attention_energy": 1.3055201609825644,
+          "information_energy": 1.0413775110958525,
+          "attention_income": 0.31422041905760195,
+          "attention_delta": 0.24103235053023936
+        },
+        "58b8ef57-a411-43a9-ab99-09faf52914d6": {
+          "attention_energy": 0.7502798462860263,
+          "information_energy": 1.5383365346572764,
+          "attention_income": 0.16495128945947826,
+          "attention_delta": 0.13158737070296883
+        },
+        "58f2b129-88f3-4eae-9124-6557a285248f": {
+          "attention_energy": 0.5482039613442703,
+          "information_energy": 0.5482039613442703,
+          "attention_income": 0.0,
+          "attention_delta": 0.0
+        },
+        "5db7f68a-425d-4723-a09f-5b4d0d50d58d": {
+          "attention_energy": 0.5708072667732645,
+          "information_energy": 1.7918434902875924,
+          "attention_income": 0.05463445947917977,
+          "attention_delta": -0.023154288568536262
+        },
+        "8000d2ee-72de-4530-bcee-09d140320208": {
+          "attention_energy": 0.581150113613396,
+          "information_energy": 0.45969678222792404,
+          "attention_income": 0.07184052629298365,
+          "attention_delta": 0.03294615226912564
+        },
+        "895004bb-bc48-4955-95ba-fcbc9c59fbe5": {
+          "attention_energy": 1.1225919563407907,
+          "information_energy": -0.044506465588187605,
+          "attention_income": 0.22837399241162606,
+          "attention_delta": 0.0
+        },
+        "cd434453-63c4-48fa-a0ea-ed3d7d0b5d69": {
+          "attention_energy": 1.552788233911391,
+          "information_energy": 2.295409360567748,
+          "attention_income": 0.1110936945514545,
+          "attention_delta": 0.0758271185865719
+        },
+        "d2bcca3a-5a3f-4ed7-9d17-1c1b18ac2bb9": {
+          "attention_energy": 1.420799664927558,
+          "information_energy": 1.424455974038115,
+          "attention_income": 0.12831359449778068,
+          "attention_delta": 0.05052484645006465
+        },
+        "f08bd08a-f499-4679-bab4-bece5d845844": {
+          "attention_energy": 2.7738327447680815,
+          "information_energy": -0.271385566464345,
+          "attention_income": 0.2983588073852775,
+          "attention_delta": 0.0
+        },
+        "f385c0e3-5f30-4792-b7b8-bb94eb1b7a62": {
+          "attention_energy": 0.7442505781815851,
+          "information_energy": 1.2571530043097716,
+          "attention_income": 0.16495128945947826,
+          "attention_delta": 0.12555810259852768
+        }
+      }
+    },
+    {
+      "time_step": 8,
+      "agents": {
+        "018b6e1e-f0ef-4e47-b67a-6e3efaebcfa8": {
+          "attention_energy": 1.4886088196111067,
+          "information_energy": 4.282475884266519,
+          "attention_income": 0.389489078249809,
+          "attention_delta": 0.32276124073679013
+        },
+        "0efea733-0cb6-48df-8eab-8992d5725072": {
+          "attention_energy": 0.5868111316619052,
+          "information_energy": 1.4010996771361102,
+          "attention_income": 0.0,
+          "attention_delta": -0.038894374023858015
+        },
+        "0fa9c395-63b2-48c8-8b50-89a2f3143a70": {
+          "attention_energy": 0.7610535788297331,
+          "information_energy": 0.9104898438531375,
+          "attention_income": 0.19480463037222,
+          "attention_delta": 0.15821059610853871
+        },
+        "1ed7699f-c973-40a0-8f0d-da74894a28b3": {
+          "attention_energy": 0.5482039613442703,
+          "information_energy": 0.5482039613442703,
+          "attention_income": 0.0,
+          "attention_delta": 0.0
+        },
+        "4a3ce7f2-a02c-406a-b661-434802eb9b0c": {
+          "attention_energy": 0.7230296130358256,
+          "information_energy": 4.6629733416231485,
+          "attention_income": 0.11737844980655726,
+          "attention_delta": 0.03859207608465608
+        },
+        "4e0b8bd9-5f80-4c70-9fdb-d848885e8805": {
+          "attention_energy": 1.4271367228274219,
+          "information_energy": 1.13057355055029,
+          "attention_income": 0.19480463037222,
+          "attention_delta": 0.12161656184485743
+        },
+        "58b8ef57-a411-43a9-ab99-09faf52914d6": {
+          "attention_energy": 1.1503688906524203,
+          "information_energy": 2.122358344595505,
+          "attention_income": 0.4334529631229034,
+          "attention_delta": 0.400089044366394
+        },
+        "58f2b129-88f3-4eae-9124-6557a285248f": {
+          "attention_energy": 0.7041142176926323,
+          "information_energy": 0.45969678222792404,
+          "attention_income": 0.19480463037222,
+          "attention_delta": 0.155910256348362
+        },
+        "5db7f68a-425d-4723-a09f-5b4d0d50d58d": {
+          "attention_energy": 0.5206083536750988,
+          "information_energy": 2.1419972711490134,
+          "attention_income": 0.02758983494955032,
+          "attention_delta": -0.05019891309816571
+        },
+        "8000d2ee-72de-4530-bcee-09d140320208": {
+          "attention_energy": 0.5622334585455636,
+          "information_energy": 0.6672999512944733,
+          "attention_income": 0.019977718956025643,
+          "attention_delta": -0.018916655067832373
+        },
+        "895004bb-bc48-4955-95ba-fcbc9c59fbe5": {
+          "attention_energy": 1.1225919563407907,
+          "information_energy": -0.044506465588187605,
+          "attention_income": 0.22837399241162606,
+          "attention_delta": 0.0
+        },
+        "cd434453-63c4-48fa-a0ea-ed3d7d0b5d69": {
+          "attention_energy": 1.5364428919807132,
+          "information_energy": 2.925369889294462,
+          "attention_income": 0.018921234034204735,
+          "attention_delta": -0.016345341930677857
+        },
+        "d2bcca3a-5a3f-4ed7-9d17-1c1b18ac2bb9": {
+          "attention_energy": 0.8919919105310324,
+          "information_energy": 1.2446358847110504,
+          "attention_income": 0.0971849549954606,
+          "attention_delta": 0.019396206947744576
+        },
+        "f08bd08a-f499-4679-bab4-bece5d845844": {
+          "attention_energy": 2.7738327447680815,
+          "information_energy": -0.271385566464345,
+          "attention_income": 0.2983588073852775,
+          "attention_delta": 0.0
+        },
+        "f385c0e3-5f30-4792-b7b8-bb94eb1b7a62": {
+          "attention_energy": 1.0164492660894637,
+          "information_energy": 1.8956135330364856,
+          "attention_income": 0.3115918747688292,
+          "attention_delta": 0.2721986879078786
+        }
+      }
+    }
+  ],
+  "legacy": [
+    {
+      "time_step": 1,
+      "agents": {
+        "018b6e1e-f0ef-4e47-b67a-6e3efaebcfa8": {
+          "attention_energy": 0.6798632349296064,
+          "information_energy": 1.3865950150936253,
+          "attention_income": 0.3300392909062891,
+          "attention_delta": 0.2633114533932702
+        },
+        "4e0b8bd9-5f80-4c70-9fdb-d848885e8805": {
+          "attention_energy": 1.6367922860194928,
+          "information_energy": 0.8234613433746792,
+          "attention_income": 0.7099803545468555,
+          "attention_delta": 0.6367922860194929
+        },
+        "5db7f68a-425d-4723-a09f-5b4d0d50d58d": {
+          "attention_energy": 0.5005394266912052,
+          "information_energy": -0.2201593589242805,
+          "attention_income": 0.7099803545468555,
+          "attention_delta": 0.6321916064991394
+        },
+        "afbc31c5-dc7a-4f54-8222-e3751f411289": {
+          "attention_energy": 1.1668964369273278,
+          "information_energy": 1.1668964369273278,
+          "attention_income": 0.0,
+          "attention_delta": 0.0
+        },
+        "d2bcca3a-e4fc-4025-a331-4ca25a3f3ed7": {
+          "attention_energy": 0.5482039613442703,
+          "information_energy": 0.5482039613442703,
+          "attention_income": 0.0,
+          "attention_delta": 0.0
+        },
+        "f08bd08a-f499-4679-bab4-bece5d845844": {
+          "attention_energy": 1.1794668480702348,
+          "information_energy": 0.7863553242011126,
+          "attention_income": 0.25,
+          "attention_delta": 0.17946684807023483
+        }
+      }
+    },
+    {
+      "time_step": 2,
+      "agents": {
+        "018b6e1e-f0ef-4e47-b67a-6e3efaebcfa8": {
+          "attention_energy": 0.38787667404076565,
+          "information_energy": 1.7379457730678567,
+          "attention_income": 0.39343375220723564,
+          "attention_delta": 0.3267059146942168
+        },
+        "4e0b8bd9-5f80-4c70-9fdb-d848885e8805": {
+          "attention_energy": 1.4478908172173304,
+          "information_energy": 0.4330931212486383,
+          "attention_income": 0.5237236167100758,
+          "attention_delta": 0.45053554818271324
+        },
+        "5db7f68a-425d-4723-a09f-5b4d0d50d58d": {
+          "attention_energy": 0.5005394266912052,
+          "information_energy": -0.2201593589242805,
+          "attention_income": 0.7099803545468555,
+          "attention_delta": 0.0
+        },
+        "7761bd50-a67f-4b71-bb70-1803101d4b4d": {
+          "attention_energy": 0.6394370169848757,
+          "information_energy": 0.6394370169848757,
+          "attention_income": 0.0,
+          "attention_delta": 0.0
+        },
+        "94f70bcd-85e2-428b-ae87-b9c8c5b72541": {
+          "attention_energy": 0.6186924755830575,
+          "information_energy": 0.6186924755830575,
+          "attention_income": 0.0,
+          "attention_delta": 0.0
+        },
+        "afbc31c5-dc7a-4f54-8222-e3751f411289": {
+          "attention_energy": 1.393769906950409,
+          "information_energy": 1.522868220522752,
+          "attention_income": 0.26023738877959063,
+          "attention_delta": 0.2268734700230812
+        },
+        "d2bcca3a-e4fc-4025-a331-4ca25a3f3ed7": {
+          "attention_energy": 1.18177051859205,
+          "information_energy": 0.45969678222792404,
+          "attention_income": 0.6724609312716378,
+          "attention_delta": 0.6335665572477798
+        },
+        "f08bd08a-f499-4679-bab4-bece5d845844": {
+          "attention_energy": 1.2590780071719296,
+          "information_energy": 0.6124257073459762,
+          "attention_income": 0.15014431103146003,
+          "attention_delta": 0.07961115910169485
+        }
+      }
+    },
+    {
+      "time_step": 3,
+      "agents": {
+        "018b6e1e-f0ef-4e47-b67a-6e3efaebcfa8": {
+          "attention_energy": -0.017097912155698114,
+          "information_energy": 2.089296531042088,
+          "attention_income": 0.2804457268996126,
+          "attention_delta": 0.21371788938659375
+        },
+        "36a3c1d3-d7a6-4e54-9f1c-7e14fa7ae0d5": {
+          "attention_energy": 0.6394370169848757,
+          "information_energy": 0.6394370169848757,
+          "attention_income": 0.0,
+          "attention_delta": 0.0
+        },
+        "4e0b8bd9-5f80-4c70-9fdb-d848885e8805": {
+          "attention_energy": 1.151746986204404,
+          "information_energy": 0.503225910876311,
+          "attention_income": 0.41648125449931206,
+          "attention_delta": 0.34329318597194947
+        },
+        "5db7f68a-425d-4723-a09f-5b4d0d50d58d": {
+          "attention_energy": 0.5005394266912052,
+          "information_energy": -0.2201593589242805,
+          "attention_income": 0.7099803545468555,
+          "attention_delta": 0.0
+        },
+        "7761bd50-a67f-4b71-bb70-1803101d4b4d": {
+          "attention_energy": 1.177979802330035,
+          "information_energy": 0.4628983603595549,
+          "attention_income": 0.5751368196088407,
+          "attention_delta": 0.5385427853451594
+        },
+        "8a4aa0a6-d37e-40e7-bb35-dc8391877fb8": {
+          "attention_energy": 0.6186924755830575,
+          "information_energy": 0.6186924755830575,
+          "attention_income": 0.0,
+          "attention_delta": 0.0
+        },
+        "94f70bcd-85e2-428b-ae87-b9c8c5b72541": {
+          "attention_energy": 0.585328556826548,
+          "information_energy": 1.5887357091403467,
+          "attention_income": 0.0,
+          "attention_delta": -0.033363918756509424
+        },
+        "afbc31c5-dc7a-4f54-8222-e3751f411289": {
+          "attention_energy": 1.7492300088256303,
+          "information_energy": 2.278840004118176,
+          "attention_income": 0.38882402063173066,
+          "attention_delta": 0.35546010187522126
+        },
+        "d2bcca3a-e4fc-4025-a331-4ca25a3f3ed7": {
+          "attention_energy": 1.3753692721115789,
+          "information_energy": 1.200217573843109,
+          "attention_income": 0.23249312754338694,
+          "attention_delta": 0.19359875351952893
+        },
+        "f08bd08a-f499-4679-bab4-bece5d845844": {
+          "attention_energy": 1.2951639060592814,
+          "information_energy": 0.4583536199627152,
+          "attention_income": 0.10661905081711692,
+          "attention_delta": 0.03608589888735174
+        }
+      }
+    },
+    {
+      "time_step": 4,
+      "agents": {
+        "018b6e1e-f0ef-4e47-b67a-6e3efaebcfa8": {
+          "attention_energy": -0.017097912155698114,
+          "information_energy": 2.089296531042088,
+          "attention_income": 0.2804457268996126,
+          "attention_delta": 0.0
+        },
+        "36a3c1d3-d7a6-4e54-9f1c-7e14fa7ae0d5": {
+          "attention_energy": 0.9267535969140985,
+          "information_energy": 0.4628983603595549,
+          "attention_income": 0.32391061419290423,
+          "attention_delta": 0.28731657992922294
+        },
+        "4e0b8bd9-5f80-4c70-9fdb-d848885e8805": {
+          "attention_energy": 1.7669393129603557,
+          "information_energy": 0.42671192028100613,
+          "attention_income": 0.6883803952833142,
+          "attention_delta": 0.6151923267559516
+        },
+        "5db7f68a-425d-4723-a09f-5b4d0d50d58d": {
+          "attention_energy": 0.5005394266912052,
+          "information_energy": -0.2201593589242805,
+          "attention_income": 0.7099803545468555,
+          "attention_delta": 0.0
+        },
+        "7761bd50-a67f-4b71-bb70-1803101d4b4d": {
+          "attention_energy": 1.1443699084978274,
+          "information_energy": 0.7544988243511019,
+          "attention_income": 0.002984140431473794,
+          "attention_delta": -0.0336098938322075
+        },
+        "8a4aa0a6-d37e-40e7-bb35-dc8391877fb8": {
+          "attention_energy": 0.7553667537106805,
+          "information_energy": 1.617050890583957,
+          "attention_income": 0.1700381968841325,
+          "attention_delta": 0.13667427812762306
+        },
+        "94f70bcd-85e2-428b-ae87-b9c8c5b72541": {
+          "attention_energy": 0.5519646380700386,
+          "information_energy": 2.5587789426976357,
+          "attention_income": 0.0,
+          "attention_delta": -0.033363918756509424
+        },
+        "afbc31c5-dc7a-4f54-8222-e3751f411289": {
+          "attention_energy": 2.2161549801702467,
+          "information_energy": 2.6348117877136,
+          "attention_income": 0.5002888901011258,
+          "attention_delta": 0.46692497134461636
+        },
+        "d2bcca3a-e4fc-4025-a331-4ca25a3f3ed7": {
+          "attention_energy": 1.4654087905549091,
+          "information_energy": 1.5084528156846653,
+          "attention_income": 0.12893389246718825,
+          "attention_delta": 0.09003951844333025
+        },
+        "f08bd08a-f499-4679-bab4-bece5d845844": {
+          "attention_energy": 1.4100946247693775,
+          "information_energy": 0.4645664736357033,
+          "attention_income": 0.18546387063986122,
+          "attention_delta": 0.11493071871009604
+        }
+      }
+    },
+    {
+      "time_step": 5,
+      "agents": {
+        "018b6e1e-f0ef-4e47-b67a-6e3efaebcfa8": {
+          "attention_energy": -0.017097912155698114,
+          "information_energy": 2.089296531042088,
+          "attention_income": 0.2804457268996126,
+          "attention_delta": 0.0
+        },
+        "36a3c1d3-d7a6-4e54-9f1c-7e14fa7ae0d5": {
+          "attention_energy": 0.8901595626504173,
+          "information_energy": 0.9230651927070679,
+          "attention_income": 0.0,
+          "attention_delta": -0.03659403426368129
+        },
+        "4e0b8bd9-5f80-4c70-9fdb-d848885e8805": {
+          "attention_energy": 1.7273935525254853,
+          "information_energy": 0.4543054207742857,
+          "attention_income": 0.3336423080924922,
+          "attention_delta": -0.0395457604348704
+        },
+        "5db7f68a-425d-4723-a09f-5b4d0d50d58d": {
+          "attention_energy": 0.5005394266912052,
+          "information_energy": -0.2201593589242805,
+          "attention_income": 0.7099803545468555,
+          "attention_delta": 0.0
+        },
+        "7761bd50-a67f-4b71-bb70-1803101d4b4d": {
+          "attention_energy": 1.1077758742341461,
+          "information_energy": 1.0208644517354217,
+          "attention_income": 0.0,
+          "attention_delta": -0.03659403426368129
+        },
+        "8a4aa0a6-d37e-40e7-bb35-dc8391877fb8": {
+          "attention_energy": 0.7220028349541711,
+          "information_energy": 2.615409305584856,
+          "attention_income": 0.0,
+          "attention_delta": -0.033363918756509424
+        },
+        "94f70bcd-85e2-428b-ae87-b9c8c5b72541": {
+          "attention_energy": 0.6937476085677386,
+          "information_energy": 3.528822176254925,
+          "attention_income": 0.1751468892542095,
+          "attention_delta": 0.14178297049770006
+        },
+        "afbc31c5-dc7a-4f54-8222-e3751f411289": {
+          "attention_energy": 1.9958814016626163,
+          "information_energy": 2.3622260315795782,
+          "attention_income": 0.39465822034965875,
+          "attention_delta": 0.3279303828366399
+        },
+        "d2bcca3a-e4fc-4025-a331-4ca25a3f3ed7": {
+          "attention_energy": 1.5955155739728817,
+          "information_energy": 1.8991414145109613,
+          "attention_income": 0.16900115744183053,
+          "attention_delta": 0.13010678341797252
+        },
+        "dfad2c4b-d228-440a-a09f-1e0db138fe3e": {
+          "attention_energy": 0.5482039613442703,
+          "information_energy": 0.5482039613442703,
+          "attention_income": 0.0,
+          "attention_delta": 0.0
+        },
+        "f08bd08a-f499-4679-bab4-bece5d845844": {
+          "attention_energy": 2.2671128977014217,
+          "information_energy": 0.29063685678056683,
+          "attention_income": 0.9275514248618091,
+          "attention_delta": 0.8570182729320439
+        }
+      }
+    },
+    {
+      "time_step": 6,
+      "agents": {
+        "018b6e1e-f0ef-4e47-b67a-6e3efaebcfa8": {
+          "attention_energy": -0.017097912155698114,
+          "information_energy": 2.089296531042088,
+          "attention_income": 0.2804457268996126,
+          "attention_delta": 0.0
+        },
+        "36a3c1d3-d7a6-4e54-9f1c-7e14fa7ae0d5": {
+          "attention_energy": 0.8629196084878711,
+          "information_energy": 1.4456705835122432,
+          "attention_income": 0.009354080101135106,
+          "attention_delta": -0.02723995416254618
+        },
+        "4e0b8bd9-5f80-4c70-9fdb-d848885e8805": {
+          "attention_energy": 1.4862633811837318,
+          "information_energy": 0.20557642775309648,
+          "attention_income": 0.47149491417048506,
+          "attention_delta": 0.39830684564312246
+        },
+        "5db7f68a-425d-4723-a09f-5b4d0d50d58d": {
+          "attention_energy": 0.5005394266912052,
+          "information_energy": -0.2201593589242805,
+          "attention_income": 0.7099803545468555,
+          "attention_delta": 0.0
+        },
+        "7761bd50-a67f-4b71-bb70-1803101d4b4d": {
+          "attention_energy": 1.077780226110475,
+          "information_energy": 1.2487431569607041,
+          "attention_income": 0.006598386140010083,
+          "attention_delta": -0.029995648123671205
+        },
+        "78b6f114-cc59-4540-8133-4f7478350a29": {
+          "attention_energy": 0.6186924755830575,
+          "information_energy": 0.6186924755830575,
+          "attention_income": 0.0,
+          "attention_delta": 0.0
+        },
+        "8a4aa0a6-d37e-40e7-bb35-dc8391877fb8": {
+          "attention_energy": 0.8853107286128563,
+          "information_energy": 3.6137677205857557,
+          "attention_income": 0.1966718124151947,
+          "attention_delta": 0.16330789365868528
+        },
+        "94f70bcd-85e2-428b-ae87-b9c8c5b72541": {
+          "attention_energy": 0.20499910788685705,
+          "information_energy": 3.880172934229156,
+          "attention_income": 0.1966718124151947,
+          "attention_delta": 0.12994397490217585
+        },
+        "afbc31c5-dc7a-4f54-8222-e3751f411289": {
+          "attention_energy": 1.3809496028053272,
+          "information_energy": 2.0354886351845956,
+          "attention_income": 0.0,
+          "attention_delta": -0.06672783751301885
+        },
+        "d2bcca3a-e4fc-4025-a331-4ca25a3f3ed7": {
+          "attention_energy": 1.7796554743044335,
+          "information_energy": 2.2153179130281546,
+          "attention_income": 0.22303427435540993,
+          "attention_delta": 0.18413990033155192
+        },
+        "da675d2a-3784-4217-b59a-60e1157d406a": {
+          "attention_energy": 0.6394370169848757,
+          "information_energy": 0.6394370169848757,
+          "attention_income": 0.0,
+          "attention_delta": 0.0
+        },
+        "dfad2c4b-d228-440a-a09f-1e0db138fe3e": {
+          "attention_energy": 1.2664929640049376,
+          "information_energy": 0.9041757449396944,
+          "attention_income": 0.7516529214171768,
+          "attention_delta": 0.7182890026606673
+        },
+        "f08bd08a-f499-4679-bab4-bece5d845844": {
+          "attention_energy": 2.3411015447570502,
+          "information_energy": 0.11670723992543036,
+          "attention_income": 0.1445217989853936,
+          "attention_delta": 0.07398864705562842
+        },
+        "f385c0e3-a7c5-4f74-9d82-ec05d834d935": {
+          "attention_energy": 0.5482039613442703,
+          "information_energy": 0.5482039613442703,
+          "attention_income": 0.0,
+          "attention_delta": 0.0
+        }
+      }
+    },
+    {
+      "time_step": 7,
+      "agents": {
+        "018b6e1e-f0ef-4e47-b67a-6e3efaebcfa8": {
+          "attention_energy": -0.017097912155698114,
+          "information_energy": 2.089296531042088,
+          "attention_income": 0.2804457268996126,
+          "attention_delta": 0.0
+        },
+        "36a3c1d3-d7a6-4e54-9f1c-7e14fa7ae0d5": {
+          "attention_energy": 1.0607411305464878,
+          "information_energy": 1.4691429679672412,
+          "attention_income": 0.23441555632229805,
+          "attention_delta": 0.19782152205861675
+        },
+        "4b6d6a66-9db9-4aff-823b-c1c33f52b13b": {
+          "attention_energy": 0.5482039613442703,
+          "information_energy": 0.5482039613442703,
+          "attention_income": 0.0,
+          "attention_delta": 0.0
+        },
+        "4e0b8bd9-5f80-4c70-9fdb-d848885e8805": {
+          "attention_energy": 1.4130753126563693,
+          "information_energy": 0.5457760976841713,
+          "attention_income": 0.0,
+          "attention_delta": -0.07318806852736258
+        },
+        "5db7f68a-425d-4723-a09f-5b4d0d50d58d": {
+          "attention_energy": 0.5005394266912052,
+          "information_energy": -0.2201593589242805,
+          "attention_income": 0.7099803545468555,
+          "attention_delta": 0.0
+        },
+        "6888655e-9285-49ac-a1db-59c3d456745a": {
+          "attention_energy": 0.6186924755830575,
+          "information_energy": 0.6186924755830575,
+          "attention_income": 0.0,
+          "attention_delta": 0.0
+        },
+        "7761bd50-a67f-4b71-bb70-1803101d4b4d": {
+          "attention_energy": 1.115271486753507,
+          "information_energy": 2.08103922403659,
+          "attention_income": 0.07408529490671326,
+          "attention_delta": 0.037491260643031966
+        },
+        "78b6f114-cc59-4540-8133-4f7478350a29": {
+          "attention_energy": 0.7962587399470957,
+          "information_energy": 1.5887357091403467,
+          "attention_income": 0.21093018312054762,
+          "attention_delta": 0.1775662643640382
+        },
+        "8a4aa0a6-d37e-40e7-bb35-dc8391877fb8": {
+          "attention_energy": 1.0424866318866788,
+          "information_energy": 3.993433660003597,
+          "attention_income": 0.8425962163698989,
+          "attention_delta": 0.7758683788568801
+        },
+        "94f70bcd-85e2-428b-ae87-b9c8c5b72541": {
+          "attention_energy": -0.415695309164934,
+          "information_energy": 4.231523692203388,
+          "attention_income": 0.0647258960442853,
+          "attention_delta": -0.002001941468733545
+        },
+        "97eeed96-3182-4982-896e-a0b93ccf36e8": {
+          "attention_energy": 0.5482039613442703,
+          "information_energy": 0.5482039613442703,
+          "attention_income": 0.0,
+          "attention_delta": 0.0
+        },
+        "a2bdfc64-ed6b-4974-879e-3a3182f9fd9d": {
+          "attention_energy": 0.6186924755830575,
+          "information_energy": 0.6186924755830575,
+          "attention_income": 0.0,
+          "attention_delta": 0.0
+        },
+        "afbc31c5-dc7a-4f54-8222-e3751f411289": {
+          "attention_energy": 0.766017803948038,
+          "information_energy": 1.6700575845416026,
+          "attention_income": 0.0,
+          "attention_delta": -0.06672783751301885
+        },
+        "d2bcca3a-e4fc-4025-a331-4ca25a3f3ed7": {
+          "attention_energy": 1.333623436201814,
+          "information_energy": 2.0445738321473623,
+          "attention_income": 0.17996067128936669,
+          "attention_delta": 0.10217192324165066
+        },
+        "da675d2a-3784-4217-b59a-60e1157d406a": {
+          "attention_energy": 0.6109423426931532,
+          "information_energy": 0.43734301257785635,
+          "attention_income": 0.0,
+          "attention_delta": -0.028494674291722442
+        },
+        "dfad2c4b-d228-440a-a09f-1e0db138fe3e": {
+          "attention_energy": 1.516731253656372,
+          "information_energy": 1.8601475285351188,
+          "attention_income": 0.28360220840794365,
+          "attention_delta": 0.25023828965143424
+        },
+        "f08bd08a-f499-4679-bab4-bece5d845844": {
+          "attention_energy": 2.3802523663662316,
+          "information_energy": 0.1427776230702939,
+          "attention_income": 0.10968397353894663,
+          "attention_delta": 0.039150821609181444
+        },
+        "f385c0e3-a7c5-4f74-9d82-ec05d834d935": {
+          "attention_energy": 0.5148400425877608,
+          "information_energy": 0.9041757449396944,
+          "attention_income": 2.4154750641080034e-19,
+          "attention_delta": -0.033363918756509424
+        }
+      }
+    },
+    {
+      "time_step": 8,
+      "agents": {
+        "018b6e1e-f0ef-4e47-b67a-6e3efaebcfa8": {
+          "attention_energy": -0.017097912155698114,
+          "information_energy": 2.089296531042088,
+          "attention_income": 0.2804457268996126,
+          "attention_delta": 0.0
+        },
+        "36a3c1d3-d7a6-4e54-9f1c-7e14fa7ae0d5": {
+          "attention_energy": 1.0241470962828065,
+          "information_energy": 1.7931228149068716,
+          "attention_income": 0.0,
+          "attention_delta": -0.03659403426368129
+        },
+        "4b6d6a66-9db9-4aff-823b-c1c33f52b13b": {
+          "attention_energy": 0.7302702551079154,
+          "information_energy": 0.8923757449396944,
+          "attention_income": 0.2187806087311655,
+          "attention_delta": 0.18206629376364514
+        },
+        "4e0b8bd9-5f80-4c70-9fdb-d848885e8805": {
+          "attention_energy": 1.453176868163922,
+          "information_energy": 0.7755163839634955,
+          "attention_income": 0.11328962403491531,
+          "attention_delta": 0.04010155550755273
+        },
+        "5db7f68a-425d-4723-a09f-5b4d0d50d58d": {
+          "attention_energy": 0.5005394266912052,
+          "information_energy": -0.2201593589242805,
+          "attention_income": 0.7099803545468555,
+          "attention_delta": 0.0
+        },
+        "5e875953-b164-41c5-91ad-a71f35ae5c8a": {
+          "attention_energy": 1.1668964369273278,
+          "information_energy": 1.1668964369273278,
+          "attention_income": 0.0,
+          "attention_delta": 0.0
+        },
+        "6888655e-9285-49ac-a1db-59c3d456745a": {
+          "attention_energy": 0.585328556826548,
+          "information_energy": 1.5687357091403467,
+          "attention_income": 0.0,
+          "attention_delta": -0.033363918756509424
+        },
+        "72e3dd09-d30b-46ee-9a18-de363bb78472": {
+          "attention_energy": 0.5482039613442703,
+          "information_energy": 0.5482039613442703,
+          "attention_income": 0.0,
+          "attention_delta": 0.0
+        },
+        "7761bd50-a67f-4b71-bb70-1803101d4b4d": {
+          "attention_energy": 1.0786774524898257,
+          "information_energy": 2.911126610187174,
+          "attention_income": 0.0,
+          "attention_delta": -0.03659403426368129
+        },
+        "78b6f114-cc59-4540-8133-4f7478350a29": {
+          "attention_energy": 1.089391729586929,
+          "information_energy": 2.5587789426976357,
+          "attention_income": 0.3264969083963429,
+          "attention_delta": 0.2931329896398335
+        },
+        "8a4aa0a6-d37e-40e7-bb35-dc8391877fb8": {
+          "attention_energy": 0.44105145447550276,
+          "information_energy": 4.408343856540832,
+          "attention_income": 0.04874087856550675,
+          "attention_delta": -0.0179869589475121
+        },
+        "94f70bcd-85e2-428b-ae87-b9c8c5b72541": {
+          "attention_energy": -0.415695309164934,
+          "information_energy": 4.231523692203388,
+          "attention_income": 0.0647258960442853,
+          "attention_delta": 0.0
+        },
+        "97eeed96-3182-4982-896e-a0b93ccf36e8": {
+          "attention_energy": 0.5093095873204123,
+          "information_energy": 0.45969678222792404,
+          "attention_income": 0.0,
+          "attention_delta": -0.038894374023858015
+        },
+        "a2bdfc64-ed6b-4974-879e-3a3182f9fd9d": {
+          "attention_energy": 0.6872680420648392,
+          "information_energy": 1.617050890583957,
+          "attention_income": 0.10193948523829104,
+          "attention_delta": 0.06857556648178162
+        },
+        "afbc31c5-dc7a-4f54-8222-e3751f411289": {
+          "attention_energy": 0.70949034202823,
+          "information_energy": 1.3453643119428214,
+          "attention_income": 0.5584043369374813,
+          "attention_delta": 0.4916764994244624
+        },
+        "d2bcca3a-e4fc-4025-a331-4ca25a3f3ed7": {
+          "attention_energy": 0.21331917333584105,
+          "information_energy": 1.2637449051295717,
+          "attention_income": 0.08913666498967729,
+          "attention_delta": 0.011347916941961259
+        },
+        "da675d2a-3784-4217-b59a-60e1157d406a": {
+          "attention_energy": 0.7863847449438397,
+          "information_energy": 0.43981119153912274,
+          "attention_income": 0.203937076542409,
+          "attention_delta": 0.17544240225068655
+        },
+        "dfad2c4b-d228-440a-a09f-1e0db138fe3e": {
+          "attention_energy": 1.7424015466355114,
+          "information_energy": 2.2161193121305427,
+          "attention_income": 0.25903421173564883,
+          "attention_delta": 0.2256702929791394
+        },
+        "ef13e1d8-29e1-4964-aea0-9a1a95bc84ec": {
+          "attention_energy": 0.5482039613442703,
+          "information_energy": 0.5482039613442703,
+          "attention_income": 0.0,
+          "attention_delta": 0.0
+        },
+        "f08bd08a-f499-4679-bab4-bece5d845844": {
+          "attention_energy": 2.342330500740219,
+          "information_energy": -0.05100952325671798,
+          "attention_income": 0.03261128630375252,
+          "attention_delta": -0.037921865626012664
+        },
+        "f385c0e3-a7c5-4f74-9d82-ec05d834d935": {
+          "attention_energy": 0.529105042356061,
+          "information_energy": 1.2601475285351187,
+          "attention_income": 0.047628918524809605,
+          "attention_delta": 0.01426499976830018
+        }
+      }
+    }
+  ]
+}

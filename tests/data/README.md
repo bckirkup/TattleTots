@@ -11,11 +11,19 @@ projection. It is a deliberately labeled change-detector: it catches discrete
 changes in IDs, counts, flags, locations, and other non-float telemetry, but it
 does not validate float telemetry.
 
+`determinism_agent_traces.json` records the per-step, per-agent energy and
+attention trace for the same seeded runs. It is tolerance-based diagnostic
+reference data, not a correctness golden: the test uses `pytest.approx(rel=1e-9)`
+and reports the first divergence plus its per-step growth curve.
+
 To deliberately regenerate the file, run `_run_payload(42)` for both the
 default configuration and the legacy configuration
 (`reproduction_coupling_strength=0.0`, `grounding_quality_strength=0.0`), then
 extract each record's float fields for
 `determinism_float_references.json` and apply `_structural_projection()` for
-`determinism_structural_references.json`. Review the resulting diff before
-replacing either file. Do not update the data merely to make a failing test
-pass; update it only for an intentional simulation behavior change.
+`determinism_structural_references.json`. For the per-agent diagnostic, run
+`_run_payload(42, capture_agent_trace=True)` for both configurations and extract
+the `agent_trace` entries into `determinism_agent_traces.json`. Review the
+resulting diff before replacing any file. Do not update the data merely to make
+a failing test pass; update it only for an intentional simulation behavior
+change.
