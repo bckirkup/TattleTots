@@ -70,7 +70,7 @@ class _FixtureAdapter(DomainAdapter):
         return []
 
     def step(self, time_step: int) -> None:
-        if not self._bypass_stream or time_step == 0:
+        if not self._bypass_stream or time_step != 1:
             data = self._probe.observe(float(time_step + 1))
         else:
             data = np.array([float(time_step + 1)], dtype=np.float64)
@@ -162,6 +162,54 @@ class _ResidualFixtureAdapter(_FixtureAdapter):
             self._residual.update(np.array([float(time_step)], dtype=np.float64))
 
 
+class _FireShapedFixtureAdapter(_FixtureAdapter):
+    """Call one sensor while feeding a second raw stream from hidden state."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._weather_probe = _Probe()
+        self._internal_stream = Stream(
+            stream_type=StreamType.RAW,
+            dimensionality=1,
+            label="internal_signal",
+            current_data=np.zeros(1, dtype=np.float64),
+            current_status=np.array([ObservationStatus.OBSERVED.value]),
+            metadata=StreamMetadata(
+                coordinates=[(2.0, 2.0)],
+                sensor_coordinates=[(2.0, 2.0)],
+                modality=["signal"],
+                identity=[None],
+                footprints=[(2.0, 2.0)],
+                resolution=[1.0],
+            ),
+        )
+
+    def get_streams(self) -> list[Stream]:
+        return [self._stream, self._internal_stream]
+
+    def step(self, time_step: int) -> None:
+        super().step(time_step)
+        self._weather_probe.observe(float(time_step))
+        self._internal_stream.update(np.array([float(time_step + 1)], dtype=np.float64))
+
+    def infer_report_location(
+        self,
+        stream_data: list[NDArray[np.float64]],
+        stream_labels: list[str],
+    ) -> EventLocation:
+        return (2, 2) if stream_labels[0] == "internal_signal" else (1, 1)
+
+
+class _RejectsEmptyObservationAdapter(_FixtureAdapter):
+    """Raise when stream assembly cannot tolerate a silenced sensor."""
+
+    def step(self, time_step: int) -> None:
+        data = self._probe.observe(float(time_step + 1))
+        if not np.any(data):
+            raise ValueError("empty observations are unsupported")
+        self._stream.update(data)
+
+
 class _MalformedDeclarationAdapter(_FixtureAdapter):
     def __init__(self) -> None:
         super().__init__()
@@ -182,6 +230,14 @@ def _matching_state_factory() -> tuple[DomainAdapter, DomainAdapter]:
 
 def _matching_residual_state_factory() -> tuple[DomainAdapter, DomainAdapter]:
     return _ResidualFixtureAdapter(), _ResidualFixtureAdapter()
+
+
+def _matching_fire_shaped_state_factory() -> tuple[DomainAdapter, DomainAdapter]:
+    return _FireShapedFixtureAdapter(), _FireShapedFixtureAdapter()
+
+
+def _matching_rejecting_state_factory() -> tuple[DomainAdapter, DomainAdapter]:
+    return _RejectsEmptyObservationAdapter(), _RejectsEmptyObservationAdapter()
 
 
 def _matching_malformed_state_factory() -> tuple[DomainAdapter, DomainAdapter]:
@@ -237,6 +293,53 @@ def test_raw_stream_bypass_is_caught_without_sensor_call() -> None:
     assert report.bypassed_streams == ("published_signal",)
 
 
+def test_silenced_probe_catches_raw_state_feed_despite_other_sensor_calls() -> None:
+    report = validate_adapter_conformance(
+        _FireShapedFixtureAdapter(),
+        steps=3,
+        state_independence_factory=_matching_fire_shaped_state_factory,
+    )
+
+    sensor_calls = next(
+        finding
+        for finding in report.findings
+        if finding.check == AdapterConformanceCheck.SENSOR_CALLS
+    )
+    bypass = next(
+        finding
+        for finding in report.findings
+        if finding.check == AdapterConformanceCheck.STREAM_BYPASS
+    )
+    silenced = next(
+        finding
+        for finding in report.findings
+        if finding.check == AdapterConformanceCheck.SILENCED_SENSOR_PROBE
+    )
+    assert sensor_calls.passed
+    assert bypass.passed
+    assert not silenced.passed
+    assert "internal_signal" in silenced.message
+
+
+def test_silenced_probe_reports_adapter_raise_as_not_exercised() -> None:
+    report = validate_adapter_conformance(
+        _RejectsEmptyObservationAdapter(),
+        steps=1,
+        state_independence_factory=_matching_rejecting_state_factory,
+    )
+
+    finding = next(
+        finding
+        for finding in report.findings
+        if finding.check == AdapterConformanceCheck.SILENCED_SENSOR_PROBE
+    )
+    assert finding.passed
+    assert not finding.exercised
+    assert "Not exercised" in finding.message
+    assert "ValueError" in finding.message
+    assert not report.valid
+
+
 def test_wrong_field_arithmetic_decoder_is_caught_by_round_trip() -> None:
     report = validate_adapter_conformance(
         _FixtureAdapter(wrong_decoder=True),
@@ -267,7 +370,7 @@ def test_missing_state_hook_is_explicitly_not_exercised() -> None:
         if finding.check == AdapterConformanceCheck.STATE_INDEPENDENCE
     )
     assert not finding.passed
-    assert "Not exercised" in finding.message
+    assert "State-independence failed" in finding.message
 
 
 def test_reflection_finds_sensors_in_nested_lists_and_dicts() -> None:

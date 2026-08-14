@@ -28,6 +28,7 @@ class AdapterConformanceCheck(StrEnum):
     EXECUTION = "execution"
     SENSOR_CALLS = "sensor_calls"
     STREAM_BYPASS = "stream_bypass"
+    SILENCED_SENSOR_PROBE = "silenced_sensor_probe"
     DECODER_ROUND_TRIP = "decoder_round_trip"
     DECLARATIONS = "declarations"
     STATE_INDEPENDENCE = "state_independence"
@@ -43,6 +44,7 @@ class AdapterConformanceFinding:
     message: str
     measured: int | float | None = None
     threshold: int | float | None = None
+    exercised: bool = True
 
 
 @dataclass(frozen=True)
@@ -60,7 +62,7 @@ class AdapterConformanceReport:
     @property
     def valid(self) -> bool:
         """Whether every requested conformance check passed."""
-        return all(finding.passed for finding in self.findings)
+        return all(finding.passed and finding.exercised for finding in self.findings)
 
 
 StateIndependenceFactory = Callable[[], tuple[DomainAdapter, DomainAdapter]]
@@ -76,25 +78,38 @@ class _SensorTarget:
     method_name: str
 
 
+@dataclass(frozen=True)
+class _ReturnSpec:
+    """Observed shape information used to silence one sensor method."""
+
+    kind: str
+    shape: tuple[int, ...] = ()
+
+
 class _CallRecorder:
     """Record reflected sensor calls for each adapter step."""
 
     def __init__(self) -> None:
         self.called: set[str] = set()
         self.step_calls: set[str] = set()
+        self.return_specs: dict[str, list[_ReturnSpec]] = {}
 
     def begin_step(self) -> None:
         self.step_calls = set()
 
-    def record(self, key: str) -> None:
+    def record(self, key: str, value: Any = None) -> None:
         self.called.add(key)
         self.step_calls.add(key)
+        spec = _return_spec(value)
+        self.return_specs.setdefault(key, []).append(spec)
 
 
 @contextmanager
 def _record_sensor_calls(
     targets: tuple[_SensorTarget, ...],
     recorder: _CallRecorder,
+    *,
+    stub_returns: dict[str, tuple[Any, ...]] | None = None,
 ) -> Iterator[tuple[str, ...]]:
     """Temporarily wrap reflected sensor methods and record their calls."""
     grouped: dict[tuple[type[Any], str], dict[int, str]] = {}
@@ -103,6 +118,7 @@ def _record_sensor_calls(
 
     patches: list[tuple[type[Any], str, Any, bool]] = []
     tracking_errors: list[str] = []
+    stub_indices: dict[str, int] = {}
     try:
         for (owner, method_name), instance_keys in grouped.items():
             raw = inspect.getattr_static(owner, method_name, None)
@@ -126,8 +142,16 @@ def _record_sensor_calls(
                     id(instance),
                     f"{_owner.__name__}.{_method_name} (unmapped instance)",
                 )
-                recorder.record(key)
-                return _raw(instance, *args, **kwargs)
+                if stub_returns is not None and key in stub_returns:
+                    index = stub_indices.get(key, 0)
+                    analogues = stub_returns[key]
+                    stub_indices[key] = index + 1
+                    value = analogues[min(index, len(analogues) - 1)]
+                    recorder.record(key, value)
+                    return value
+                value = _raw(instance, *args, **kwargs)
+                recorder.record(key, value)
+                return value
 
             had_own_method = method_name in owner.__dict__
             original = owner.__dict__.get(method_name)
@@ -268,6 +292,14 @@ def validate_adapter_conformance(
         )
     )
 
+    silenced_finding = _silenced_sensor_probe(
+        adapter,
+        targets,
+        recorder.return_specs,
+        steps,
+    )
+    findings.append(silenced_finding)
+
     declaration_findings = _declaration_findings(streams)
     declaration_failures = [finding for finding in declaration_findings if not finding.passed]
     findings.append(
@@ -337,7 +369,9 @@ def assert_adapter_conformance(
         steps,
         state_independence_factory=state_independence_factory,
     )
-    failures = [finding for finding in report.findings if not finding.passed]
+    failures = [
+        finding for finding in report.findings if not finding.passed or not finding.exercised
+    ]
     if failures:
         details = "\n".join(f"- {finding.check.value}: {finding.message}" for finding in failures)
         raise AssertionError(f"Adapter conformance failed:\n{details}")
@@ -358,6 +392,114 @@ def _invalid_steps_report(steps: int) -> AdapterConformanceReport:
         bypassed_streams=(),
         decoder_failures=(),
         state_independence_exercised=False,
+    )
+
+
+def _return_spec(value: Any) -> _ReturnSpec:
+    if value is None:
+        return _ReturnSpec("none")
+    if isinstance(value, np.ndarray):
+        return _ReturnSpec("ndarray", value.shape)
+    if isinstance(value, list):
+        return _ReturnSpec("list")
+    if isinstance(value, tuple):
+        return _ReturnSpec("tuple")
+    return _ReturnSpec("unsupported")
+
+
+def _empty_analogue(spec: _ReturnSpec) -> Any:
+    if spec.kind == "none":
+        return None
+    if spec.kind == "ndarray":
+        return np.zeros(spec.shape, dtype=np.float64)
+    if spec.kind == "list":
+        return []
+    if spec.kind == "tuple":
+        return ()
+    return None
+
+
+def _silenced_sensor_probe(
+    adapter: DomainAdapter,
+    targets: tuple[_SensorTarget, ...],
+    return_specs: dict[str, list[_ReturnSpec]],
+    start_step: int,
+) -> AdapterConformanceFinding:
+    """Check whether raw streams vary while every reflected sensor is silenced."""
+    if not targets:
+        return AdapterConformanceFinding(
+            AdapterConformanceCheck.SILENCED_SENSOR_PROBE,
+            True,
+            "Not exercised: no reflected sensor methods returned a value to silence.",
+            exercised=False,
+        )
+    if any(target.key not in return_specs for target in targets):
+        missing = [target.key for target in targets if target.key not in return_specs]
+        return AdapterConformanceFinding(
+            AdapterConformanceCheck.SILENCED_SENSOR_PROBE,
+            True,
+            "Not exercised: no observed return shape for " + ", ".join(missing) + ".",
+            exercised=False,
+        )
+    if any(spec.kind == "unsupported" for specs in return_specs.values() for spec in specs):
+        return AdapterConformanceFinding(
+            AdapterConformanceCheck.SILENCED_SENSOR_PROBE,
+            True,
+            "Not exercised: at least one reflected sensor returned an unsupported "
+            "value shape; only None, lists, tuples, and ndarrays can be silenced.",
+            exercised=False,
+        )
+
+    stubs = {
+        key: tuple(_empty_analogue(spec) for spec in specs) for key, specs in return_specs.items()
+    }
+    recorder = _CallRecorder()
+    varying_streams: set[str] = set()
+    previous: dict[str, NDArray[np.float64]] | None = None
+    try:
+        with _record_sensor_calls(targets, recorder, stub_returns=stubs):
+            for offset in range(2):
+                adapter.step(start_step + offset)
+                streams = adapter.get_streams()
+                current = _stream_snapshots(streams)
+                if previous is not None:
+                    for label, before_data in previous.items():
+                        after_data = current.get(label)
+                        if (
+                            after_data is not None
+                            and not np.array_equal(before_data, after_data)
+                            and _is_raw_stream(streams, label)
+                        ):
+                            varying_streams.add(label)
+                previous = current
+    except Exception as error:  # noqa: BLE001 - report probe limitations structurally
+        return AdapterConformanceFinding(
+            AdapterConformanceCheck.SILENCED_SENSOR_PROBE,
+            True,
+            "Not exercised: adapter raised "
+            f"{type(error).__name__} while sensor methods were silenced: {error}",
+            exercised=False,
+        )
+
+    if varying_streams:
+        return AdapterConformanceFinding(
+            AdapterConformanceCheck.SILENCED_SENSOR_PROBE,
+            False,
+            "Raw streams varied across consecutive steps while every reflected sensor "
+            "was silenced: "
+            + ", ".join(sorted(varying_streams))
+            + ". This observes data surviving total sensor silence; it does not prove "
+            "intent or identify the responsible internal state.",
+            measured=len(varying_streams),
+            threshold=0,
+        )
+    return AdapterConformanceFinding(
+        AdapterConformanceCheck.SILENCED_SENSOR_PROBE,
+        True,
+        "No published raw stream varied across consecutive steps while every "
+        "reflected sensor was silenced.",
+        measured=0,
+        threshold=0,
     )
 
 
@@ -473,7 +615,7 @@ def _state_independence_finding(
             AdapterConformanceFinding(
                 AdapterConformanceCheck.STATE_INDEPENDENCE,
                 False,
-                "Not exercised: supply state_independence_factory to compare "
+                "State-independence failed: supply state_independence_factory to compare "
                 "identical sensor configurations across hidden states.",
             ),
             False,
@@ -538,7 +680,7 @@ def _frame_containment_finding(
         return AdapterConformanceFinding(
             AdapterConformanceCheck.FRAME_CONTAINMENT,
             False,
-            "Not exercised: adapter does not declare a public location frame.",
+            "Frame containment failed: adapter does not declare a public location frame.",
         )
     failures = _declared_geometry_outside_frame(streams, frame) + measured_failures
     return AdapterConformanceFinding(
@@ -563,20 +705,30 @@ def _declared_geometry_outside_frame(
     for stream in streams:
         if stream.metadata is None:
             continue
-        for field_name in ("coordinates", "sensor_coordinates"):
-            coordinates = getattr(stream.metadata, field_name)
-            if coordinates is None:
-                continue
+        if stream.metadata.coordinates is not None:
             failures.extend(
                 _outside_frame(
                     frame,
                     [
                         location
-                        for coordinate in coordinates
+                        for coordinate in stream.metadata.coordinates
                         if coordinate
                         and (location := _coordinate_to_location(coordinate)) is not None
                     ],
-                    f"{stream.label}.{field_name}",
+                    f"{stream.label}.coordinates",
+                )
+            )
+        if stream.metadata.sensor_coordinates is not None:
+            failures.extend(
+                _outside_frame(
+                    frame,
+                    [
+                        location
+                        for coordinate in stream.metadata.sensor_coordinates
+                        if coordinate
+                        and (location := _coordinate_to_location(coordinate)) is not None
+                    ],
+                    f"{stream.label}.sensor_coordinates",
                 )
             )
     return failures
