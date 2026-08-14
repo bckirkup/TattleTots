@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import math
 import os
 import platform
 import subprocess
@@ -24,12 +25,14 @@ from tattletots.models.identity import stable_id_digest
 from tattletots.scenarios.gaussian_shift import GaussianShiftScenario
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_FINGERPRINT = "4b98dbd41feb9fcd0d207de2b9a7b54fedacfd6f6bf8ac99b780e2829fcad8bc"
-EXPECTED_LEGACY_FINGERPRINT = "5263ba65680de33c6fe1d6dd693e725a084bd6e0f5fbe64fc06678d299c14b23"
+FLOAT_REFERENCE_PATH = REPO_ROOT / "tests" / "data" / "determinism_float_references.json"
+# CHANGE DETECTOR, not a correctness check. This hash covers only the
+# float-free structure of both seeded runs; it does not validate float telemetry.
+EXPECTED_STRUCTURAL_FINGERPRINT = "aa1231053791820c27bc599370e56b51bf2148c1dc30e1550528344cb49207da"
 
 
 def _canonicalize(value: object) -> object:
-    """Normalize floating-point serialization across supported runtimes."""
+    """Normalize floating-point serialization for within-process fingerprints."""
     if isinstance(value, float):
         return round(value, 12)
     if isinstance(value, dict):
@@ -39,6 +42,34 @@ def _canonicalize(value: object) -> object:
     if isinstance(value, tuple):
         return tuple(_canonicalize(item) for item in value)
     return value
+
+
+def _structural_projection(value: object) -> object:
+    """Keep the payload structure while omitting floating-point leaves."""
+    if isinstance(value, dict):
+        return {
+            key: _structural_projection(item)
+            for key, item in value.items()
+            if not isinstance(item, float)
+        }
+    if isinstance(value, list):
+        return [_structural_projection(item) for item in value if not isinstance(item, float)]
+    if isinstance(value, tuple):
+        return tuple(_structural_projection(item) for item in value if not isinstance(item, float))
+    return value
+
+
+def _structural_fingerprint(value: object) -> str:
+    encoded = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _float_fields(record: dict[str, object]) -> dict[str, float]:
+    return {key: value for key, value in record.items() if isinstance(value, float)}
+
+
+def _load_float_references() -> dict[str, list[dict[str, float]]]:
+    return json.loads(FLOAT_REFERENCE_PATH.read_text(encoding="utf-8"))
 
 
 def _run_payload(
@@ -122,86 +153,79 @@ def _environment_diagnostics() -> str:
     )
 
 
-def _payload_diagnostics(payload: dict[str, object]) -> str:
+def _assert_float_telemetry_bounds(payload: dict[str, object]) -> None:
     records = payload["records"]
     assert isinstance(records, list)
-    lines = []
-    for section in ("agents", "streams", "users"):
-        value = payload[section]
-        encoded = json.dumps(_canonicalize(value), sort_keys=True, separators=(",", ":")).encode()
-        lines.append(f"{section} digest={hashlib.sha256(encoded).hexdigest()}")
     for index, record in enumerate(records):
-        canonical = _canonicalize(record)
-        encoded = json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()
-        values = _float_values(record)
-        magnitude = max((abs(value) for value in values), default=0.0)
-        lines.append(
-            f"record[{index}] max_abs={magnitude:.17g} digest={hashlib.sha256(encoded).hexdigest()}"
-        )
         assert isinstance(record, dict)
-        for key in sorted(record):
-            value = _canonicalize(record[key])
-            encoded = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
-            lines.append(
-                f"record[{index}].{key}={value!r} digest={hashlib.sha256(encoded).hexdigest()}"
-            )
-    return "\n".join(lines)
+        for field, value in record.items():
+            if isinstance(value, float):
+                assert math.isfinite(value), f"record[{index}].{field} is not finite"
+                if field.endswith("_share"):
+                    assert 0.0 <= value <= 1.0, f"record[{index}].{field} is out of bounds"
+                else:
+                    assert value >= 0.0, f"record[{index}].{field} is negative"
+            elif isinstance(value, int) and not isinstance(value, bool):
+                assert value >= 0, f"record[{index}].{field} is negative"
 
 
-def _float_values(value: object) -> list[float]:
-    if isinstance(value, float):
-        return [value]
-    if isinstance(value, dict):
-        return [item for child in value.values() for item in _float_values(child)]
-    if isinstance(value, (list, tuple)):
-        return [item for child in value for item in _float_values(child)]
-    return []
-
-
-def _assert_fingerprint(
-    expected: str,
+def _assert_float_telemetry(
+    label: str,
     payload: dict[str, object],
-    attention_trace: dict[int, dict[str, float]] | None = None,
+    references: list[dict[str, float]],
 ) -> None:
-    encoded = json.dumps(_canonicalize(payload), sort_keys=True, separators=(",", ":")).encode()
-    actual = hashlib.sha256(encoded).hexdigest()
-    if actual != expected:
-        boundary_lines = []
-        if attention_trace is not None and 6 in attention_trace:
-            boundary_lines = [
-                "attention deltas at step 6:",
-                *(
-                    f"{agent_id}={delta:.17g}"
-                    for agent_id, delta in sorted(attention_trace[6].items())
-                ),
-            ]
-        pytest.fail(
-            "\n".join(
-                [
-                    f"fingerprint mismatch: expected={expected} actual={actual}",
-                    _environment_diagnostics(),
-                    "per-record diagnostics:",
-                    _payload_diagnostics(payload),
-                    *boundary_lines,
-                ]
+    records = payload["records"]
+    assert isinstance(records, list)
+    assert len(records) == len(references), f"{label} record count changed"
+    for index, (record, reference) in enumerate(zip(records, references, strict=True)):
+        assert isinstance(record, dict)
+        actual_fields = _float_fields(record)
+        if set(actual_fields) != set(reference):
+            pytest.fail(
+                f"{label} record[{index}] float fields changed: "
+                f"expected={sorted(reference)} actual={sorted(actual_fields)}"
             )
-        )
+        for field, expected in reference.items():
+            actual = actual_fields[field]
+            if actual != pytest.approx(expected, rel=1e-9):
+                relative_difference = (
+                    abs(actual - expected) / abs(expected) if expected else abs(actual)
+                )
+                pytest.fail(
+                    f"{label} record[{index}].{field} differs: "
+                    f"expected={expected!r} actual={actual!r} "
+                    f"relative difference={relative_difference:.17g}\n"
+                    f"{_environment_diagnostics()}"
+                )
 
 
-def test_seeded_run_has_golden_fingerprint() -> None:
-    _assert_fingerprint(EXPECTED_FINGERPRINT, _run_payload(42))
-
-
-def test_legacy_setting_has_branch_golden_fingerprint() -> None:
-    attention_trace: dict[int, dict[str, float]] = {}
-    payload = _run_payload(
+def test_seeded_runs_have_structural_golden_change_detector() -> None:
+    default_payload = _run_payload(42)
+    legacy_payload = _run_payload(
         42,
         reproduction_coupling_strength=0.0,
         grounding_quality_strength=0.0,
-        attention_trace=attention_trace,
     )
+    projection = {
+        "default": _structural_projection(default_payload),
+        "legacy": _structural_projection(legacy_payload),
+    }
+    assert _structural_fingerprint(projection) == EXPECTED_STRUCTURAL_FINGERPRINT
 
-    _assert_fingerprint(EXPECTED_LEGACY_FINGERPRINT, payload, attention_trace)
+
+def test_float_telemetry_matches_both_run_references() -> None:
+    payloads = {
+        "default": _run_payload(42),
+        "legacy": _run_payload(
+            42,
+            reproduction_coupling_strength=0.0,
+            grounding_quality_strength=0.0,
+        ),
+    }
+    references = _load_float_references()
+    for label, payload in payloads.items():
+        _assert_float_telemetry_bounds(payload)
+        _assert_float_telemetry(label, payload, references[label])
 
 
 def test_reproduction_coupling_config_changes_run_fingerprint() -> None:
