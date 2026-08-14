@@ -133,7 +133,7 @@ def test_policy_location_is_projected_and_passes_grounded_gate() -> None:
 
 def test_escalating_policy_must_name_a_location() -> None:
     class _MissingLocationPolicy:
-        def decide(self, context: ReporterPolicyContext) -> ReporterDecision:
+        def decide(self, _context: ReporterPolicyContext) -> ReporterDecision:
             return ReporterDecision(escalate=True)
 
     register_reporter_policy("missing-location-policy", _MissingLocationPolicy)

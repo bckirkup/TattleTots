@@ -12,7 +12,7 @@ from tattletots.scenarios.sparse_sensor import SparseSensorScenario
 
 class _UninformativeDecoderSparse(SparseSensorScenario):
     def infer_report_location(
-        self, stream_data: list[NDArray[np.float64]], stream_labels: list[str]
+        self, _stream_data: list[NDArray[np.float64]], _stream_labels: list[str]
     ) -> tuple[int, int]:
         return (999, 999)
 

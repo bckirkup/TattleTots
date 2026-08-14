@@ -1,6 +1,6 @@
 ---
 name: sonar-quality
-description: Resolve and prevent SonarCloud/SonarQube code quality issues in Python repos. Use when fixing Sonar findings, reviewing PRs with Sonar annotations, or writing new code that must pass SonarCloud analysis.
+description: Prevent SonarCloud/SonarQube issues when writing or changing code in the TattleTots repo, and resolve findings when they are reported.
 ---
 
 # SonarCloud Quality Standards
@@ -11,6 +11,8 @@ does not reintroduce flagged patterns.
 ## Pre-commit checklist
 
 ```bash
+pre-commit run --all-files
+python scripts/sonar_guard.py src tests "Large Experiments"
 ruff check src/ tests/
 ruff format --check src/ tests/
 pytest
@@ -19,7 +21,13 @@ pytest
 After substantive changes, verify the SonarCloud check on the PR or compare against
 `https://sonarcloud.io/project/issues?id=bckirkup_TattleTots&issueStatuses=OPEN,CONFIRMED`.
 
-## Rule catalog (most common in this monorepo)
+## Rule catalog (current TattleTots findings and local defenses)
+
+The Ruff configuration enables `ARG`, `C90` (maximum complexity 15), `NPY`, and
+the mechanical Bandit rules that are useful here. `scripts/sonar_guard.py`
+provides the local checks for float equality in asserts, bare NumPy randomness,
+and uncommented `pass` stubs. The `zizmor` pre-commit hook and the `workflows`
+CI job check GitHub Actions files.
 
 ### python:S1244 — no floating-point equality
 
@@ -76,6 +84,18 @@ Use `np.random.default_rng(seed)` instead of legacy `np.random.seed()` /
 
 When Sonar flags a function, extract helpers for distinct logical blocks. Prefer
 early returns over deep nesting. Each helper should have a single responsibility.
+
+### pythonsecurity:S6680, S6639, S6549 — taint-analysis security findings
+
+These are inter-procedural taint rules. The local Ruff and guard checks can
+enforce safer conventions, but they cannot prove that untrusted data reaches
+or avoids a sink. Only the CI Sonar job can catch these findings reliably.
+
+### githubactions:S8541, S8544 — workflow action pinning and hygiene
+
+Actions in `.github/workflows` must use full commit SHAs with a version comment.
+Run `zizmor` locally through pre-commit; CI repeats the check in the `workflows`
+job.
 
 ### pythonsecurity:S8707 — CLI path traversal
 

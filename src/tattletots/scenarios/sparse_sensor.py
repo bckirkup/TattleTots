@@ -210,8 +210,8 @@ class SparseSensorScenario(DomainAdapter):
 
     def dispatch_and_judge_responses(
         self,
-        targets: list[DispatchTarget],
-        time_step: int,
+        _targets: list[DispatchTarget],
+        _time_step: int,
     ) -> list[ResponseOutcome]:
         return []
 

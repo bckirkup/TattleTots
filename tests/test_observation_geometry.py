@@ -46,7 +46,8 @@ def test_missing_status_is_distinct_from_zero_value() -> None:
         [ObservationStatus.MISSING, ObservationStatus.OBSERVED],
     )
 
-    assert stream.current_data[0] == stream.current_data[1] == 0.0
+    assert stream.current_data[0] == pytest.approx(stream.current_data[1])
+    assert stream.current_data[1] == pytest.approx(0.0)
     assert list(stream.current_status) == ["missing", "observed"]
 
 
@@ -169,7 +170,7 @@ def test_metadata_consumes_numeric_selection_without_rederiving(
     )
     selections = [np.array([1, 4, 5], dtype=np.int64)]
 
-    def select_once(total_dim: int, working_dim: int, seed: int) -> np.ndarray:
+    def select_once(total_dim: int, working_dim: int, _seed: int) -> np.ndarray:
         assert total_dim == 6
         assert working_dim == 8
         return selections.pop()
