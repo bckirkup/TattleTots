@@ -1,3 +1,24 @@
+> **Superseded provenance notice**
+>
+> This document was produced by the harness at `/home/ubuntu/initiation-diag`,
+> which was never committed and no longer exists. Its results are therefore
+> not reproducible from this repository. The `gaussian_shift` scenario has no
+> modeled instruments and a vacuous localization null: there is a single event
+> location, so the static prior is 100%. As recorded by the sensor-check
+> exemption in TattleTots #44, this scenario cannot support a claim about
+> whether competence is expressible in genome space.
+>
+> The headline conclusion in the companion ceiling test is contradicted by
+> measurement on a real instrument: Coral's hand-designed reporter reached
+> 26.2% all-designed precision and 32.8% invasion precision against a 14.84%
+> static-prior null (20 seeds, cap 48; Coral
+> `docs/designed_reporter_measurement.md`).
+>
+> The reward-magnitude observations still concern the engine's economy, not
+> the `gaussian_shift` instrument. The cost-structure observations likewise
+> concern the engine's economy, not that instrument. Both were measured on a
+> superseded engine, so their magnitudes are indicative only.
+
 # Initiation: the population goes self-sustaining before it is ever any good
 
 Status: analysis, no code changes. Re-baselined on reproducible `main` after
