@@ -262,7 +262,16 @@ gradient that points the wrong way just gets you there faster.
    The design invariant to hold: whatever gates reproduction must be capped by the
    same carrying capacity that gates survival. Partly done: co-limited
    reproduction landed in #25 and removed the overshoot, but did not improve
-   grounding or precision, which is what the ceiling test explains.
+   grounding or precision, which is what the ceiling test explains. Now measured
+   link by link in `docs/currency-coupling-diagnosis.md`: verification and trust
+   work (correctness → trust r = +0.82 for a 97.6%-correct reporter) and
+   reproduction responds to attention (r = +0.48), but trust → attention income
+   is severed by scale — attention runs ~0.02/agent-step against ~0.78/agent-step
+   of correctness-blind information income, silence earns the same as reporting,
+   and the 0.05/0.2 trust asymmetry sets an 80% break-even precision against a
+   16% decoder ceiling. Relieving that scale limit exposes a second severed link:
+   with income abundant, the population cap rations reproduction by creation
+   order, so correctness → offspring stays ≤ +0.14.
 4. **Price reproduction against function**, so precocity is not the dominant
    gradient — pay for offspring in the scarce currency.
 5. **Only then** consider innate calibration (adaptive escalation thresholds as the

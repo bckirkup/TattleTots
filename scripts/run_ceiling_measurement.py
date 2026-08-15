@@ -165,12 +165,13 @@ def _seed_genomes(world: World, config: SimulationConfig, oracle_share: float) -
     return genomes
 
 
-def _build_world(
+def build_world(
     adapter: DomainAdapter,
     point: GridPoint,
     seed: int,
     options: HarnessOptions,
 ) -> World:
+    """Construct a seeded world for one grid cell against the supplied adapter."""
     config = _simulation_config(point, seed, options)
     world = World(config=config)
     for stream in adapter.get_streams():
@@ -183,7 +184,8 @@ def _build_world(
     return world
 
 
-def _set_oracle_locations(world: World, active_locations: Sequence[EventLocation]) -> None:
+def set_oracle_locations(world: World, active_locations: Sequence[EventLocation]) -> None:
+    """Publish the current active locations to any harness-local oracle policy."""
     locations = tuple(active_locations)
     for policy in world.reporter_policies.values():
         if isinstance(policy, _OracleDiagnosticPolicy):
@@ -284,12 +286,12 @@ def measure_grid_point(
 ) -> tuple[dict[str, Any], SimulationOutput]:
     """Run one arm/knob/seed cell and return its metrics and unified output."""
     adapter = build_adapter(options.adapter_spec, seed, options.steps)
-    world = _build_world(adapter, point, seed, options)
+    world = build_world(adapter, point, seed, options)
     for step in range(options.steps):
         adapter.step(step)
         active_locations = adapter.get_active_locations(step)
         world.set_event_state(active_locations)
-        _set_oracle_locations(world, active_locations)
+        set_oracle_locations(world, active_locations)
         world.step()
 
     metrics: dict[str, Any] = {
