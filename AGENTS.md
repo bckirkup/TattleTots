@@ -6,9 +6,8 @@ that will integrate with domain-specific repos (FireEcology, CruiseEcology, etc.
 
 ## Setup
 ```bash
-pip install -e domain-runner[dev]   # required for tests/test_dispatch_integration.py
-pip install -e ".[dev]"
-pre-commit install
+uv sync --locked --no-build --no-binary-package domain-runner --no-binary-package tattletots --extra dev
+uv run --no-sync --no-build pre-commit install
 ```
 
 ## Before Editing
@@ -17,12 +16,12 @@ pre-commit install
 ## Validation Commands
 Run these before committing:
 ```bash
-pre-commit run --all-files
-python scripts/sonar_guard.py src tests scripts "Large Experiments"
-ruff check src/ tests/ scripts/ "Large Experiments/"
-ruff format --check src/ tests/ scripts/ "Large Experiments/"
-mypy src/
-pytest
+uv run --no-sync --no-build pre-commit run --all-files
+uv run --no-sync --no-build python scripts/sonar_guard.py src tests scripts "Large Experiments"
+uv run --no-sync --no-build ruff check src/ tests/ scripts/ "Large Experiments/"
+uv run --no-sync --no-build ruff format --check src/ tests/ scripts/ "Large Experiments/"
+uv run --no-sync --no-build mypy src/
+uv run --no-sync --no-build pytest
 ```
 
 ## Architecture Rules
