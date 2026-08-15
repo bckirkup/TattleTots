@@ -10,6 +10,11 @@ from tattletots.models.identity import stable_id_digest
 from tattletots.models.stream import Stream
 
 
+def stream_attachment_key(stream: Stream) -> str:
+    """Return the stable genome key for a stream attachment."""
+    return stream.label or stream.id
+
+
 def compute_stream_attractiveness(agent: Agent, stream: Stream, rng: np.random.Generator) -> float:
     """Score how attractive a stream is to an agent based on genome preferences.
 
@@ -23,7 +28,7 @@ def compute_stream_attractiveness(agent: Agent, stream: Stream, rng: np.random.G
     if pref.size == 0:
         pref = agent.genome.input_preference
     if pref.size > 0:
-        idx = stable_id_digest(stream.id) % len(pref)
+        idx = stable_id_digest(stream_attachment_key(stream)) % len(pref)
         weight = float(pref[idx])
     else:
         weight = 1.0 + rng.normal(0, 0.1)

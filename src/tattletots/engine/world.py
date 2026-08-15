@@ -425,6 +425,7 @@ class World:
         return Genome.random_genome(
             self.rng,
             n_streams=max(len(self.streams), 1),
+            input_preference_slots=self.config.input_preference_slots,
             n_users=max(len(self.users), 1),
             gene_pool=self.gene_pool,
         )
