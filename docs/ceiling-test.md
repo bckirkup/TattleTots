@@ -17,8 +17,65 @@
 > the `gaussian_shift` instrument. The cost-structure observations likewise
 > concern the engine's economy, not that instrument. Both were measured on a
 > superseded engine, so their magnitudes are indicative only.
+>
+> The uncommitted harness has been replaced by
+> [`scripts/run_ceiling_measurement.py`](../scripts/run_ceiling_measurement.py),
+> which runs against any supplied `DomainAdapter` and validates the instrument
+> first. Its results on a modeled instrument are recorded below and in
+> [`docs/ceiling-measurement.md`](ceiling-measurement.md) /
+> `docs/ceiling-measurement.json`.
 
-# Currency reward ceiling and oracle test
+# Re-measurement on a modeled instrument (SparseSensor)
+
+Reproduce with:
+
+```bash
+uv run --no-sync --no-build python scripts/run_ceiling_measurement.py \
+  --adapter tattletots.scenarios.sparse_sensor:SparseSensorScenario \
+  --steps 200 --seeds 42 43 44 45 46 --grounded-fractions 0.0 0.34 0.67 1.0
+```
+
+The instrument is non-vacuous, unlike `gaussian_shift`: 24 candidate
+locations, 83 distinct event locations, static-prior null **3.00%**, uniform
+null **4.17%**, evidence inferability **24.00%**, decoder precision **16.00%**.
+
+All cells: `initial_population=20`, `max_population=60`, 200 steps, 5 seeds,
+`grounded_attractiveness_multiplier=1.0`, no scaffolding added.
+
+| Cell | Correct-report rate | Drift (2nd half − 1st) | Attention solvency | Grounded-yield share | Ordinary precision | Parent–child repro corr |
+|---|---:|---:|---:|---:|---:|---:|
+| ordinary, fraction 0 (legacy) | 3.09% | −2.23% | 28.20% | 4.61% | 3.09% | 0.092 |
+| ordinary, fraction ≥ 0.34 | 12.80% | +0.87% | 40.62% | 52.97% | 12.80% | 0.114 |
+| oracle monoculture, fraction 0 | 100.00% | +0.00% | 25.78% | 0.45% | — | 0.041 |
+| oracle monoculture, fraction ≥ 0.34 | 100.00% | +0.00% | 35.04% | 72.22% | — | 0.092 |
+| oracle invasion, fraction 0 | 99.04% | +2.83% | 25.98% | 0.84% | 1.71% | 0.072 |
+| oracle invasion, fraction ≥ 0.34 | 97.64% | +7.05% | 37.30% | 64.23% | 14.62% | 0.100 |
+
+What this changes and what it does not:
+
+- **Competence is expressible.** Ordinary (evolved) genomes reach 12.80%
+  correct-report rate against a 3.00% static-prior null once grounded input is
+  reserved. The superseded "no reporter above chance" conclusion was an
+  artifact of `gaussian_shift` plus input starvation, not of genome space.
+- **Input starvation was the binding constraint.** Grounded-yield share moves
+  from 4.61% to 52.97% for ordinary agents and from 0.84% to 64.23% under
+  oracle invasion; the correct-report drift flips from −2.23% to +0.87%.
+- **Transmission is still weak.** Parent–child reproductive correlation stays
+  at 0.09–0.11, below the ~0.2 falsification bar. The within-run rise in
+  correct-report rate clears the falsification test's first clause; the
+  heritability clause does not clear.
+- **The fraction knob saturates.** `SparseSensorScenario` publishes exactly one
+  raw stream, so every fraction above 0 reserves that same single slot
+  (`ceil(fraction × slots)` is capped by the number of raw streams available).
+  Fractions 0.34, 0.67 and 1.0 are therefore identical here by construction,
+  not by insensitivity. Domains publishing several raw streams (Coral, Xylella)
+  do separate the fractions.
+
+The same knob was measured in Coral, Scrapiron and Xylella; see
+[`docs/cross-domain-grounding.md`](cross-domain-grounding.md) for the four-domain
+comparison and the two negative results.
+
+# Currency reward ceiling and oracle test (superseded, `gaussian_shift`)
 
 Date: 2025-02-14
 
