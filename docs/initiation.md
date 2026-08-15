@@ -18,6 +18,49 @@
 > the `gaussian_shift` instrument. The cost-structure observations likewise
 > concern the engine's economy, not that instrument. Both were measured on a
 > superseded engine, so their magnitudes are indicative only.
+>
+> The step-2 metrics below are now produced by a committed, re-runnable harness:
+> [`scripts/run_ceiling_measurement.py`](../scripts/run_ceiling_measurement.py).
+> See "Post-grounding-fix measurement" below.
+
+## Post-grounding-fix measurement (real instrument, reproducible)
+
+The diagnosis in this document said competence was not expressible in genome
+space. On a modeled instrument that claim does not survive; the binding
+constraint was **input starvation**. `select_input_streams` picked three streams
+by attractiveness with no preference for `StreamType.RAW`, so agents fed on peer
+residual exhaust and rarely saw grounded evidence. `SimulationConfig` now exposes
+`max_input_streams`, `grounded_input_fraction`, and
+`grounded_attractiveness_multiplier`; defaults reproduce the old behavior exactly.
+
+SparseSensor, 200 steps, 5 seeds, no scaffolding
+(`docs/ceiling-measurement.md`; static-prior null **3.00%**, uniform null
+**4.17%**, 24 candidate and 83 distinct event locations):
+
+| Metric (ordinary/evolved agents) | fraction 0 (legacy) | fraction ≥ 0.34 |
+|---|---:|---:|
+| Correct-report rate | 3.09% | **12.80%** |
+| Correct-report drift (2nd half − 1st) | −2.23% | **+0.87%** |
+| Per-capita attention solvency | 28.20% | 40.62% |
+| Grounded-yield share | 4.61% | **52.97%** |
+| Parent–child reproductive correlation | 0.092 | 0.114 |
+
+Under oracle invasion, ordinary precision rises from 1.71% to 14.62% and
+grounded-yield share from 0.84% to 64.23%.
+
+Against the falsification test at the end of this document: the first clause
+(correct-report rate rising within a run at fixed initial parameters, above a
+non-vacuous null) **is now met**; the second clause (parent–child reproductive
+correlation reliably above ~0.2) is **not** — it remains ~0.09–0.11. So the
+diagnosis is half refuted: the gradient exists and points at function once
+grounded input is reachable, but reproductive success still does not transmit.
+That makes item 1 of "What to do" complete and moves the open problem to items
+3 and 4 (coupling the currencies and pricing reproduction), still without
+scaffolding.
+
+The same fix was measured in Coral (fishery/IUU), Scrapiron (wildfire) and
+Xylella (grain); the four-domain comparison, including two negative results, is
+in [`docs/cross-domain-grounding.md`](cross-domain-grounding.md).
 
 # Initiation: the population goes self-sustaining before it is ever any good
 
