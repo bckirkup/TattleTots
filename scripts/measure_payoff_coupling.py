@@ -32,8 +32,8 @@ from tattletots.telemetry.payoff_ledger import PayoffLedger
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _HARNESS_PATH = _REPO_ROOT / "scripts" / "run_ceiling_measurement.py"
-_JSON_ARTIFACT = _REPO_ROOT / "docs" / "payoff-coupling.json"
-_REPORT_ARTIFACT = _REPO_ROOT / "docs" / "payoff-coupling.md"
+_JSON_ARTIFACT = "docs/payoff-coupling.json"
+_REPORT_ARTIFACT = "docs/payoff-coupling.md"
 
 
 def load_harness() -> ModuleType:
@@ -274,7 +274,10 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     parser.add_argument(
         "--no-write",
         action="store_true",
-        help="Print the report without rewriting the committed docs/ artifacts.",
+        help=(
+            "Print the report without rewriting the committed docs/ artifacts. "
+            "Writing expects the repository root as the working directory."
+        ),
     )
     return parser.parse_args(argv)
 
@@ -304,8 +307,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.attention_budget_scale,
     )
     if not args.no_write:
-        _JSON_ARTIFACT.write_text(json.dumps(results, indent=2, sort_keys=True), encoding="utf-8")
-        _REPORT_ARTIFACT.write_text(markdown_report(results), encoding="utf-8")
+        with open(_JSON_ARTIFACT, "w", encoding="utf-8") as handle:
+            json.dump(results, handle, indent=2, sort_keys=True)
+        with open(_REPORT_ARTIFACT, "w", encoding="utf-8") as handle:
+            handle.write(markdown_report(results))
     print(markdown_report(results))
     return 0
 
