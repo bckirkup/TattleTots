@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 from numpy.typing import NDArray
 
 from tattletots.interface.instrument import InstrumentCheck, validate_instrument
 from tattletots.scenarios.gaussian_shift import GaussianShiftScenario
-from tattletots.scenarios.sparse_sensor import SparseSensorScenario
+from tattletots.scenarios.sparse_sensor import (
+    MAX_GRID_SIZE,
+    MAX_TOTAL_STEPS,
+    SparseSensorScenario,
+)
 
 
 class _UninformativeDecoderSparse(SparseSensorScenario):
@@ -15,6 +20,40 @@ class _UninformativeDecoderSparse(SparseSensorScenario):
         self, _stream_data: list[NDArray[np.float64]], _stream_labels: list[str]
     ) -> tuple[int, int]:
         return (999, 999)
+
+
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        ({"grid_size": 0}, "grid_size"),
+        ({"grid_size": MAX_GRID_SIZE + 1}, "grid_size"),
+        ({"n_sensors": 0}, "n_sensors"),
+        ({"n_sensors": 101}, "n_sensors"),
+        ({"noise_std": -0.1}, "noise_std"),
+        ({"noise_std": np.inf}, "noise_std"),
+        ({"dropout_rate": -0.1}, "dropout_rate"),
+        ({"dropout_rate": 1.1}, "dropout_rate"),
+        ({"dropout_rate": np.nan}, "dropout_rate"),
+        ({"decay_length": 0.0}, "decay_length"),
+        ({"decay_length": np.inf}, "decay_length"),
+        ({"total_steps": 0}, "total_steps"),
+        ({"total_steps": MAX_TOTAL_STEPS + 1}, "total_steps"),
+    ],
+)
+def test_sparse_sensor_rejects_invalid_configuration(
+    overrides: dict[str, object], message: str
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        SparseSensorScenario(**overrides)
+
+
+def test_sparse_sensor_default_configuration_steps() -> None:
+    scenario = SparseSensorScenario()
+
+    scenario.step(0)
+
+    assert scenario.get_streams()[0].current_data.size == scenario.n_sensors
+    assert scenario.get_active_locations(0)
 
 
 def test_sparse_sensor_instrument_is_valid_and_reaches_above_chance() -> None:

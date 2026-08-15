@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 import numpy as np
@@ -15,6 +16,9 @@ from tattletots.models.observation import ObservationStatus, StreamMetadata
 from tattletots.models.response_outcome import ResponseOutcome
 from tattletots.models.stream import Stream, StreamType
 from tattletots.models.user import User
+
+MAX_GRID_SIZE = 512
+MAX_TOTAL_STEPS = 100_000
 
 
 class SparseSensorScenario(DomainAdapter):
@@ -30,6 +34,14 @@ class SparseSensorScenario(DomainAdapter):
         total_steps: int = 200,
         seed: int = 42,
     ) -> None:
+        self._validate_parameters(
+            grid_size=grid_size,
+            n_sensors=n_sensors,
+            noise_std=noise_std,
+            dropout_rate=dropout_rate,
+            decay_length=decay_length,
+            total_steps=total_steps,
+        )
         self.grid_size = grid_size
         self.n_sensors = n_sensors
         self.noise_std = noise_std
@@ -51,6 +63,29 @@ class SparseSensorScenario(DomainAdapter):
         self._users: list[User] = []
         self._setup_streams()
         self._setup_users()
+
+    @staticmethod
+    def _validate_parameters(
+        *,
+        grid_size: int,
+        n_sensors: int,
+        noise_std: float,
+        dropout_rate: float,
+        decay_length: float,
+        total_steps: int,
+    ) -> None:
+        if not 1 <= grid_size <= MAX_GRID_SIZE:
+            raise ValueError(f"grid_size must be between 1 and {MAX_GRID_SIZE}")
+        if not 1 <= total_steps <= MAX_TOTAL_STEPS:
+            raise ValueError(f"total_steps must be between 1 and {MAX_TOTAL_STEPS}")
+        if not 1 <= n_sensors <= grid_size**2:
+            raise ValueError("n_sensors must be at least 1 and no greater than grid_size squared")
+        if not math.isfinite(noise_std) or noise_std < 0.0:
+            raise ValueError("noise_std must be finite and non-negative")
+        if not math.isfinite(dropout_rate) or not 0.0 <= dropout_rate <= 1.0:
+            raise ValueError("dropout_rate must be finite and between 0 and 1")
+        if not math.isfinite(decay_length) or decay_length <= 0.0:
+            raise ValueError("decay_length must be finite and strictly positive")
 
     def _setup_streams(self) -> None:
         coordinates: list[tuple[float, ...] | None] = [
