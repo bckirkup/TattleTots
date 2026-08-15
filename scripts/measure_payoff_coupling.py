@@ -18,36 +18,19 @@ enough spread to measure.
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import json
-import sys
 from collections.abc import Sequence
-from pathlib import Path
-from types import ModuleType
 from typing import Any
 
+import measurement_support
 import numpy as np
 
 from tattletots.telemetry.payoff_ledger import PayoffLedger
 
-_REPO_ROOT = Path(__file__).resolve().parents[1]
-_HARNESS_PATH = _REPO_ROOT / "scripts" / "run_ceiling_measurement.py"
 _JSON_ARTIFACT = "docs/payoff-coupling.json"
 _REPORT_ARTIFACT = "docs/payoff-coupling.md"
 
-
-def load_harness() -> ModuleType:
-    """Load the committed ceiling harness for its world-construction helpers."""
-    spec = importlib.util.spec_from_file_location("run_ceiling_measurement", _HARNESS_PATH)
-    if spec is None or spec.loader is None:
-        raise ImportError(f"could not load harness from {_HARNESS_PATH}")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-harness = load_harness()
+harness = measurement_support.load_harness()
 
 
 def measure_run(
@@ -68,14 +51,7 @@ def measure_run(
     for user in world.users.values():
         user.attention_budget *= attention_budget_scale
     ledger = PayoffLedger()
-    for step in range(options.steps):
-        adapter.step(step)
-        active_locations = adapter.get_active_locations(step)
-        world.set_event_state(active_locations)
-        harness.set_oracle_locations(world, active_locations)
-        world.step()
-        ledger.observe(world)
-    ledger.finalize(world)
+    measurement_support.drive_world(harness, world, adapter, options.steps, ledger)
 
     summary = world.telemetry.summary()
     return {
@@ -297,16 +273,8 @@ def _parse_config_overrides(pairs: Sequence[str]) -> dict[str, Any]:
 
 
 def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--adapter", default="tattletots.scenarios.sparse_sensor:SparseSensorScenario"
-    )
-    parser.add_argument("--steps", type=int, default=200)
-    parser.add_argument("--seeds", type=int, nargs="+", default=[42, 43, 44, 45, 46])
-    parser.add_argument("--grounded-fraction", type=float, default=0.67)
+    parser = measurement_support.add_shared_arguments(argparse.ArgumentParser(description=__doc__))
     parser.add_argument("--arms", nargs="+", default=["ordinary", "oracle_invasion"])
-    parser.add_argument("--initial-population", type=int, default=20)
-    parser.add_argument("--max-population", type=int, default=60)
     parser.add_argument(
         "--attention-budget-scale",
         type=float,

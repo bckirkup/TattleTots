@@ -26,33 +26,16 @@ Prints only; it writes no artifacts.
 from __future__ import annotations
 
 import argparse
-import importlib.util
-import sys
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from pathlib import Path
-from types import ModuleType
 from typing import Any
 
+import measurement_support
 import numpy as np
 
 from tattletots.models.agent import Agent, LifecycleStage
 
-_REPO_ROOT = Path(__file__).resolve().parents[1]
-_HARNESS_PATH = _REPO_ROOT / "scripts" / "run_ceiling_measurement.py"
-
-
-def _load_harness() -> ModuleType:
-    spec = importlib.util.spec_from_file_location("run_ceiling_measurement", _HARNESS_PATH)
-    if spec is None or spec.loader is None:
-        raise ImportError(f"could not load harness from {_HARNESS_PATH}")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-harness = _load_harness()
+harness = measurement_support.load_harness()
 
 
 @dataclass
@@ -289,27 +272,12 @@ def run(arm: str, seed: int, options: Any, grounded_fraction: float) -> Opportun
     adapter = harness.build_adapter(options.adapter_spec, seed, options.steps)
     world = harness.build_world(adapter, point, seed, options)
     ledger = OpportunityLedger()
-    for step in range(options.steps):
-        adapter.step(step)
-        active = adapter.get_active_locations(step)
-        world.set_event_state(active)
-        harness.set_oracle_locations(world, active)
-        world.step()
-        ledger.observe(world)
-    ledger.finalize(world)
+    measurement_support.drive_world(harness, world, adapter, options.steps, ledger)
     return ledger
 
 
 def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--adapter", default="tattletots.scenarios.sparse_sensor:SparseSensorScenario"
-    )
-    parser.add_argument("--steps", type=int, default=200)
-    parser.add_argument("--seeds", type=int, nargs="+", default=[42, 43, 44, 45, 46])
-    parser.add_argument("--grounded-fraction", type=float, default=0.67)
-    parser.add_argument("--initial-population", type=int, default=20)
-    parser.add_argument("--max-population", type=int, default=60)
+    parser = measurement_support.add_shared_arguments(argparse.ArgumentParser(description=__doc__))
     parser.add_argument("--arms", nargs="+", default=["ordinary", "oracle_invasion"])
     parser.add_argument("--target-reports", type=float, default=7.2)
     return parser.parse_args(argv)
@@ -318,13 +286,7 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
 def main(argv: Sequence[str] | None = None) -> int:
     """Measure both reporting-opportunity throttles and print them per arm."""
     args = _parse_args(argv)
-    options = harness.HarnessOptions(
-        adapter_spec=args.adapter,
-        steps=args.steps,
-        seeds=tuple(args.seeds),
-        initial_population=args.initial_population,
-        max_population=args.max_population,
-    )
+    options = measurement_support.harness_options(harness, args)
     print(f"steps={args.steps} seeds={list(args.seeds)} grounded={args.grounded_fraction}")
     for arm in args.arms:
         records = [
