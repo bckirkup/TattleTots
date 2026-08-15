@@ -109,3 +109,6 @@ Two links are severed, in series:
 Fixing (1) without (2) moves the bottleneck rather than closing it. Neither
 falsification clause is cleared by this measurement, and nothing here changes
 engine mechanics: the ledger and the two overrides are diagnostics only.
+
+Both links are addressed as config-gated mechanisms, and a third break is found
+upstream of payoff, in `docs/payoff-fix-measurement.md`.

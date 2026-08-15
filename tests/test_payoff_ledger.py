@@ -24,7 +24,11 @@ _CORRELATION_KEYS = (
 )
 
 
-def _run(attention_budget_scale: float = 1.0, seed: int = 42) -> tuple[World, PayoffLedger]:
+def _run(
+    attention_budget_scale: float = 1.0,
+    seed: int = 42,
+    correct_report_attention_value: float = 0.0,
+) -> tuple[World, PayoffLedger]:
     adapter = SparseSensorScenario(seed=seed, total_steps=_STEPS)
     config = SimulationConfig(
         initial_population=10,
@@ -32,6 +36,7 @@ def _run(attention_budget_scale: float = 1.0, seed: int = 42) -> tuple[World, Pa
         max_steps=_STEPS,
         seed=seed,
         grounded_input_fraction=0.67,
+        correct_report_attention_value=correct_report_attention_value,
     )
     world = World(config=config)
     for stream in adapter.get_streams():
@@ -101,6 +106,35 @@ def test_information_dominates_reserves_at_default_attention_budget() -> None:
 
     assert summary["mean_information_income_per_step"] > summary["mean_attention_income_per_step"]
     assert summary["mean_information_share_of_reserves"] > 0.5
+
+
+def test_correct_reporters_earn_more_attention_as_verified_value_rises() -> None:
+    """The knob prices correctness into attention income; default pays nothing for it."""
+    correct_income = []
+    silent_income = []
+    for value in (0.0, 4.0, 16.0):
+        _, ledger = _run(correct_report_attention_value=value)
+        summary = ledger.coupling_summary()
+        correct_income.append(summary["correct_group_mean_attention_income"])
+        silent_income.append(summary["never_correct_group_mean_attention_income"])
+
+    assert correct_income[0] < correct_income[1] < correct_income[2]
+    assert correct_income[0] < silent_income[0]
+    assert correct_income[-1] > silent_income[-1]
+
+
+def test_falsification_metrics_are_reported_and_bounded() -> None:
+    """The two clauses are measurable on the same run that measures the links."""
+    _, ledger = _run()
+    summary = ledger.coupling_summary()
+
+    assert summary["generations_observed"] >= 1
+    assert summary["n_parent_child_pairs"] > 0
+    assert -1.0 <= summary["corr_parent_child_offspring"] <= 1.0
+    assert -1.0 <= summary["corr_parent_child_precision"] <= 1.0
+    assert math.isfinite(summary["precision_generation_slope"])
+    for rate in summary["precision_by_generation"].values():
+        assert 0.0 <= rate <= 1.0
 
 
 def test_false_alarm_cost_dwarfs_attention_income_at_default_config() -> None:
