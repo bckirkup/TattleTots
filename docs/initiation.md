@@ -205,8 +205,10 @@ extinct nor free; **(b)** heritable variance, so differences compound; **(c)**
 coupling to the function you want, so the gradient points at it. Here, the
 information channel has (b) but not (a) or (c); the attention channel has (a)
 approximately, but the correctness-dependent increment is too small to provide
-a detectable (c). More basically, the tested genome space has no high-precision
-reporter for selection to discover. Hand-tuning is what currently substitutes
+a detectable (c). The genome space *does* contain reporters well above the decoder
+ceiling — clone monocultures reach 34.9% precision, `docs/heritability-measurement.md`
+— but (b) is unusable in practice because an agent emits too few reports in its life
+for its own precision to be scored. Hand-tuning is what currently substitutes
 for all three, which is exactly the trap in the question: the tuned parameters
 are not helping evolution start, they are standing in for it.
 
@@ -278,7 +280,15 @@ gradient that points the wrong way just gets you there faster.
    clause clears, because a third break sits upstream — among evolved agents
    parent–child correlation of precision is only ~0.02–0.13 against ~0.6–0.7 for
    the heritable-by-construction oracle lineage, so correctness carries almost no
-   heritable variance for selection to act on.
+   *measured* heritable variance for selection to act on. `docs/heritability-measurement.md`
+   then shows that break 3 is neither the instrument nor an absent trait: clone
+   monocultures put the genome's intraclass correlation on precision at **0.63**, with
+   genome means spanning 0% → 34.9%, while an adult issues **0.46 reports in a ~6.8-step
+   adult life**, making 97% of the between-agent spread in precision binomial noise. The
+   observed weak correlation is precisely the sample-size attenuation of a real heritable
+   trait (predicted +0.038; ~7 reports per agent are needed to halve it). Correctness is
+   heritable; an individual's correctness is unmeasurable, and the next lever is
+   reporting opportunity per lifetime — not payoff mechanics.
 4. **Price reproduction against function**, so precocity is not the dominant
    gradient — pay for offspring in the scarce currency.
 5. **Only then** consider innate calibration (adaptive escalation thresholds as the
