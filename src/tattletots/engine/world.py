@@ -222,7 +222,14 @@ class World:
     def _attach_trophic_inputs(self, living_agents: list[Agent]) -> None:
         available_streams = list(self.streams.values())
         for agent in living_agents:
-            new_inputs = select_input_streams(agent, available_streams, max_inputs=3, rng=self.rng)
+            new_inputs = select_input_streams(
+                agent,
+                available_streams,
+                max_inputs=self.config.max_input_streams,
+                rng=self.rng,
+                grounded_fraction=self.config.grounded_input_fraction,
+                grounded_multiplier=self.config.grounded_attractiveness_multiplier,
+            )
             agent.state.input_stream_ids = new_inputs
 
     def _run_juvenile_mimesis(self, living_agents: list[Agent]) -> None:

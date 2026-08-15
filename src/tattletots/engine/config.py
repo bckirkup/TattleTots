@@ -103,6 +103,28 @@ class SimulationConfig(BaseModel):
         ge=1,
         description="Number of genome slots used to hash stream attachment preferences.",
     )
+    max_input_streams: int = Field(
+        default=3,
+        ge=1,
+        description="Number of input streams each agent attaches to per step.",
+    )
+    grounded_input_fraction: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Fraction of an agent's input slots reserved for grounded raw streams. "
+            "At 0.0 (default) attachment is unreserved and identical to legacy behavior."
+        ),
+    )
+    grounded_attractiveness_multiplier: float = Field(
+        default=1.0,
+        ge=0.0,
+        description=(
+            "Attractiveness multiplier applied to grounded raw streams during "
+            "attachment. At 1.0 (default) raw and residual streams compete unweighted."
+        ),
+    )
     default_working_dim: int = Field(default=30, ge=8, le=256)
     max_working_dim: int = Field(default=256, ge=8, le=1024)
     extinction_check_window: int = Field(
