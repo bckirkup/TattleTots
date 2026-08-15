@@ -96,13 +96,21 @@ The payoff path is now three breaks, not two, and the first two are fixed:
 3. **correctness -> heritable correctness** — open. Selection has nothing to act on
    because evolved precision carries almost no between-lineage variance.
 
+Break 3 has since been measured in `docs/heritability-measurement.md`: correctness is
+strongly heritable (clone-monoculture intraclass correlation 0.63, genome means 0% ->
+34.9%), but an adult issues ~0.46 reports in a ~6.8-step adult life, so its own
+precision is a Bernoulli estimate whose between-agent spread is 97% binomial noise.
+The observed evolved correlation is exactly the sample-size attenuation of a real
+heritable trait (predicted +0.038).
+
 Discounting information yield by verification (the third proposed intervention)
 shrinks the correctness-blind path, which sharpens 1 further; on this evidence it
 cannot by itself clear either clause, because break 3 is upstream of payoff
 entirely. The candidates for break 3 are the instrument's own ceiling (a 16%
 decoder precision leaves little heritable spread to select on) and the genome's
 lack of a trait that changes precision, both of which are measurable with the
-existing ceiling harness before any further engine change.
+existing ceiling harness before any further engine change. Both were subsequently
+ruled out; see `docs/heritability-measurement.md`.
 
 Defaults are unchanged: `correct_report_attention_value=0.0` and
 `reproduction_merit_ordering=False` reproduce the previous engine exactly, and the
