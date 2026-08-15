@@ -99,11 +99,16 @@ of two things:
 - ~0.068 reports per adult step.
 
 Even an immortal agent at the current reporting rate would need ~100 adult steps to
-reach 7 reports. So the actionable question — measurable next, and none of it
-scaffolding — is which of the two the engine is throttling: whether adult lifespan is
-short because maintenance outruns income, and whether the reporting rate per adult
-step is held down by escalation thresholds and evidence arrival rather than by choice.
-Selection cannot act on a phenotype nobody expresses often enough to be scored on.
+reach 7 reports. Selection cannot act on a phenotype nobody expresses often enough to
+be scored on.
+
+Both throttles have since been measured in `docs/reporting-opportunity-measurement.md`:
+evidence arrival is *not* limiting (93% of adult steps carry grounded yield), the
+escalation threshold sits ~0.56 above the median anomaly so 79.5% of evolved adults
+never report at all, 97% of deaths are attention insolvency, and at ~12% precision
+escalating makes an agent's attention balance *worse* (corr(escalation rate, attention
+drift) = −0.17) while for the oracle lineage the same mechanism runs the other way
+(+0.33, and reporting nearly triples adult lifespan). Silence is the evolved optimum.
 
 Neither falsification clause clears here, and nothing in this document changes engine
 behavior: it adds a measurement script and no defaults.
