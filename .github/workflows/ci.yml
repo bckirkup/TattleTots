@@ -26,7 +26,7 @@ jobs:
           python-version: "3.11"
       - name: Install dependencies
         run: |
-          pip install -e domain-runner[dev]
+          pip install --only-binary ":all:" -e domain-runner[dev]
           pip install -e ".[dev]"
       - name: Ruff lint
         run: ruff check src/ tests/ scripts/ "Large Experiments/"
@@ -45,6 +45,8 @@ jobs:
           python-version: "3.11"
       - name: Run Sonar mechanical guard
         run: python scripts/sonar_guard.py src tests scripts "Large Experiments"
+      - name: Run workflow guards
+        run: python scripts/sonar_guard.py --workflows .github/workflows
 
   typecheck:
     runs-on: ubuntu-latest
@@ -62,7 +64,7 @@ jobs:
           python-version: "3.11"
       - name: Install dependencies
         run: |
-          pip install -e domain-runner[dev]
+          pip install --only-binary ":all:" -e domain-runner[dev]
           pip install -e ".[dev]"
       - name: Mypy
         run: mypy src/
@@ -86,7 +88,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: |
-          pip install -e domain-runner[dev]
+          pip install --only-binary ":all:" -e domain-runner[dev]
           pip install -e ".[dev]"
       - name: Print numerical environment
         run: |
@@ -140,7 +142,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: |
-          pip install -e domain-runner[dev]
+          pip install --only-binary ":all:" -e domain-runner[dev]
           pip install -e ".[dev]"
       - name: Run smoke tests
         run: pytest -m smoke --tb=short

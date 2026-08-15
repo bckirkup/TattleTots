@@ -4,7 +4,7 @@ repos:
     rev: v0.15.20
     hooks:
       - id: ruff
-        args: [--fix]
+        args: [--fix, "--config=lint.mccabe.max-complexity=15"]
         files: ^(src|tests|scripts|Large Experiments)/.*\.py$
       - id: ruff-format
         files: ^(src|tests|scripts|Large Experiments)/.*\.py$
@@ -30,3 +30,9 @@ repos:
         language: system
         files: ^(src|tests|scripts|Large Experiments)/.*\.py$
         types: [python]
+      - id: sonar-workflow-guards
+        name: Sonar workflow guards
+        entry: python scripts/sonar_guard.py --workflows
+        language: system
+        files: ^\.github/workflows/.*\.(yml|yaml)$
+        types: [yaml]
