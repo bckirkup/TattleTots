@@ -6,18 +6,17 @@ description: Development workflow, testing, and configuration reference for the 
 ## Setup
 
 ```bash
-pip install -e domain-runner[dev]   # for integration/tattletots_layer tests
-pip install -e ".[dev]"
-pre-commit install
+uv sync --locked --no-build --no-binary-package domain-runner --no-binary-package tattletots --extra dev
+uv run --no-sync --no-build pre-commit install
 ```
 
 ## Validation (run before every commit)
 
 ```bash
-ruff check src/ tests/
-ruff format --check src/ tests/
-mypy src/
-pytest
+uv run --no-sync --no-build ruff check src/ tests/
+uv run --no-sync --no-build ruff format --check src/ tests/
+uv run --no-sync --no-build mypy src/
+uv run --no-sync --no-build pytest
 ```
 
 ## Running a Simulation
@@ -48,7 +47,7 @@ pytest --cov=tattletots  # with coverage
 | `trust_delta_pos` / `trust_delta_neg` | 0.05 / 0.2 | Asymmetric trust update magnitudes |
 | `trust_delta_miss` | 0.1 | Trust penalty for missed events |
 | `seed` | None | Random seed for reproducibility |
-| `use_gpu` | False | Offload array math to GPU via CuPy. Requires `pip install -e ".[gpu]"` |
+| `use_gpu` | False | Offload array math to GPU via CuPy. Requires the locked `gpu` extra |
 | `juvenile_maintenance_fraction` | 0.5 | Maintenance cost multiplier for juveniles |
 | `mimesis_learning_rate` | 0.05 | How fast juveniles copy role models |
 | `lineage_signature_tolerance` | 0.5 | Max distance for lineage subsidy eligibility |
@@ -115,9 +114,10 @@ Dispatch still gates on responder COP `threat_level` at **reported locations** (
 Domain repos implement `DomainAdapter` plus `{package}/runner.py`. Install order:
 
 ```bash
-pip install -e domain-runner[dev]
-pip install -e TattleTots[dev]
-pip install -e <domain_repo>[dev]
+# In TattleTots, use the committed lock:
+uv sync --locked --no-build --no-binary-package domain-runner --no-binary-package tattletots --extra dev
+# In a domain repository, use its committed lock and dev extra:
+uv sync --locked --no-build --extra dev
 ```
 
 | Repo | Domain | CLI |
@@ -142,7 +142,7 @@ Agents must **not** read `User.trust` (user-side only).
 ## GPU Acceleration
 
 ```bash
-pip install -e ".[gpu]"  # installs cupy-cuda12x
+uv sync --locked --no-build --no-binary-package domain-runner --no-binary-package tattletots --extra gpu
 ```
 
 Set `"use_gpu": true` in config JSON. All array math (SVD in PCA compression, attention

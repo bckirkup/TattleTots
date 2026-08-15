@@ -7,8 +7,8 @@ TattleTots models populations of information-processing agents ("Tots") that com
 ## Quick Start
 
 ```bash
-pip install -e ".[dev]"
-tattletots --scenario gaussian_shift --steps 400 --verbose
+uv sync --locked --no-build --no-binary-package domain-runner --no-binary-package tattletots --extra dev
+uv run --no-sync --no-build tattletots --scenario gaussian_shift --steps 400 --verbose
 ```
 
 ## What It Does
@@ -178,13 +178,13 @@ TattleTots supports optional GPU offloading via [CuPy](https://cupy.dev/) for la
 
 ```bash
 # Install with GPU support
-pip install -e ".[gpu]"
+uv sync --locked --no-build --no-binary-package domain-runner --no-binary-package tattletots --extra gpu
 
 # Enable in config JSON
 {"simulation": {"use_gpu": true, ...}}
 
 # Or pass directly via the engine
-tattletots --config configs/gpu_scan.json --verbose
+uv run --no-sync --no-build tattletots --config configs/gpu_scan.json --verbose
 ```
 
 When `use_gpu: true`, all array math (compression SVD, attention softmax, niche overlap) dispatches to CuPy. Falls back to NumPy silently if CuPy is unavailable or no CUDA device is found.

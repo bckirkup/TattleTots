@@ -14,10 +14,11 @@ patterns across all domain adapters.
 ## Install Order (all domain repos follow this)
 
 ```bash
-pip install -e domain-runner[dev]   # shared layer orchestration
-pip install -e TattleTots[dev]      # engine (only for --layer tattletots)
-pip install -e <domain_repo>[dev]   # the specific domain
-pre-commit install
+# In TattleTots, install the committed development environment:
+uv sync --locked --no-build --no-binary-package domain-runner --no-binary-package tattletots --extra dev
+# In a domain repository, use that repository's committed uv.lock and dev extra.
+uv sync --locked --no-build --extra dev
+uv run --no-sync --no-build pre-commit install
 ```
 
 ## DomainAdapter ABC — Required Methods
@@ -65,7 +66,7 @@ world.set_event_state(adapter.get_active_locations(step))
 ## GPU Acceleration
 
 ```bash
-pip install -e ".[gpu]"  # installs cupy-cuda12x
+uv sync --locked --no-build --no-binary-package domain-runner --no-binary-package tattletots --extra gpu
 ```
 
 Set `"use_gpu": true` in the `"simulation"` section of the integration config.
