@@ -98,6 +98,11 @@ class SimulationConfig(BaseModel):
             "Prevents exponential vector growth through the trophic chain."
         ),
     )
+    input_preference_slots: int = Field(
+        default=32,
+        ge=1,
+        description="Number of genome slots used to hash stream attachment preferences.",
+    )
     default_working_dim: int = Field(default=30, ge=8, le=256)
     max_working_dim: int = Field(default=256, ge=8, le=1024)
     extinction_check_window: int = Field(

@@ -555,6 +555,7 @@ class Genome(BaseModel):
         rng: np.random.Generator,
         *,
         n_streams: int = 1,
+        input_preference_slots: int | None = None,
         n_users: int = 1,
         gene_pool: GenePoolConfig | None = None,
     ) -> Genome:
@@ -574,11 +575,14 @@ class Genome(BaseModel):
         spatial_types = pool.available_spatial_strategies or [SpatialStrategy.GLOBAL]
         residual_types = pool.available_residual_policies or [ResidualPolicy.EXCRETE]
         escalation_types = pool.available_escalation_modes or [EscalationMode.FIXED]
+        preference_slots = (
+            input_preference_slots if input_preference_slots is not None else n_streams
+        )
 
         return cls(
             compression_type=comp_type,
             n_components=int(rng.integers(lo, hi + 1)),
-            input_preference=rng.dirichlet(np.ones(max(n_streams, 1))),
+            input_preference=rng.dirichlet(np.ones(max(preference_slots, 1))),
             escalation_threshold=float(rng.uniform(et_lo, et_hi)),
             target_user_affinity=rng.dirichlet(np.ones(max(n_users, 1))),
             metabolic_efficiency=float(rng.uniform(me_lo, me_hi)),
