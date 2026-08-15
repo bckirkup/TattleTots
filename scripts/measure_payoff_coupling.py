@@ -20,6 +20,8 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import os.path
+import re
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -32,6 +34,16 @@ from tattletots.telemetry.payoff_ledger import PayoffLedger
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _HARNESS_PATH = _REPO_ROOT / "scripts" / "run_ceiling_measurement.py"
+_ARTIFACT_DIR = _REPO_ROOT / "docs"
+_ARTIFACT_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
+
+
+def artifact_path(raw: str) -> Path:
+    """Return a validated artifact path; only a plain file name is honored."""
+    name = os.path.basename(raw)
+    if _ARTIFACT_NAME.fullmatch(name) is None:
+        raise ValueError(f"artifact name is not a plain file name: {raw}")
+    return _ARTIFACT_DIR / name
 
 
 def load_harness() -> ModuleType:
@@ -269,8 +281,16 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         default=None,
         help="Diagnostic override of SimulationConfig.false_alarm_penalty.",
     )
-    parser.add_argument("--output", default="docs/payoff-coupling.json")
-    parser.add_argument("--report", default="docs/payoff-coupling.md")
+    parser.add_argument(
+        "--output",
+        default="payoff-coupling.json",
+        help="JSON artifact file name, written under docs/.",
+    )
+    parser.add_argument(
+        "--report",
+        default="payoff-coupling.md",
+        help="Markdown artifact file name, written under docs/.",
+    )
     return parser.parse_args(argv)
 
 
@@ -298,10 +318,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.seeds,
         args.attention_budget_scale,
     )
-    output_path = harness.safe_output_path(args.output)
-    report_path = harness.safe_output_path(args.report)
-    output_path.write_text(json.dumps(results, indent=2, sort_keys=True), encoding="utf-8")
-    report_path.write_text(markdown_report(results), encoding="utf-8")
+    artifact_path(args.output).write_text(
+        json.dumps(results, indent=2, sort_keys=True), encoding="utf-8"
+    )
+    artifact_path(args.report).write_text(markdown_report(results), encoding="utf-8")
     print(markdown_report(results))
     return 0
 
