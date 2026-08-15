@@ -1,6 +1,7 @@
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.16
+    # Keep this rev equal to the Ruff version in uv.lock.
+    rev: v0.15.20
     hooks:
       - id: ruff
         args: [--fix]
