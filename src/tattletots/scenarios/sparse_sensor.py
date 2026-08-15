@@ -18,6 +18,7 @@ from tattletots.models.stream import Stream, StreamType
 from tattletots.models.user import User
 
 MAX_GRID_SIZE = 512
+MAX_SENSOR_COUNT = MAX_GRID_SIZE**2
 MAX_TOTAL_STEPS = 100_000
 
 
@@ -50,14 +51,18 @@ class SparseSensorScenario(DomainAdapter):
         self.total_steps = total_steps
         self.seed = seed
         self.rng = np.random.default_rng(seed)
+        # Keep sink bounds visible to static taint analysis; validation makes these no-ops.
+        bounded_grid_size = min(grid_size, MAX_GRID_SIZE)
+        bounded_sensor_count = min(n_sensors, MAX_SENSOR_COUNT)
+        bounded_total_steps = min(total_steps, MAX_TOTAL_STEPS)
         all_locations = np.array(
-            [(row, col) for row in range(grid_size) for col in range(grid_size)],
+            [(row, col) for row in range(bounded_grid_size) for col in range(bounded_grid_size)],
             dtype=np.int64,
         )
-        selected = self.rng.choice(len(all_locations), size=n_sensors, replace=False)
+        selected = self.rng.choice(len(all_locations), size=bounded_sensor_count, replace=False)
         self.sensor_locations = all_locations[selected]
         self._source_locations = self.rng.integers(
-            0, grid_size, size=(total_steps, 2), dtype=np.int64
+            0, bounded_grid_size, size=(bounded_total_steps, 2), dtype=np.int64
         )
         self._streams: list[Stream] = []
         self._users: list[User] = []
@@ -88,20 +93,21 @@ class SparseSensorScenario(DomainAdapter):
             raise ValueError("decay_length must be finite and strictly positive")
 
     def _setup_streams(self) -> None:
+        bounded_sensor_count = min(self.n_sensors, MAX_SENSOR_COUNT)
         coordinates: list[tuple[float, ...] | None] = [
             tuple(map(float, location)) for location in self.sensor_locations
         ]
         metadata = StreamMetadata(
             sensor_coordinates=coordinates,
-            modality=["point_sensor"] * self.n_sensors,
-            resolution=[1.0] * self.n_sensors,
+            modality=["point_sensor"] * bounded_sensor_count,
+            resolution=[1.0] * bounded_sensor_count,
         )
         self._streams = [
             Stream(
                 stream_type=StreamType.RAW,
-                dimensionality=self.n_sensors,
+                dimensionality=bounded_sensor_count,
                 label="sparse_point_sensors",
-                current_data=np.zeros(self.n_sensors, dtype=np.float64),
+                current_data=np.zeros(bounded_sensor_count, dtype=np.float64),
                 metadata=metadata,
             )
         ]
