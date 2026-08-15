@@ -1,0 +1,103 @@
+#!/usr/bin/env python3
+"""Per-seed reliability of the two falsification clauses under the payoff fixes.
+
+The arm-averaged coupling report hides whether a clause is *reliably* met: a mean
+generational slope of +0.001 can come from every seed rising slightly or from a
+few seeds rising while the rest fall. This script runs the ordinary (evolved) arm
+over many seeds at several doses of `correct_report_attention_value` and reports,
+per dose, how many seeds actually satisfy each clause.
+
+Prints only; it writes no artifacts.
+"""
+
+from __future__ import annotations
+
+import argparse
+import importlib.util
+import sys
+from collections.abc import Sequence
+from pathlib import Path
+from types import ModuleType
+from typing import Any
+
+import numpy as np
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_MEASURE_PATH = _REPO_ROOT / "scripts" / "measure_payoff_coupling.py"
+_CORRELATION_CLAUSE = 0.2
+
+
+def _load(name: str, path: Path) -> ModuleType:
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"could not load {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _dose_options(measure: ModuleType, value: float, args: argparse.Namespace) -> Any:
+    return measure.harness.HarnessOptions(
+        adapter_spec=args.adapter,
+        steps=args.steps,
+        seeds=tuple(args.seeds),
+        initial_population=args.initial_population,
+        max_population=args.max_population,
+        extra_config={
+            "correct_report_attention_value": value,
+            "reproduction_merit_ordering": args.merit_ordering,
+        },
+    )
+
+
+def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--adapter", default="tattletots.scenarios.sparse_sensor:SparseSensorScenario"
+    )
+    parser.add_argument("--steps", type=int, default=200)
+    parser.add_argument("--seeds", type=int, nargs="+", default=list(range(42, 62)))
+    parser.add_argument("--doses", type=float, nargs="+", default=[0.0, 32.0, 128.0])
+    parser.add_argument("--grounded-fraction", type=float, default=0.67)
+    parser.add_argument("--initial-population", type=int, default=20)
+    parser.add_argument("--max-population", type=int, default=60)
+    parser.add_argument("--merit-ordering", action="store_true", default=True)
+    parser.add_argument("--no-merit-ordering", dest="merit_ordering", action="store_false")
+    return parser.parse_args(argv)
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """Report per-seed clause satisfaction for each attention-value dose."""
+    args = _parse_args(argv)
+    measure = _load("measure_payoff_coupling", _MEASURE_PATH)
+    for value in args.doses:
+        options = _dose_options(measure, value, args)
+        slopes: list[float] = []
+        offspring_corrs: list[float] = []
+        precision_corrs: list[float] = []
+        rates: list[float] = []
+        for seed in args.seeds:
+            run = measure.measure_run("ordinary", args.grounded_fraction, seed, options)
+            coupling = run["coupling"]
+            slopes.append(coupling["precision_generation_slope"])
+            offspring_corrs.append(coupling["corr_parent_child_offspring"])
+            precision_corrs.append(coupling["corr_parent_child_precision"])
+            rates.append(run["correct_report_rate"])
+        n = len(args.seeds)
+        print(
+            f"correct_report_attention_value={value:g} "
+            f"correct-report rate={float(np.mean(rates)):.2%}\n"
+            f"  clause 1 (within-run rise): mean slope {float(np.mean(slopes)):+.4f}/generation, "
+            f"rising in {sum(1 for s in slopes if s > 0)}/{n} seeds\n"
+            f"  clause 2 (parent-child offspring r > {_CORRELATION_CLAUSE}): "
+            f"mean {float(np.mean(offspring_corrs)):+.3f}, "
+            f"cleared in {sum(1 for c in offspring_corrs if c > _CORRELATION_CLAUSE)}/{n} seeds\n"
+            f"  heritability of correctness (parent-child precision r): "
+            f"mean {float(np.mean(precision_corrs)):+.3f}"
+        )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

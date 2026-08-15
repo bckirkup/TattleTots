@@ -82,6 +82,24 @@ class SimulationConfig(BaseModel):
     false_alarm_penalty: float = Field(
         default=0.3, ge=0.0, description="Attention energy penalty for false alarms"
     )
+    correct_report_attention_value: float = Field(
+        default=0.0,
+        ge=0.0,
+        description=(
+            "Extra attention value per verified-correct report, applied as the "
+            "per-user value term v in income = alpha * v. At 0.0 (default) attention "
+            "income is paid for trust-weighted relevance alone, independent of whether "
+            "the agent was right."
+        ),
+    )
+    reproduction_merit_ordering: bool = Field(
+        default=False,
+        description=(
+            "Order eligible parents by reproductive co-limitation before the population "
+            "cap is applied, so a binding cap rations opportunities by reserves rather "
+            "than by agent creation order. At False (default) ordering is creation order."
+        ),
+    )
     recombination_probability: float = Field(
         default=0.3,
         ge=0.0,

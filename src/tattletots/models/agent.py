@@ -183,6 +183,26 @@ class Agent(BaseModel):
             and self.state.energy.total >= self.genome.reproduction_threshold
         )
 
+    def reproduction_sufficiency(
+        self,
+        information_scale: float = 1.0,
+        attention_scale: float = 1.0,
+    ) -> float:
+        """Return the uncapped scarcer-currency sufficiency ratio for reproduction.
+
+        Unlike the limiting factor this does not saturate at 1.0, so it still
+        discriminates between agents that are both solvent.
+        """
+        threshold = self.genome.reproduction_threshold
+        if threshold <= 0.0:
+            return 1.0
+        information_required = threshold * self.genome.information_requirement * information_scale
+        attention_required = threshold * self.genome.attention_requirement * attention_scale
+        return min(
+            self.state.energy.information / information_required,
+            self.state.energy.attention / attention_required,
+        )
+
     def reproduction_limiting_factor(
         self,
         coupling_strength: float = 1.0,
@@ -192,14 +212,11 @@ class Agent(BaseModel):
         """Return the continuous information/attention reproduction factor."""
         if coupling_strength <= 0.0:
             return 1.0
-        threshold = self.genome.reproduction_threshold
-        if threshold <= 0.0:
+        if self.genome.reproduction_threshold <= 0.0:
             return 1.0
-        information_required = threshold * self.genome.information_requirement * information_scale
-        attention_required = threshold * self.genome.attention_requirement * attention_scale
-        information_sufficiency = min(1.0, self.state.energy.information / information_required)
-        attention_sufficiency = min(1.0, self.state.energy.attention / attention_required)
-        limiting_factor = min(information_sufficiency, attention_sufficiency)
+        limiting_factor = min(
+            1.0, self.reproduction_sufficiency(information_scale, attention_scale)
+        )
         return (1.0 - coupling_strength) + coupling_strength * limiting_factor
 
     def advance_age(self) -> None:

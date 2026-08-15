@@ -145,6 +145,11 @@ def run_measurement(
         "grounded_input_fraction": grounded_fraction,
         "attention_budget_scale": attention_budget_scale,
         "false_alarm_penalty": options.extra_config.get("false_alarm_penalty"),
+        "config_overrides": {
+            key: value
+            for key, value in options.extra_config.items()
+            if key != "false_alarm_penalty"
+        },
         "runs": runs,
         "summary": {arm: _summarize(cell) for arm, cell in runs.items()},
     }
@@ -175,6 +180,7 @@ def markdown_report(results: dict[str, Any]) -> str:
         f"- Grounded input fraction (fixed): `{results['grounded_input_fraction']:g}`",
         f"- User attention-budget scale: `{results['attention_budget_scale']:g}`",
         f"- False-alarm penalty override: `{results['false_alarm_penalty']}`",
+        f"- Config overrides: `{results['config_overrides'] or 'none'}`",
         "",
         "## Coupling of each link (Pearson r, mean over seeds)",
         "",
@@ -217,9 +223,34 @@ def markdown_report(results: dict[str, Any]) -> str:
             "{:.1f}",
         ),
     )
+    falsification_rows = (
+        ("Generations with reports", "mean_generations_observed", "{:.1f}"),
+        (
+            "Correct-report rate slope per generation",
+            "mean_precision_generation_slope",
+            "{:+.4f}",
+        ),
+        ("Parent-child offspring correlation", "mean_corr_parent_child_offspring", "{:+.3f}"),
+        ("Parent-child pairs", "mean_n_parent_child_pairs", "{:.1f}"),
+        (
+            "Parent-child precision correlation",
+            "mean_corr_parent_child_precision",
+            "{:+.3f}",
+        ),
+    )
     lines.append("| Quantity | " + " | ".join(f"`{arm}`" for arm in results["summary"]) + " |")
     lines.append("|---" * (len(results["summary"]) + 1) + "|")
     for label, key, fmt in scale_rows:
+        cells = " | ".join(
+            fmt.format(cell.get(key, 0.0)) if cell.get("n_runs") else "n/a"
+            for cell in results["summary"].values()
+        )
+        lines.append(f"| {label} | {cells} |")
+
+    lines.extend(["", "### Falsification clauses, measured on these runs", ""])
+    lines.append("| Quantity | " + " | ".join(f"`{arm}`" for arm in results["summary"]) + " |")
+    lines.append("|---" * (len(results["summary"]) + 1) + "|")
+    for label, key, fmt in falsification_rows:
         cells = " | ".join(
             fmt.format(cell.get(key, 0.0)) if cell.get("n_runs") else "n/a"
             for cell in results["summary"].values()
@@ -248,6 +279,23 @@ def markdown_report(results: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _parse_config_overrides(pairs: Sequence[str]) -> dict[str, Any]:
+    """Parse KEY=VALUE config overrides into typed SimulationConfig values."""
+    overrides: dict[str, Any] = {}
+    for pair in pairs:
+        key, _, raw = pair.partition("=")
+        if not key or not raw:
+            raise ValueError(f"config override must be KEY=VALUE: {pair}")
+        lowered = raw.lower()
+        value: Any
+        if lowered in ("true", "false"):
+            value = lowered == "true"
+        else:
+            value = float(raw)
+        overrides[key] = value
+    return overrides
+
+
 def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -272,6 +320,13 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         help="Diagnostic override of SimulationConfig.false_alarm_penalty.",
     )
     parser.add_argument(
+        "--config",
+        nargs="*",
+        default=[],
+        metavar="KEY=VALUE",
+        help="Additional SimulationConfig overrides, e.g. reproduction_merit_ordering=true.",
+    )
+    parser.add_argument(
         "--no-write",
         action="store_true",
         help=(
@@ -280,6 +335,13 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         ),
     )
     return parser.parse_args(argv)
+
+
+def _extra_config(args: argparse.Namespace) -> dict[str, Any]:
+    extra = _parse_config_overrides(args.config)
+    if args.false_alarm_penalty is not None:
+        extra["false_alarm_penalty"] = args.false_alarm_penalty
+    return extra
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -293,11 +355,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         initial_population=args.initial_population,
         max_population=args.max_population,
         arms=tuple(args.arms),
-        extra_config=(
-            {}
-            if args.false_alarm_penalty is None
-            else {"false_alarm_penalty": args.false_alarm_penalty}
-        ),
+        extra_config=_extra_config(args),
     )
     results = run_measurement(
         options,

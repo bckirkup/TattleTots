@@ -771,17 +771,22 @@ class World:
 
         agent.state.energy.apply_info_delta(info_delta)
 
-        attn_income = compute_attention_income(agent, list(self.users.values()), allocations)
+        agent_reports = [r for r in reports if r.agent_id == agent.id]
+        false_alarms = sum(1 for r in agent_reports if r.verified and not r.correct)
+        correct = sum(1 for r in agent_reports if r.verified and r.correct)
+
+        verified_value = 1.0 + self.config.correct_report_attention_value * correct
+        attn_income = compute_attention_income(
+            agent, list(self.users.values()), allocations, verified_value=verified_value
+        )
         agent.state.last_step_attention_income = attn_income
         agent.state.cumulative_attention += attn_income
         maint = juvenile_maintenance_cost(agent, self.config)
         attn_delta = attn_income - maint
 
-        agent_reports = [r for r in reports if r.agent_id == agent.id]
-        false_alarms = sum(1 for r in agent_reports if r.verified and not r.correct)
         attn_delta -= false_alarms * self.config.false_alarm_penalty
         agent.state.false_alarms += false_alarms
-        agent.state.correct_reports += sum(1 for r in agent_reports if r.verified and r.correct)
+        agent.state.correct_reports += correct
 
         agent.state.energy.apply_attention_delta(attn_delta)
         self._attention_deltas[agent.id] = attn_delta

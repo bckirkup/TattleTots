@@ -27,6 +27,9 @@ def attempt_reproduction(
     if not eligible:
         return offspring
 
+    if config.reproduction_merit_ordering:
+        eligible = _merit_ordered(eligible, config)
+
     current_pop = len([a for a in agents if a.is_alive])
 
     for parent in eligible:
@@ -55,6 +58,24 @@ def attempt_reproduction(
         offspring.append(child)
 
     return offspring
+
+
+def _merit_ordered(eligible: list[Agent], config: SimulationConfig) -> list[Agent]:
+    """Sort eligible parents by scarcer-currency sufficiency, best first.
+
+    When the population cap binds it is the ordering, not the reserves, that decides
+    who reproduces. Sorting by the same currency sufficiency that gates reproduction
+    rations scarce opportunities by reserves instead of by agent creation order. The
+    sort is stable, so creation order remains the tie-break.
+    """
+    return sorted(
+        eligible,
+        key=lambda a: a.reproduction_sufficiency(
+            config.reproduction_information_scale,
+            config.reproduction_attention_scale,
+        ),
+        reverse=True,
+    )
 
 
 def _sexual_reproduction(

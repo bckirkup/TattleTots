@@ -12,6 +12,7 @@ Nothing here is domain-specific: it reads public agent state and user trust only
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -29,6 +30,7 @@ class AgentPayoffRecord:
 
     agent_id: str
     generation: int = 0
+    parent_ids: tuple[str, ...] = ()
     steps_alive: int = 0
     adult_steps: int = 0
     reports_issued: int = 0
@@ -69,6 +71,7 @@ class AgentPayoffRecord:
         return {
             "agent_id": self.agent_id,
             "generation": self.generation,
+            "n_parents": len(self.parent_ids),
             "steps_alive": self.steps_alive,
             "adult_steps": self.adult_steps,
             "reports_issued": self.reports_issued,
@@ -123,8 +126,31 @@ def _pearson(xs: list[float], ys: list[float]) -> float:
     return float(np.corrcoef(x, y)[0, 1])
 
 
+def _correlate_pairs(pairs: list[tuple[float, float]]) -> float:
+    """Pearson correlation over (parent, child) trait pairs."""
+    return _pearson([pair[0] for pair in pairs], [pair[1] for pair in pairs])
+
+
+def _precision(record: AgentPayoffRecord) -> float:
+    """Share of an agent's reports that were verified correct."""
+    if record.reports_issued == 0:
+        return 0.0
+    return record.correct_reports / record.reports_issued
+
+
 def _mean(values: list[float]) -> float:
     return float(np.mean(values)) if values else 0.0
+
+
+def _slope(xs: list[float], ys: list[float]) -> float:
+    """Least-squares slope of ys on xs, returning 0.0 for degenerate inputs."""
+    if len(xs) < 2:
+        return 0.0
+    x = np.asarray(xs, dtype=np.float64)
+    y = np.asarray(ys, dtype=np.float64)
+    if math.isclose(float(x.std()), 0.0, abs_tol=1e-12):
+        return 0.0
+    return float(np.polyfit(x, y, 1)[0])
 
 
 class PayoffLedger:
@@ -208,6 +234,7 @@ class PayoffLedger:
         for agent in world.agents.values():
             record = self._record_for(agent)
             record.generation = agent.state.generation
+            record.parent_ids = tuple(agent.state.parent_ids)
             record.reports_issued = agent.state.reports_issued
             record.correct_reports = agent.state.correct_reports
             record.false_alarms = agent.state.false_alarms
@@ -308,7 +335,69 @@ class PayoffLedger:
                 [record.attention_income_per_step for record in incorrect_group]
             ),
             "reproduction_gate": self.gate.as_dict(),
+            **self._falsification_summary(adults),
         }
+
+    def _falsification_summary(self, adults: list[AgentPayoffRecord]) -> dict[str, Any]:
+        """The two falsification clauses, measured on this run.
+
+        Clause 1 is a within-run rise in correct-report rate over generations at
+        fixed initial parameters; clause 2 is parent-child reproductive correlation.
+        """
+        by_generation: dict[int, list[AgentPayoffRecord]] = {}
+        for record in adults:
+            by_generation.setdefault(record.generation, []).append(record)
+        precision_by_generation = {
+            generation: (
+                sum(record.correct_reports for record in cohort)
+                / sum(record.reports_issued for record in cohort)
+                if sum(record.reports_issued for record in cohort)
+                else 0.0
+            )
+            for generation, cohort in sorted(by_generation.items())
+        }
+        reporting_generations = [
+            generation
+            for generation, cohort in sorted(by_generation.items())
+            if sum(record.reports_issued for record in cohort)
+        ]
+        return {
+            "precision_by_generation": precision_by_generation,
+            "generations_observed": len(reporting_generations),
+            "precision_generation_slope": _slope(
+                [float(generation) for generation in reporting_generations],
+                [precision_by_generation[generation] for generation in reporting_generations],
+            ),
+            "corr_parent_child_offspring": _correlate_pairs(
+                self._parent_child_pairs(lambda record: float(record.offspring))
+            ),
+            "n_parent_child_pairs": len(
+                self._parent_child_pairs(lambda record: float(record.offspring))
+            ),
+            "corr_parent_child_precision": _correlate_pairs(
+                self._parent_child_pairs(_precision, reporting_only=True)
+            ),
+            "n_parent_child_precision_pairs": len(
+                self._parent_child_pairs(_precision, reporting_only=True)
+            ),
+        }
+
+    def _parent_child_pairs(
+        self,
+        trait: Callable[[AgentPayoffRecord], float],
+        reporting_only: bool = False,
+    ) -> list[tuple[float, float]]:
+        """Parent/child values of one trait over every observed parentage link."""
+        pairs: list[tuple[float, float]] = []
+        for record in self.records:
+            if reporting_only and record.reports_issued == 0:
+                continue
+            for parent_id in record.parent_ids:
+                parent = self._records.get(parent_id)
+                if parent is None or (reporting_only and parent.reports_issued == 0):
+                    continue
+                pairs.append((trait(parent), trait(record)))
+        return pairs
 
 
 __all__ = [

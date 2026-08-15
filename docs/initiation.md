@@ -271,7 +271,14 @@ gradient that points the wrong way just gets you there faster.
    and the 0.05/0.2 trust asymmetry sets an 80% break-even precision against a
    16% decoder ceiling. Relieving that scale limit exposes a second severed link:
    with income abundant, the population cap rations reproduction by creation
-   order, so correctness → offspring stays ≤ +0.14.
+   order, so correctness → offspring stays ≤ +0.14. Both links are repaired by
+   config-gated mechanisms in `docs/payoff-fix-measurement.md`
+   (`correct_report_attention_value`, `reproduction_merit_ordering`): correctness →
+   offspring rises monotonically with the dose to +0.44, but neither falsification
+   clause clears, because a third break sits upstream — among evolved agents
+   parent–child correlation of precision is only ~0.02–0.13 against ~0.6–0.7 for
+   the heritable-by-construction oracle lineage, so correctness carries almost no
+   heritable variance for selection to act on.
 4. **Price reproduction against function**, so precocity is not the dominant
    gradient — pay for offspring in the scarce currency.
 5. **Only then** consider innate calibration (adaptive escalation thresholds as the
