@@ -96,3 +96,11 @@ def test_falsification_verdict_reads_the_measured_grid() -> None:
 def test_adapter_spec_must_be_module_and_callable() -> None:
     with pytest.raises(ValueError, match="module:Callable"):
         harness.build_adapter("tattletots.scenarios.sparse_sensor", seed=1, steps=5)
+
+
+def test_output_paths_must_stay_inside_allowed_bases() -> None:
+    inside = harness.safe_output_path("docs/ceiling-measurement.json")
+
+    assert inside.name == "ceiling-measurement.json"
+    with pytest.raises(ValueError, match="escapes the allowed directories"):
+        harness.safe_output_path("../../etc/passwd")

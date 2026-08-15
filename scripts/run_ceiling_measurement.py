@@ -15,6 +15,8 @@ import argparse
 import importlib
 import inspect
 import json
+import math
+import tempfile
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -44,6 +46,15 @@ _INVASION_SHARE = 0.15
 _DEFAULT_SEEDS = (42, 43, 44, 45, 46)
 _DEFAULT_GROUNDED_FRACTIONS = (0.0, 0.34, 0.67, 1.0)
 _DEFAULT_GROUNDED_MULTIPLIERS = (1.0,)
+_ALLOWED_OUTPUT_BASES = (_REPO_ROOT, Path(tempfile.gettempdir()).resolve())
+
+
+def safe_output_path(raw: str) -> Path:
+    """Resolve a caller-supplied output path inside an allowed base directory."""
+    resolved = (_REPO_ROOT / raw).resolve()
+    if not any(resolved.is_relative_to(base) for base in _ALLOWED_OUTPUT_BASES):
+        raise ValueError(f"output path escapes the allowed directories: {raw}")
+    return resolved
 
 
 @dataclass
@@ -216,7 +227,9 @@ def parent_child_reproductive_correlation(agents: dict[str, Agent]) -> float:
         return 0.0
     parents = np.array(parent_values, dtype=np.float64)
     children = np.array(child_values, dtype=np.float64)
-    if parents.std() == 0.0 or children.std() == 0.0:
+    if math.isclose(parents.std(), 0.0, abs_tol=1e-12) or math.isclose(
+        children.std(), 0.0, abs_tol=1e-12
+    ):
         return 0.0
     return float(np.corrcoef(parents, children)[0, 1])
 
@@ -470,12 +483,8 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         nargs="+",
         default=["ordinary", "oracle_monoculture", "oracle_invasion"],
     )
-    parser.add_argument(
-        "--output", type=Path, default=_REPO_ROOT / "docs" / "ceiling-measurement.json"
-    )
-    parser.add_argument(
-        "--report", type=Path, default=_REPO_ROOT / "docs" / "ceiling-measurement.md"
-    )
+    parser.add_argument("--output", default="docs/ceiling-measurement.json")
+    parser.add_argument("--report", default="docs/ceiling-measurement.md")
     return parser.parse_args(argv)
 
 
@@ -502,10 +511,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     verdict = falsification_verdict(results)
     results["falsification"] = verdict
 
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(results, indent=2, sort_keys=True) + "\n")
-    args.report.parent.mkdir(parents=True, exist_ok=True)
-    args.report.write_text(markdown_report(results, verdict))
+    output_path = safe_output_path(args.output)
+    report_path = safe_output_path(args.report)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(results, indent=2, sort_keys=True) + "\n")
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(markdown_report(results, verdict))
     print(markdown_report(results, verdict))
     return 0
 
