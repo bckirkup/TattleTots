@@ -1,17 +1,47 @@
 # Domain Integration Guide
 
-How to connect a domain-specific simulation to the TattleTots engine.
+Domain repositories integrate with TattleTots by implementing
+`tattletots.interface.domain_adapter.DomainAdapter`. TattleTots remains
+domain-agnostic; domain physics, sensors, and response costs stay in the
+domain repository.
 
-## Overview
+## Repository setup and command context
 
-TattleTots is domain-agnostic. The engine operates on abstract data streams,
-agents, and users — it does not know whether the underlying domain involves
-wildfire monitoring, ship biome analysis, or network intrusion detection.
+Run TattleTots commands from `TattleTots/`:
 
-Domain-specific behavior is provided by implementing the `DomainAdapter`
-abstract base class.
+```bash
+uv sync --locked --no-build --no-binary-package domain-runner --no-binary-package tattletots --extra dev
+uv run --no-sync --no-build pre-commit install
+```
 
-## The DomainAdapter Interface
+Run domain commands from the relevant domain repository. Each domain's
+lockfile installs its package together with `domain-runner` and `tattletots`:
+
+```bash
+# From Scrapiron_and_the_Bear/
+uv sync --locked --no-build --no-binary-package fire-ecology --no-binary-package domain-runner --no-binary-package tattletots --extra dev
+uv run --no-sync --no-build fire-ecology sim --layer domain_only --steps 200
+uv run --no-sync --no-build fire-ecology sim --layer tattletots --config configs/tattletots_integration.json
+uv run --no-sync --no-build fire-ecology batch --config configs/batch_example.json
+```
+
+The analogous commands from `Coral_Key_in_Three_Hour_Epochs/` use `coral-key`
+and its lockfile; those from `Xylella_SPQR/` use `grain-guard` and its
+lockfile. The compatibility wrapper
+`scripts/run_with_tattletots.py` lives in each domain repository, not in
+TattleTots:
+
+```bash
+# From a domain repository
+uv run --no-sync --no-build python scripts/run_with_tattletots.py \
+  --config configs/tattletots_integration.json \
+  --output results.json
+```
+
+Do not use the old multi-repository editable-install ritual. A repository's
+committed `uv.lock` is the source of its dependency versions.
+
+## The DomainAdapter interface
 
 ```python
 from tattletots.interface import DomainAdapter
@@ -19,210 +49,99 @@ from tattletots.models.stream import Stream
 from tattletots.models.user import User
 
 class MyDomainAdapter(DomainAdapter):
-
-    def get_streams(self) -> list[Stream]:
-        """Create and return the domain's data streams."""
-        ...
-
-    def get_users(self) -> list[User]:
-        """Define the human stakeholders in this domain."""
-        ...
-
-    def step(self, time_step: int) -> None:
-        """Advance the domain state by one step.
-        Update stream.current_data for each stream."""
-        ...
-
-    def get_ground_truth(self, time_step: int) -> bool:
-        """Is a real event (fire, intrusion, etc.) active right now?"""
-        return len(self.get_active_locations(time_step)) > 0
-
-    def get_active_locations(self, time_step: int) -> list[tuple[int, int]]:
-        """Return grid cells or zones where a true event is active."""
-        ...
-
-    def infer_report_location(
-        self,
-        stream_data: list,
-        stream_labels: list[str],
-    ) -> tuple[int, int]:
-        """Infer the location an agent reports from its input stream data."""
-        ...
-
-    def score_relevance(self, signal_vector, user) -> float:
-        """How relevant is this compressed signal to this user?"""
-        ...
-
-    def compute_costs(self, n_escalations, n_correct, n_false_alarms, n_missed):
-        """Return domain-specific cost breakdown."""
-        ...
-
-    def get_responder_user_id(self) -> str:
-        """User id authorized to dispatch physical responses from their COP."""
-
-    def dispatch_and_judge_responses(
-        self,
-        targets: list[DispatchTarget],
-        time_step: int,
-    ) -> list[ResponseOutcome]:
-        """Execute COP-selected responses and return outcome judgments."""
-        ...
+    def get_streams(self) -> list[Stream]: ...
+    def get_users(self) -> list[User]: ...
+    def step(self, time_step: int) -> None: ...
+    def get_ground_truth(self, time_step: int) -> bool: ...
+    def get_active_locations(self, time_step: int) -> list[tuple[int, int]]: ...
+    def infer_report_location(self, stream_data, stream_labels) -> tuple[int, int]: ...
+    def score_relevance(self, signal_vector, user) -> float: ...
+    def compute_costs(self, ...) -> dict: ...
+    def get_responder_user_id(self) -> str: ...
+    def dispatch_and_judge_responses(self, targets, time_step): ...
 ```
 
 Import `DispatchTarget` from `tattletots.models.dispatch_target` and
-`ResponseOutcome` from `tattletots.models.response_outcome`.
+`ResponseOutcome` from `tattletots.models.response_outcome` when annotating
+dispatch methods. Agents must not read `User.trust`; agents learn from
+peer-trust and observable reports or response outcomes.
 
-**Trust boundary:** Agents must not read `User.trust`. That field is for user-side
-attention and COP fusion only. Agents update `peer_trust` from observable signals
-(reports, dispatch outcomes, whistleblower verification).
+The integration loop records spatial event state with:
 
-## domain-runner Layers
-
-Domain repos ship `{package}/runner.py` with a `*DomainHooks` class. The shared
-[domain-runner](https://github.com/bckirkup/domain-runner) package orchestrates runs:
-
-| Layer | Requires TattleTots | Behavior |
-|-------|---------------------|----------|
-| `domain_only` | No | Advance adapter physics only |
-| `tattletots` | Yes | Full agent ecology + COP dispatch loop |
-
-```bash
-pip install -e domain-runner[dev]
-pip install -e TattleTots[dev]   # only for --layer tattletots
-
-fire-ecology sim --layer domain_only --steps 200
-fire-ecology sim --layer tattletots --config configs/tattletots_integration.json
-fire-ecology batch --config configs/batch_example.json
+```python
+world.set_event_state(adapter.get_active_locations(step))
 ```
 
-Programmatic use:
+It verifies reports against active locations, rather than using a global
+boolean alone.
+
+## domain-runner layers
+
+| Layer | Requires TattleTots | Behavior |
+| --- | --- | --- |
+| `domain_only` | No | Advance domain physics |
+| `tattletots` | Yes | Agent ecology, COP fusion, and dispatch |
+
+Domain repositories expose `*DomainHooks` and a `run_*_simulation()` entry
+point. For example, from `Scrapiron_and_the_Bear/`:
 
 ```python
 from fire_ecology.runner import FireDomainHooks, run_fire_simulation
 
 hooks = FireDomainHooks()
-run = hooks.load_run_context(cli_overrides={"layer": "tattletots", "domain": {"steps": 200}})
+run = hooks.load_run_context(
+    cli_overrides={"layer": "tattletots", "domain": {"steps": 200}}
+)
 result = run_fire_simulation(run)
 ```
 
-## Step-by-Step Implementation
+## Adapter implementation
 
-### 1. Define Your Streams
+### Streams and users
 
-Each stream is a multivariate time series with fixed dimensionality.
+Streams have fixed dimensionality and expose NumPy data. Use
+`StreamType.RAW` for basal domain sources; residual and output streams are
+created by the engine. Combined inputs are capped at
+`SimulationConfig.max_stream_dim`, whose default is 30.
+
+Users have finite attention budgets and role-specific priority vectors:
 
 ```python
 from tattletots.models.stream import Stream, StreamType
-
-def get_streams(self) -> list[Stream]:
-    return [
-        Stream(
-            name="sensor_array_1",
-            stream_type=StreamType.RAW,
-            dimensionality=20,
-        ),
-        Stream(
-            name="sensor_array_2",
-            stream_type=StreamType.RAW,
-            dimensionality=15,
-        ),
-    ]
-```
-
-**Rules:**
-- Each stream has a fixed `dimensionality` that never changes.
-- Stream data (`current_data`) must be a NumPy array of that exact size.
-- `StreamType.RAW` for basal data sources. Residual and output streams are
-  created automatically by the engine.
-- The engine caps combined agent inputs at `config.max_stream_dim` dimensions
-  (default 30). If your streams exceed this, set `max_stream_dim` in the
-  `SimulationConfig` to match your adapter's dimensionality.
-
-### 2. Define Your Users
-
-Users represent human stakeholders with finite attention budgets.
-
-```python
 from tattletots.models.user import User
 
-def get_users(self) -> list[User]:
-    return [
-        User(
-            name="field_commander",
-            attention_budget=1.0,
-            priority_vector=np.array([0.8, 0.2]),
-        ),
-        User(
-            name="operations_center",
-            attention_budget=1.5,
-            priority_vector=np.array([0.3, 0.7]),
-        ),
-    ]
+Stream(name="sensor_array", stream_type=StreamType.RAW, dimensionality=20)
+User(name="field_commander", attention_budget=1.0,
+     priority_vector=np.array([0.8, 0.2]))
 ```
 
-**Rules:**
-- `attention_budget` is the total attention the user can allocate per step.
-- `priority_vector` defines the user's relative interest in different signal
-  dimensions. Length should match the number of streams.
+### State and location
 
-### 3. Implement `step()`
+`step()` advances domain state and updates each stream. `get_ground_truth()`
+is a convenience boolean; `get_active_locations()` supplies the coordinates
+used for report verification. `infer_report_location()` maps agent input to
+the reported coordinate.
 
-Update stream data each time step. This is where your domain simulation runs.
+### Relevance and COP fusion
 
-```python
-def step(self, time_step: int) -> None:
-    for stream in self._streams:
-        stream.current_data = self._generate_data(stream, time_step)
-```
-
-The engine calls `step()` once per simulation step, before agents consume
-the streams.
-
-### 4. Provide Ground Truth and Active Locations
-
-The engine verifies escalation reports against **active event locations**.
-Each report includes a `location` tuple `(row, col)` or `(zone_x, zone_y)`.
-A report is correct iff its location is in the active set for that step.
-Wrong-location reports are false alarms; agents that stay silent or report
-the wrong location during an active event receive missed-event penalties.
+Reports carry compressed `signal_vector`s, while user priorities originate in
+raw-stream space. COP fusion calls `adapter.score_relevance()` rather than
+using a raw prefix dot product:
 
 ```python
-def get_ground_truth(self, time_step: int) -> bool:
-    return len(self.get_active_locations(time_step)) > 0
+from tattletots.engine.relevance import score_report_relevance
 
-def get_active_locations(self, time_step: int) -> list[tuple[int, int]]:
-    return self._active_event_cells  # domain-specific
-
-def infer_report_location(self, stream_data, stream_labels) -> tuple[int, int]:
-    # Map agent input streams to the reported location
-    ...
-```
-
-### 5. Score Relevance
-
-Role-weighted relevance for COP fusion and attention. Agent reports use **compressed**
-`signal_vector`s; user `priority_vector`s are defined in **raw stream space** with
-role-specific bands (e.g. first/middle/last third).
-
-**COP fusion calls `adapter.score_relevance()`**, not a blind dot product on the
-first N components. The default helper is `tattletots.engine.relevance.score_report_relevance()`,
-which uses proportional band mapping when dimensions differ.
-
-At integrated setup, `TattleTotsLayer` remaps user priorities to the median agent
-report dimension via `align_user_priorities_to_report_space()`.
-
-```python
 def score_relevance(self, signal_vector, user) -> float:
-    from tattletots.engine.relevance import score_report_relevance
     return score_report_relevance(signal_vector, user)
 ```
 
-Override when your domain has custom role logic (e.g. fisheries enforcement vs stock signals).
-See `tests/test_relevance.py` for band-mapping examples.
+At integrated setup, `align_user_priorities_to_report_space()` maps priorities
+to the median agent working dimension. Override the default for domain-specific
+role logic.
 
-### 6. Compute Domain Costs
+### Costs and dispatch
 
-Return a dictionary with three cost categories:
+Return surveillance, response, and damage categories from `compute_costs()`:
 
 ```python
 def compute_costs(self, n_escalations, n_correct, n_false_alarms, n_missed):
@@ -233,11 +152,14 @@ def compute_costs(self, n_escalations, n_correct, n_false_alarms, n_missed):
     }
 ```
 
-These costs feed into the `CostAccumulator` telemetry module for analysis.
+`get_responder_user_id()` identifies the user authorized to dispatch physical
+responses. `dispatch_and_judge_responses()` executes selected targets and
+returns `ResponseOutcome` values.
 
-## Running a Simulation with Your Adapter
+## Manual loop
 
-### Manual loop (low-level)
+For low-level experiments, run this code from the TattleTots repository after
+the TattleTots setup above:
 
 ```python
 from tattletots.engine.config import SimulationConfig
@@ -247,13 +169,11 @@ config = SimulationConfig(
     initial_population=20,
     max_population=100,
     max_steps=500,
-    max_stream_dim=50,  # raise from default 30 if your streams are high-dimensional
+    max_stream_dim=50,
     seed=42,
 )
-
 adapter = MyDomainAdapter(...)
 world = World(config=config)
-
 for stream in adapter.get_streams():
     world.add_stream(stream)
 for user in adapter.get_users():
@@ -267,48 +187,15 @@ for step_num in range(config.max_steps):
     world.step()
     if world.living_population == 0:
         break
-
-# Analyze results
-print(world.telemetry.summary())
 ```
 
-### Recommended: domain-runner + TattleTots layer
+The `max_population=100` value is the engine default. Domain integration
+configs may override it (for example, `60`) to keep cross-repository runs
+manageable.
 
-Use each domain's `run_*_simulation()` entry point (see `{domain}/runner.py`) with
-`--layer tattletots` or `TattleTotsLayer` directly. The layer runs `world.step()`,
-then `run_dispatch_cycle()` and `apply_post_dispatch_feedback()` automatically.
+## Reference implementation
 
-See `integration/tattletots_layer.py` and `docs/COORDINATION.md`.
-
-## Using Cost Accounting
-
-To track domain costs alongside the simulation:
-
-```python
-from tattletots.telemetry import CostAccumulator
-
-costs = CostAccumulator()
-
-for step_num in range(config.max_steps):
-    adapter.step(step_num)
-    world.set_event_state(adapter.get_active_locations(step_num))
-    world.step()
-
-    # Get last step's telemetry
-    last = world.telemetry.history[-1]
-    cost_dict = adapter.compute_costs(
-        n_escalations=last.reports_issued,
-        n_correct=last.correct_reports,
-        n_false_alarms=last.false_alarms,
-        n_missed=0,  # compute from ground truth vs reports
-    )
-    costs.record_from_dict(step_num, cost_dict)
-
-print(costs.summary())
-```
-
-## Reference Implementation
-
-See `scenarios/gaussian_shift.py` for a complete working adapter. It generates
-K=10 structured Gaussian components with noise, a midpoint regime shift, and
-two distinct users.
+`scenarios/gaussian_shift.py` is the built-in complete adapter example. It
+generates structured Gaussian components, a midpoint regime shift, and two
+distinct users. See [COORDINATION.md](COORDINATION.md) for repository
+architecture, setup, output schema, and comparison guidance.

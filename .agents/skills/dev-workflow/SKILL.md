@@ -22,16 +22,16 @@ uv run --no-sync --no-build pytest
 ## Running a Simulation
 
 ```bash
-tattletots --scenario gaussian_shift --steps 400 --verbose
-tattletots --config configs/gaussian_shift_default.json --verbose
+uv run --no-sync --no-build tattletots --scenario gaussian_shift --steps 400 --verbose
+uv run --no-sync --no-build tattletots --config configs/gaussian_shift_default.json --verbose
 ```
 
 ## Test Markers
 
 ```bash
-pytest                   # all tests
-pytest -m smoke          # emergent behavior validation only
-pytest --cov=tattletots  # with coverage
+uv run --no-sync --no-build pytest                   # all tests
+uv run --no-sync --no-build pytest -m smoke          # emergent behavior validation only
+uv run --no-sync --no-build pytest --cov=tattletots  # with coverage
 ```
 
 ## Key Configuration Parameters (`SimulationConfig`)

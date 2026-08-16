@@ -70,7 +70,7 @@ Simulations are parameterized via JSON:
 }
 ```
 
-Run with config: `tattletots --config configs/gaussian_shift_default.json --verbose`
+Run with config: `uv run --no-sync --no-build tattletots --config configs/gaussian_shift_default.json --verbose`
 
 ### Gaussian Shift instrument exemption
 
@@ -170,7 +170,14 @@ assertion containing all failed findings.
 | [Xylella_SPQR](https://github.com/bckirkup/Xylella_SPQR) | Precision agriculture & pest management | `grain-guard` |
 | [Scrapiron_and_the_Bear](https://github.com/bckirkup/Scrapiron_and_the_Bear) | Wildfire detection & suppression | `fire-ecology` |
 
-Each domain repo includes `{package}/runner.py` and CLI commands (`sim`, `batch`, `--layer domain_only|tattletots`) via [domain-runner](https://github.com/bckirkup/domain-runner). Legacy `scripts/run_with_tattletots.py` wrappers still work. See [docs/COORDINATION.md](docs/COORDINATION.md) for installation, configuration, and output schema.
+Each domain repo includes `{package}/runner.py` and CLI commands (`sim`, `batch`,
+`--layer domain_only|tattletots`) via
+[domain-runner](https://github.com/bckirkup/domain-runner). Legacy
+`scripts/run_with_tattletots.py` wrappers still work, but those wrappers live in
+the domain repositories, not in TattleTots. Run them from the relevant domain
+repository with `uv run --no-sync --no-build`. See
+[docs/COORDINATION.md](docs/COORDINATION.md) for installation, configuration,
+and output schema.
 
 ## GPU Acceleration
 
@@ -191,27 +198,35 @@ When `use_gpu: true`, all array math (compression SVD, attention softmax, niche 
 
 ### Parameter Scans
 
-For large sweeps across parameter space, use the runner script with shell parallelism:
+For large sweeps across parameter space, use a domain repository's wrapper with
+shell parallelism. The wrapper commands below run from that domain repository;
+the configuration-generation command runs from `TattleTots/` and writes
+configurations that must be available in the domain repository.
 
 ```bash
-# Single run with JSON output
-python scripts/run_with_tattletots.py --config configs/tattletots_integration.json --output results.json
+# From the relevant domain repository: single run with JSON output
+uv run --no-sync --no-build python scripts/run_with_tattletots.py --config configs/tattletots_integration.json --output results.json
+```
 
-# Parallel parameter scan (example: vary mutation_rate and seed)
-for rate in 0.01 0.05 0.1 0.2 0.5; do
-  for seed in $(seq 1 10); do
-    python -c "
-import json, sys
-cfg = json.load(open('configs/gaussian_shift_default.json'))
-cfg['simulation']['mutation_rate'] = $rate
-cfg['simulation']['seed'] = $seed
-json.dump(cfg, open(f'configs/scan/mr{rate}_s{seed}.json', 'w'))
-" && python scripts/run_with_tattletots.py \
-      --config "configs/scan/mr${rate}_s${seed}.json" \
-      --output "results/mr${rate}_s${seed}.json" &
-  done
-done
-wait
+To generate a scan configuration, run this from `TattleTots/`, then make the
+generated file available under the domain repository's `configs/scan/` directory:
+
+```bash
+uv run --no-sync --no-build python -c '
+import json
+cfg = json.load(open("configs/gaussian_shift_default.json"))
+cfg["simulation"]["mutation_rate"] = 0.1
+cfg["simulation"]["seed"] = 1
+json.dump(cfg, open("configs/scan/mr0.1_s1.json", "w"))
+'
+```
+
+From the relevant domain repository, run the generated configuration:
+
+```bash
+uv run --no-sync --no-build python scripts/run_with_tattletots.py \
+  --config "configs/scan/mr0.1_s1.json" \
+  --output "results/mr0.1_s1.json"
 ```
 
 All output files conform to `tattletots.output_schema.SimulationOutput`, so results can be loaded and compared programmatically:
@@ -229,9 +244,9 @@ results = [
 ## Testing
 
 ```bash
-pytest                        # All tests
-pytest -m smoke               # Smoke tests (emergent behavior validation)
-pytest --cov=tattletots       # With coverage
+uv run --no-sync --no-build pytest                        # All tests
+uv run --no-sync --no-build pytest -m smoke               # Smoke tests (emergent behavior validation)
+uv run --no-sync --no-build pytest --cov=tattletots       # With coverage
 ```
 
 ### Success Criteria (Requirements §9)
@@ -245,4 +260,4 @@ The engine passes if:
 
 ## License
 
-Apache 2.0
+Apache-2.0 — see [LICENSE](LICENSE).

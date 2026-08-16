@@ -11,11 +11,11 @@ does not reintroduce flagged patterns.
 ## Pre-commit checklist
 
 ```bash
-pre-commit run --all-files
-python scripts/sonar_guard.py src tests scripts "Large Experiments"
-ruff check src/ tests/ scripts/ "Large Experiments/"
-ruff format --check src/ tests/ scripts/ "Large Experiments/"
-pytest
+uv run --no-sync --no-build pre-commit run --all-files
+uv run --no-sync --no-build python scripts/sonar_guard.py src tests scripts "Large Experiments"
+uv run --no-sync --no-build ruff check src/ tests/ scripts/ "Large Experiments/"
+uv run --no-sync --no-build ruff format --check src/ tests/ scripts/ "Large Experiments/"
+uv run --no-sync --no-build pytest
 ```
 
 After substantive changes, verify the SonarCloud check on the PR or compare against
