@@ -251,13 +251,20 @@ done
 From the selected domain repository, run the generated configurations in parallel:
 
 ```bash
+# This block is run from the selected domain repository.  The wrappers use
+# --epochs in Coral Key and --steps in FireEcology and GrainGuard.
+case "$(basename "$PWD")" in
+  Coral*) DURATION_FLAG=--epochs ;;
+  Scrapiron*|Xylella*) DURATION_FLAG=--steps ;;
+  *) echo "Run this block from Coral Key, Scrapiron, or Xylella" >&2; exit 1 ;;
+esac
 mkdir -p results
 for rate in 0.1 0.2; do
   for seed in 1 2; do
     uv run --no-sync --no-build python scripts/run_with_tattletots.py \
       --config "configs/scan/mr${rate}_s${seed}.json" \
       --seed "$seed" \
-      --epochs 3 \
+      "$DURATION_FLAG" 3 \
       --output "results/mr${rate}_s${seed}.json" &
   done
 done
