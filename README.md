@@ -70,7 +70,7 @@ Simulations are parameterized via JSON:
 }
 ```
 
-Run with config: `tattletots --config configs/gaussian_shift_default.json --verbose`
+Run with config: `uv run --no-sync --no-build tattletots --config configs/gaussian_shift_default.json --verbose`
 
 ### Gaussian Shift instrument exemption
 
@@ -170,7 +170,14 @@ assertion containing all failed findings.
 | [Xylella_SPQR](https://github.com/bckirkup/Xylella_SPQR) | Precision agriculture & pest management | `grain-guard` |
 | [Scrapiron_and_the_Bear](https://github.com/bckirkup/Scrapiron_and_the_Bear) | Wildfire detection & suppression | `fire-ecology` |
 
-Each domain repo includes `{package}/runner.py` and CLI commands (`sim`, `batch`, `--layer domain_only|tattletots`) via [domain-runner](https://github.com/bckirkup/domain-runner). Legacy `scripts/run_with_tattletots.py` wrappers still work. See [docs/COORDINATION.md](docs/COORDINATION.md) for installation, configuration, and output schema.
+Each domain repo includes `{package}/runner.py` and CLI commands (`sim`, `batch`,
+`--layer domain_only|tattletots`) via
+[domain-runner](https://github.com/bckirkup/domain-runner). Legacy
+`scripts/run_with_tattletots.py` wrappers still work, but those wrappers live in
+the domain repositories, not in TattleTots. Run them from the relevant domain
+repository with `uv run --no-sync --no-build`. See
+[docs/COORDINATION.md](docs/COORDINATION.md) for installation, configuration,
+and output schema.
 
 ## GPU Acceleration
 
@@ -180,38 +187,103 @@ TattleTots supports optional GPU offloading via [CuPy](https://cupy.dev/) for la
 # Install with GPU support
 uv sync --locked --no-build --no-binary-package domain-runner --no-binary-package tattletots --extra gpu
 
-# Enable in config JSON
-{"simulation": {"use_gpu": true, ...}}
+# Enable GPU in a copy of an existing config
+uv run --no-sync --no-build python -c '
+import json
+from pathlib import Path
 
-# Or pass directly via the engine
-uv run --no-sync --no-build tattletots --config configs/gpu_scan.json --verbose
+source = Path("configs/gaussian_shift_default.json")
+target = Path("configs/gaussian_shift_gpu.json")
+config = json.loads(source.read_text())
+config.setdefault("simulation", {})["use_gpu"] = True
+target.write_text(json.dumps(config, indent=2) + "\n")
+'
+
+# Run the generated config (remove configs/gaussian_shift_gpu.json afterward if desired)
+uv run --no-sync --no-build tattletots --config configs/gaussian_shift_gpu.json --steps 1 --verbose
 ```
 
 When `use_gpu: true`, all array math (compression SVD, attention softmax, niche overlap) dispatches to CuPy. Falls back to NumPy silently if CuPy is unavailable or no CUDA device is found.
 
 ### Parameter Scans
 
-For large sweeps across parameter space, use the runner script with shell parallelism:
+For large sweeps across parameter space, use a domain repository's wrapper with
+shell parallelism. The configuration-generation block below runs from
+`TattleTots/` and copies configurations into the selected domain repository;
+the sweep block runs from that domain repository.
 
 ```bash
-# Single run with JSON output
-python scripts/run_with_tattletots.py --config configs/tattletots_integration.json --output results.json
+# From the relevant domain repository: single run with JSON output
+uv run --no-sync --no-build python scripts/run_with_tattletots.py --config configs/tattletots_integration.json --output results.json
+```
 
-# Parallel parameter scan (example: vary mutation_rate and seed)
-for rate in 0.01 0.05 0.1 0.2 0.5; do
-  for seed in $(seq 1 10); do
-    python -c "
-import json, sys
-cfg = json.load(open('configs/gaussian_shift_default.json'))
-cfg['simulation']['mutation_rate'] = $rate
-cfg['simulation']['seed'] = $seed
-json.dump(cfg, open(f'configs/scan/mr{rate}_s{seed}.json', 'w'))
-" && python scripts/run_with_tattletots.py \
+To generate a modest 2 × 2 scan, run this block from `TattleTots/`. Set
+`DOMAIN_REPO` to the domain repository you want to exercise; the generated
+configurations are copied into its `configs/scan/` directory:
+
+```bash
+DOMAIN_REPO=../Coral-Key-in-Three-Hour-Epochs
+mkdir -p "$DOMAIN_REPO/configs/scan"
+for rate in 0.1 0.2; do
+  for seed in 1 2; do
+    RATE="$rate" SEED="$seed" uv run --no-sync --no-build python -c '
+import json
+import os
+from pathlib import Path
+
+cfg = json.load(open("configs/gaussian_shift_default.json"))
+cfg["simulation"]["mutation_rate"] = float(os.environ["RATE"])
+cfg["simulation"]["seed"] = int(os.environ["SEED"])
+scan_dir = Path("configs/scan")
+scan_dir.mkdir(parents=True, exist_ok=True)
+rate = os.environ["RATE"]
+seed = os.environ["SEED"]
+name = f"mr{rate}_s{seed}.json"
+with (scan_dir / name).open("w") as output:
+    json.dump(cfg, output)
+'
+    cp "configs/scan/mr${rate}_s${seed}.json" \
+      "$DOMAIN_REPO/configs/scan/mr${rate}_s${seed}.json"
+  done
+done
+```
+
+From the selected domain repository, run the generated configurations in parallel:
+
+```bash
+# This block is run from the selected domain repository.  The wrappers use
+# --epochs in Coral Key and --steps in FireEcology and GrainGuard.
+case "$(basename "$PWD")" in
+  Coral*) DURATION_FLAG=--epochs ;;
+  Scrapiron*|Xylella*) DURATION_FLAG=--steps ;;
+  *) echo "Run this block from Coral Key, Scrapiron, or Xylella" >&2; exit 1 ;;
+esac
+mkdir -p results
+for rate in 0.1 0.2; do
+  for seed in 1 2; do
+    uv run --no-sync --no-build python scripts/run_with_tattletots.py \
       --config "configs/scan/mr${rate}_s${seed}.json" \
+      --seed "$seed" \
+      "$DURATION_FLAG" 3 \
       --output "results/mr${rate}_s${seed}.json" &
   done
 done
 wait
+```
+
+Confirm that every generated result is a valid `SimulationOutput`:
+
+```bash
+uv run --no-sync --no-build python -c '
+from pathlib import Path
+from tattletots.output_schema import SimulationOutput
+
+results = sorted(Path("results").glob("mr*_s*.json"))
+assert len(results) == 4, results
+for path in results:
+    SimulationOutput.model_validate_json(path.read_text())
+print(f"validated {len(results)} scan results")
+'
 ```
 
 All output files conform to `tattletots.output_schema.SimulationOutput`, so results can be loaded and compared programmatically:
@@ -229,9 +301,9 @@ results = [
 ## Testing
 
 ```bash
-pytest                        # All tests
-pytest -m smoke               # Smoke tests (emergent behavior validation)
-pytest --cov=tattletots       # With coverage
+uv run --no-sync --no-build pytest                        # All tests
+uv run --no-sync --no-build pytest -m smoke               # Smoke tests (emergent behavior validation)
+uv run --no-sync --no-build pytest --cov=tattletots       # With coverage
 ```
 
 ### Success Criteria (Requirements §9)
@@ -245,4 +317,4 @@ The engine passes if:
 
 ## License
 
-Apache 2.0
+Apache-2.0 — see [LICENSE](LICENSE).

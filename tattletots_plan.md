@@ -1,3 +1,10 @@
+# Historical planning document
+
+This plan describes the pre-implementation design and is superseded by the
+implemented architecture documented in [AGENTS.md](AGENTS.md) and
+[README.md](README.md). Preserve it for historical context; use those documents
+for current setup, APIs, and behavior.
+
 # TattleTots — Greenfield Build Plan
 
 ## Current State

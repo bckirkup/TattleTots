@@ -57,10 +57,10 @@ world.set_event_state(adapter.get_active_locations(step))
 ## Running Integrated Mode
 
 ```bash
-# Each domain repo provides a CLI with --layer flag:
-<domain-cli> sim --layer domain_only --steps N --verbose    # domain physics only
-<domain-cli> sim --layer tattletots --config configs/tattletots_integration.json  # full ecology
-<domain-cli> batch --config configs/batch_example.json      # parameter sweeps
+# Run these commands from the relevant domain repository, not from TattleTots:
+uv run --no-sync --no-build <domain-cli> sim --layer domain_only --steps N --verbose
+uv run --no-sync --no-build <domain-cli> sim --layer tattletots --config configs/tattletots_integration.json
+uv run --no-sync --no-build <domain-cli> batch --config configs/batch_example.json
 ```
 
 ## GPU Acceleration
@@ -79,7 +79,8 @@ Key files in TattleTots:
 ## Parameter Scans
 
 ```bash
-python scripts/run_with_tattletots.py --config <variant>.json --output results/<name>.json
+# Run from the relevant domain repository; this wrapper is not in TattleTots.
+uv run --no-sync --no-build python scripts/run_with_tattletots.py --config <variant>.json --output results/<name>.json
 ```
 
 Load results:
