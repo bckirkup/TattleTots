@@ -41,6 +41,8 @@ class AgentPayoffRecord:
     information_subsidy: float = 0.0
     trust_samples: float = 0.0
     trust_observations: int = 0
+    false_alarm_price_sum: float = 0.0
+    correct_report_value_sum: float = 0.0
     final_information_energy: float = 0.0
     final_attention_energy: float = 0.0
     offspring: int = 0
@@ -58,6 +60,34 @@ class AgentPayoffRecord:
         if self.steps_alive == 0:
             return 0.0
         return self.attention_income / self.steps_alive
+
+    @property
+    def mean_false_alarm_price(self) -> float:
+        """Attention charged per false alarm, averaged over the steps this agent lived."""
+        if self.steps_alive == 0:
+            return 0.0
+        return self.false_alarm_price_sum / self.steps_alive
+
+    @property
+    def mean_correct_report_value(self) -> float:
+        """Attention a correct report would have earned, averaged over steps alive."""
+        if self.steps_alive == 0:
+            return 0.0
+        return self.correct_report_value_sum / self.steps_alive
+
+    @property
+    def realized_break_even_precision(self) -> float:
+        """Precision at which this agent's reporting return changes sign.
+
+        `price / (price + value)`: the precision that makes `p*value - (1-p)*price`
+        zero. It is what the agent actually faced, whether the price came from the flat
+        penalty or from repricing.
+        """
+        price = self.mean_false_alarm_price
+        value = self.mean_correct_report_value
+        if price + value <= 0.0:
+            return 0.0
+        return price / (price + value)
 
     @property
     def information_income_per_step(self) -> float:
@@ -85,6 +115,9 @@ class AgentPayoffRecord:
             "information_income_per_step": self.information_income_per_step,
             "final_information_energy": self.final_information_energy,
             "final_attention_energy": self.final_attention_energy,
+            "mean_false_alarm_price": self.mean_false_alarm_price,
+            "mean_correct_report_value": self.mean_correct_report_value,
+            "realized_break_even_precision": self.realized_break_even_precision,
             "offspring": self.offspring,
         }
 
@@ -194,6 +227,8 @@ class PayoffLedger:
             record.attention_income += agent.state.last_step_attention_income
             record.information_yield += agent.state.last_step_yield
             record.information_subsidy += agent.state.last_step_info_subsidy
+            record.false_alarm_price_sum += agent.state.last_step_false_alarm_price
+            record.correct_report_value_sum += agent.state.last_step_correct_report_value
             for user in users:
                 record.trust_samples += user.get_trust(agent.id)
                 record.trust_observations += 1
@@ -290,6 +325,9 @@ class PayoffLedger:
             "corr_reports_issued_attention_income": _pearson(reports, attn),
             "corr_reports_issued_offspring": _pearson(reports, offspring),
             "n_silent_adults": len(silent_group),
+            "silent_adult_share": len(silent_group) / len(adults),
+            "mean_reports_per_adult": _mean(reports),
+            "mean_adult_steps": _mean([float(record.adult_steps) for record in adults]),
             "silent_mean_attention_income": _mean(
                 [record.attention_income_per_step for record in silent_group]
             ),
@@ -303,6 +341,17 @@ class PayoffLedger:
             "trust_break_even_precision": self._trust_break_even_precision,
             "false_alarm_penalty_in_attention_income_steps": (
                 self._false_alarm_penalty / _mean(attn) if _mean(attn) > 0.0 else 0.0
+            ),
+            "mean_false_alarm_price": _mean([record.mean_false_alarm_price for record in adults]),
+            "mean_correct_report_value": _mean(
+                [record.mean_correct_report_value for record in adults]
+            ),
+            "realized_break_even_precision": _mean(
+                [
+                    record.realized_break_even_precision
+                    for record in adults
+                    if record.mean_false_alarm_price + record.mean_correct_report_value > 0.0
+                ]
             ),
             "mean_attention_income_per_step": _mean(attn),
             "mean_information_income_per_step": _mean(info),

@@ -213,6 +213,8 @@ class World:
             agent.state.last_whistleblower_reports_issued = 0
             agent.state.last_step_attention_income = 0.0
             agent.state.last_step_info_subsidy = 0.0
+            agent.state.last_step_false_alarm_price = 0.0
+            agent.state.last_step_correct_report_value = 0.0
             agent.state.last_step_grounded_yield = 0.0
             agent.state.last_step_ungrounded_yield = 0.0
             agent.state.policy_report_location = None
@@ -784,12 +786,40 @@ class World:
         maint = juvenile_maintenance_cost(agent, self.config)
         attn_delta = attn_income - maint
 
-        attn_delta -= false_alarms * self.config.false_alarm_penalty
+        attn_delta -= false_alarms * self._false_alarm_price(agent, allocations)
         agent.state.false_alarms += false_alarms
         agent.state.correct_reports += correct
 
         agent.state.energy.apply_attention_delta(attn_delta)
         self._attention_deltas[agent.id] = attn_delta
+
+    def _false_alarm_price(
+        self,
+        agent: Agent,
+        allocations: dict[str, dict[str, float]],
+    ) -> float:
+        """Attention charged for one false alarm, recording the price it was charged at.
+
+        With `false_alarm_break_even_precision` set to p, the price is the value of a
+        correct report scaled by `p / (1 - p)`, which is the penalty that makes the
+        expected attention return on a report change sign exactly at precision p. The
+        value of a correct report is this agent's own attention allocation times
+        `correct_report_attention_value`, so the price follows the agent's standing with
+        users rather than a global constant.
+        """
+        target = self.config.false_alarm_break_even_precision
+        value_rate = self.config.correct_report_attention_value
+        value_per_correct = 0.0
+        if value_rate > 0.0:
+            base_income = compute_attention_income(agent, list(self.users.values()), allocations)
+            value_per_correct = base_income * value_rate
+        if target is None or value_rate <= 0.0:
+            price = self.config.false_alarm_penalty
+        else:
+            price = value_per_correct * target / (1.0 - target)
+        agent.state.last_step_correct_report_value = value_per_correct
+        agent.state.last_step_false_alarm_price = price
+        return price
 
     def _apply_domestication(self, living_agents: list[Agent]) -> None:
         for downstream in living_agents:

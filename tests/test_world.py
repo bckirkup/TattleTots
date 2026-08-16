@@ -469,6 +469,77 @@ class TestApplyEnergy:
         world._apply_energy(agent, {}, [false_report])
         assert agent.state.energy.attention < 1.0
 
+    def test_false_alarm_price_scales_with_break_even_target(self) -> None:
+        """Repricing charges what makes reporting break even at the target precision."""
+        prices = []
+        for target in (0.2, 0.5, 0.8):
+            world = _minimal_world(
+                false_alarm_penalty=0.5,
+                correct_report_attention_value=4.0,
+                false_alarm_break_even_precision=target,
+            )
+            user = User(name="u1")
+            world.add_user(user)
+            agent = Agent(
+                genome=Genome(compute_cost=0.01, maintenance_cost=0.01),
+                state=AgentState(
+                    lifecycle=LifecycleStage.ADULT,
+                    energy=EnergyReserves(information=1.0, attention=1.0),
+                ),
+            )
+            allocations = {user.id: {agent.id: 0.1}}
+            world._apply_energy(agent, allocations, [])
+            prices.append(agent.state.last_step_false_alarm_price)
+
+        assert 0.0 < prices[0] < prices[1] < prices[2]
+        # At the target the price is far below the flat penalty a 20%-precision
+        # reporter would otherwise pay.
+        assert prices[0] < 0.5
+
+    def test_false_alarm_price_defaults_to_flat_penalty(self) -> None:
+        """Unset target, or correctness worth nothing, leaves the flat penalty in force."""
+        for config_kw in (
+            {"correct_report_attention_value": 4.0},
+            {"false_alarm_break_even_precision": 0.2},
+        ):
+            world = _minimal_world(false_alarm_penalty=0.5, **config_kw)
+            user = User(name="u1")
+            world.add_user(user)
+            agent = Agent(
+                genome=Genome(compute_cost=0.01, maintenance_cost=0.01),
+                state=AgentState(
+                    lifecycle=LifecycleStage.ADULT,
+                    energy=EnergyReserves(information=1.0, attention=1.0),
+                ),
+            )
+            world._apply_energy(agent, {user.id: {agent.id: 0.1}}, [])
+            assert agent.state.last_step_false_alarm_price == pytest.approx(0.5)
+
+    def test_false_alarm_pricing_leaves_information_energy_untouched(self) -> None:
+        """Negative control: the price is an attention-side term only."""
+        reserves = []
+        for target in (None, 0.15, 0.6):
+            world = _minimal_world(
+                correct_report_attention_value=4.0,
+                false_alarm_break_even_precision=target,
+            )
+            user = User(name="u1")
+            world.add_user(user)
+            agent = Agent(
+                genome=Genome(compute_cost=0.1, maintenance_cost=0.01),
+                state=AgentState(
+                    lifecycle=LifecycleStage.ADULT,
+                    energy=EnergyReserves(information=1.0, attention=1.0),
+                    last_step_yield=0.2,
+                    last_compute_cost_paid=0.1,
+                ),
+            )
+            world._apply_energy(agent, {user.id: {agent.id: 0.1}}, [])
+            reserves.append(agent.state.energy.information)
+
+        assert reserves[0] == pytest.approx(reserves[1])
+        assert reserves[0] == pytest.approx(reserves[2])
+
     def test_subsidy_from_downstream_consumers(self) -> None:
         world = _minimal_world(subsidy_rate=0.1)
         # Upstream agent with a residual stream

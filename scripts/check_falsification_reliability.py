@@ -38,16 +38,19 @@ def _load(name: str, path: Path) -> ModuleType:
 
 
 def _dose_options(measure: ModuleType, value: float, args: argparse.Namespace) -> Any:
+    extra_config: dict[str, Any] = {
+        "correct_report_attention_value": value,
+        "reproduction_merit_ordering": args.merit_ordering,
+    }
+    if args.break_even_precision is not None:
+        extra_config["false_alarm_break_even_precision"] = args.break_even_precision
     return measure.harness.HarnessOptions(
         adapter_spec=args.adapter,
         steps=args.steps,
         seeds=tuple(args.seeds),
         initial_population=args.initial_population,
         max_population=args.max_population,
-        extra_config={
-            "correct_report_attention_value": value,
-            "reproduction_merit_ordering": args.merit_ordering,
-        },
+        extra_config=extra_config,
     )
 
 
@@ -64,6 +67,15 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     parser.add_argument("--max-population", type=int, default=60)
     parser.add_argument("--merit-ordering", action="store_true", default=True)
     parser.add_argument("--no-merit-ordering", dest="merit_ordering", action="store_false")
+    parser.add_argument(
+        "--break-even-precision",
+        type=float,
+        default=None,
+        help=(
+            "Price false alarms so reporting breaks even at this precision instead of "
+            "at the flat penalty."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -77,6 +89,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         offspring_corrs: list[float] = []
         precision_corrs: list[float] = []
         rates: list[float] = []
+        reports_per_adult: list[float] = []
         for seed in args.seeds:
             run = measure.measure_run("ordinary", args.grounded_fraction, seed, options)
             coupling = run["coupling"]
@@ -84,10 +97,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             offspring_corrs.append(coupling["corr_parent_child_offspring"])
             precision_corrs.append(coupling["corr_parent_child_precision"])
             rates.append(run["correct_report_rate"])
+            reports_per_adult.append(coupling["mean_reports_per_adult"])
         n = len(args.seeds)
         print(
             f"correct_report_attention_value={value:g} "
+            f"break_even_precision={args.break_even_precision} "
             f"correct-report rate={float(np.mean(rates)):.2%}\n"
+            f"  reports/adult lifetime: "
+            f"{float(np.mean(reports_per_adult)):.2f}\n"
             f"  clause 1 (within-run rise): mean slope {float(np.mean(slopes)):+.4f}/generation, "
             f"rising in {sum(1 for s in slopes if s > 0)}/{n} seeds\n"
             f"  clause 2 (parent-child offspring r > {_CORRELATION_CLAUSE}): "

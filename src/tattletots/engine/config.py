@@ -92,6 +92,20 @@ class SimulationConfig(BaseModel):
             "the agent was right."
         ),
     )
+    false_alarm_break_even_precision: float | None = Field(
+        default=None,
+        gt=0.0,
+        lt=1.0,
+        description=(
+            "Target break-even precision for reporting. When set, the per-false-alarm "
+            "attention penalty is priced as value_per_correct_report * p / (1 - p) "
+            "instead of the flat false_alarm_penalty, so an agent reporting above this "
+            "precision gains attention by reporting and one below it loses attention. "
+            "Requires correct_report_attention_value > 0, which supplies the value of a "
+            "correct report; without it the flat penalty is used. At None (default) the "
+            "penalty is flat, independent of the precision the instrument makes reachable."
+        ),
+    )
     reproduction_merit_ordering: bool = Field(
         default=False,
         description=(

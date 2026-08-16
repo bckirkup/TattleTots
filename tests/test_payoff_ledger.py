@@ -28,6 +28,7 @@ def _run(
     attention_budget_scale: float = 1.0,
     seed: int = 42,
     correct_report_attention_value: float = 0.0,
+    false_alarm_break_even_precision: float | None = None,
 ) -> tuple[World, PayoffLedger]:
     adapter = SparseSensorScenario(seed=seed, total_steps=_STEPS)
     config = SimulationConfig(
@@ -37,6 +38,7 @@ def _run(
         seed=seed,
         grounded_input_fraction=0.67,
         correct_report_attention_value=correct_report_attention_value,
+        false_alarm_break_even_precision=false_alarm_break_even_precision,
     )
     world = World(config=config)
     for stream in adapter.get_streams():
@@ -142,3 +144,35 @@ def test_false_alarm_cost_dwarfs_attention_income_at_default_config() -> None:
     summary = ledger.coupling_summary()
 
     assert summary["false_alarm_penalty_in_attention_income_steps"] > 1.0
+
+
+def test_realized_break_even_precision_tracks_the_pricing_target() -> None:
+    """Repricing moves the precision at which reporting starts paying."""
+    break_evens = []
+    prices = []
+    for target in (0.1, 0.25, 0.5):
+        _, ledger = _run(
+            correct_report_attention_value=8.0,
+            false_alarm_break_even_precision=target,
+        )
+        summary = ledger.coupling_summary()
+        break_evens.append(summary["realized_break_even_precision"])
+        prices.append(summary["mean_false_alarm_price"])
+        assert 0.0 <= summary["realized_break_even_precision"] <= 1.0
+
+    assert break_evens[0] < break_evens[1] < break_evens[2]
+    assert prices[0] < prices[1] < prices[2]
+
+
+def test_repricing_undercuts_the_flat_penalty_at_reachable_precision() -> None:
+    """At a reachable target the charge per false alarm falls below the flat penalty."""
+    _, flat = _run(correct_report_attention_value=8.0)
+    _, repriced = _run(
+        correct_report_attention_value=8.0,
+        false_alarm_break_even_precision=0.15,
+    )
+
+    flat_summary = flat.coupling_summary()
+    repriced_summary = repriced.coupling_summary()
+    assert repriced_summary["mean_false_alarm_price"] < flat_summary["mean_false_alarm_price"]
+    assert repriced_summary["realized_break_even_precision"] < 0.5

@@ -126,6 +126,16 @@ class AgentState(BaseModel):
         ge=0.0,
         description="Downstream information subsidy received this step (observable)",
     )
+    last_step_false_alarm_price: float = Field(
+        default=0.0,
+        ge=0.0,
+        description="Attention charged per false alarm this step, after any repricing",
+    )
+    last_step_correct_report_value: float = Field(
+        default=0.0,
+        ge=0.0,
+        description="Attention a verified-correct report would have earned this step",
+    )
     last_step_grounded_yield: float = Field(
         default=0.0,
         ge=0.0,
