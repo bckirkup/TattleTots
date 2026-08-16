@@ -18,39 +18,16 @@ from __future__ import annotations
 import argparse
 import json
 from collections.abc import Sequence
-from pathlib import Path
 from typing import Any
 
+import config_arm_sweep
 import measurement_support
 
 _JSON_ARTIFACT = "docs/false-alarm-pricing.json"
 _REPORT_ARTIFACT = "docs/false-alarm-pricing.md"
 
 harness = measurement_support.load_harness()
-coupling = measurement_support.load_module(
-    "measure_payoff_coupling",
-    Path(__file__).resolve().parent / "measure_payoff_coupling.py",
-)
-
-_ROWS = (
-    ("Realized break-even precision", "mean_realized_break_even_precision", "{:.2%}"),
-    ("Attention charged per false alarm", "mean_mean_false_alarm_price", "{:.4f}"),
-    ("Attention value of a correct report", "mean_mean_correct_report_value", "{:.4f}"),
-    ("Correct-report rate", "mean_correct_report_rate", "{:.2%}"),
-    ("Reports per adult lifetime", "mean_mean_reports_per_adult", "{:.2f}"),
-    ("Adult steps per agent", "mean_mean_adult_steps", "{:.2f}"),
-    ("Silent-adult share", "mean_silent_adult_share", "{:.2%}"),
-    ("Attention income / agent-step", "mean_mean_attention_income_per_step", "{:.4f}"),
-    (
-        "Fitness alignment b (correctness -> offspring)",
-        "mean_corr_correct_reports_offspring",
-        "{:+.3f}",
-    ),
-    ("Clause 1: correct-report slope / generation", "mean_precision_generation_slope", "{:+.4f}"),
-    ("Clause 2: parent-child offspring correlation", "mean_corr_parent_child_offspring", "{:+.3f}"),
-    ("Parent-child precision correlation", "mean_corr_parent_child_precision", "{:+.3f}"),
-    ("Parent-child pairs", "mean_n_parent_child_pairs", "{:.1f}"),
-)
+coupling = config_arm_sweep.load_coupling()
 
 
 def pricing_config(target: float | None, correct_report_value: float) -> dict[str, Any]:
@@ -66,54 +43,21 @@ def pricing_config(target: float | None, correct_report_value: float) -> dict[st
 
 def run_sweep(args: argparse.Namespace) -> dict[str, Any]:
     """Run every pricing arm at the same fixed initial parameters."""
-    arms: dict[str, Any] = {}
-    for target in [None, *args.targets]:
-        label = "flat_penalty" if target is None else f"break_even_{target:g}"
-        options = harness.HarnessOptions(
-            adapter_spec=args.adapter,
-            steps=args.steps,
-            seeds=tuple(args.seeds),
-            grounded_fractions=(args.grounded_fraction,),
-            initial_population=args.initial_population,
-            max_population=args.max_population,
-            arms=(args.arm,),
-            extra_config=pricing_config(target, args.correct_report_value),
+    arm_configs = [
+        (
+            "flat_penalty" if target is None else f"break_even_{target:g}",
+            pricing_config(target, args.correct_report_value),
         )
-        results = coupling.run_measurement(
-            options,
-            (args.arm,),
-            args.grounded_fraction,
-            args.seeds,
-        )
-        arms[label] = {
-            "break_even_target": target,
-            "summary": results["summary"][args.arm],
-            "runs": results["runs"][args.arm],
-        }
-    return {
-        "adapter": args.adapter,
-        "steps": args.steps,
-        "seeds": list(args.seeds),
-        "arm": args.arm,
-        "grounded_input_fraction": args.grounded_fraction,
-        "max_population": args.max_population,
-        "correct_report_attention_value": args.correct_report_value,
-        "arms": arms,
-    }
+        for target in [None, *args.targets]
+    ]
+    results = config_arm_sweep.run_arms(harness, coupling, args, arm_configs)
+    results["correct_report_attention_value"] = args.correct_report_value
+    return results
 
 
 def markdown_report(results: dict[str, Any]) -> str:
     """Render the pricing sweep as one table of arms against reporting economics."""
-    arms = results["arms"]
-    lines = [
-        "# Repricing false alarms against reachable precision",
-        "",
-        f"- Adapter: `{results['adapter']}`",
-        f"- Arm: `{results['arm']}`",
-        f"- Steps per run: `{results['steps']}`",
-        f"- Seeds: `{', '.join(str(seed) for seed in results['seeds'])}`",
-        f"- Grounded input fraction (fixed): `{results['grounded_input_fraction']:g}`",
-        f"- Max population (fixed): `{results['max_population']}`",
+    preamble = [
         (
             "- `correct_report_attention_value` (fixed across arms): "
             f"`{results['correct_report_attention_value']:g}`"
@@ -121,18 +65,10 @@ def markdown_report(results: dict[str, Any]) -> str:
         "",
         "Every arm shares the same initial parameters; only "
         "`false_alarm_break_even_precision` differs.",
-        "",
-        "| Quantity | " + " | ".join(f"`{name}`" for name in arms) + " |",
-        "|---" * (len(arms) + 1) + "|",
     ]
-    for label, key, fmt in _ROWS:
-        cells = " | ".join(
-            fmt.format(arm["summary"].get(key, 0.0)) if arm["summary"].get("n_runs") else "n/a"
-            for arm in arms.values()
-        )
-        lines.append(f"| {label} | {cells} |")
-    lines.append("")
-    return "\n".join(lines)
+    return config_arm_sweep.markdown_report(
+        results, "Repricing false alarms against reachable precision", preamble
+    )
 
 
 def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:

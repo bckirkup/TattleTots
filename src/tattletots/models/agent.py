@@ -63,6 +63,10 @@ class AgentState(BaseModel):
         default_factory=list,
         description="Rolling window of raw anomaly scores for baseline normalization",
     )
+    normalized_anomaly_history: list[float] = Field(
+        default_factory=list,
+        description="Rolling window of normalized anomaly scores, in threshold units",
+    )
     temporal_buffer: list[ObservationPacket] = Field(
         default_factory=list,
         description="Ring buffer of post-sensing vectors and feature schemas",

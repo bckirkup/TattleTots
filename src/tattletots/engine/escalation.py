@@ -22,6 +22,7 @@ def normalize_anomaly(
         history = agent.state.anomaly_history
 
     if len(history) < 3:
+        _record_normalized(agent, 0.0, depth)
         return 0.0
 
     hist = np.array(history[:-1])
@@ -29,18 +30,34 @@ def normalize_anomaly(
     sigma = max(float(np.std(hist)), 1e-10)
     z = (raw_anomaly - mu) / sigma
     z_clipped = float(np.clip(z, -20.0, 20.0))
-    return float(1.0 / (1.0 + np.exp(-0.5 * (z_clipped - 2.0))))
+    score = float(1.0 / (1.0 + np.exp(-0.5 * (z_clipped - 2.0))))
+    _record_normalized(agent, score, depth)
+    return score
 
 
-def compute_effective_threshold(agent: Agent) -> float:
-    """Compute escalation threshold based on genome mode."""
+def _record_normalized(agent: Agent, score: float, depth: int) -> None:
+    """Keep a rolling window of scores in the units thresholds are compared against."""
+    history = agent.state.normalized_anomaly_history
+    history.append(score)
+    if len(history) > depth:
+        agent.state.normalized_anomaly_history = history[-depth:]
+
+
+def compute_effective_threshold(agent: Agent, *, score_units: bool = False) -> float:
+    """Compute escalation threshold based on genome mode.
+
+    Adaptive modes calibrate against a rolling anomaly window. With `score_units` that
+    window is the normalized scores the threshold is compared against in
+    `should_escalate`; otherwise it is the raw anomaly window, whose scale is set by the
+    compression model rather than by the 0-1 score the comparison uses.
+    """
     genome = agent.genome
     base = genome.escalation_threshold
 
     if genome.escalation_mode == EscalationMode.FIXED:
         return base
 
-    history = agent.state.anomaly_history
+    history = agent.state.normalized_anomaly_history if score_units else agent.state.anomaly_history
     if len(history) < 3:
         return base
 
@@ -64,6 +81,7 @@ def should_escalate(
     combined_input: np.ndarray,
     *,
     raw_anomaly: float | None = None,
+    score_units: bool = False,
 ) -> tuple[float, float, bool]:
     """Score anomaly and decide escalation.
 
@@ -71,6 +89,6 @@ def should_escalate(
     """
     raw = model.anomaly_score(combined_input) if raw_anomaly is None else raw_anomaly
     anomaly = normalize_anomaly(agent, raw)
-    threshold = compute_effective_threshold(agent)
+    threshold = compute_effective_threshold(agent, score_units=score_units)
     agent.state.effective_escalation_threshold = threshold
     return anomaly, threshold, anomaly >= threshold

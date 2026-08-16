@@ -44,6 +44,13 @@ def _dose_options(measure: ModuleType, value: float, args: argparse.Namespace) -
     }
     if args.break_even_precision is not None:
         extra_config["false_alarm_break_even_precision"] = args.break_even_precision
+    if args.score_units:
+        extra_config["escalation_calibration_in_score_units"] = True
+    gene_pool = (
+        {"escalation_threshold_range": list(args.threshold_range)}
+        if args.threshold_range is not None
+        else None
+    )
     return measure.harness.HarnessOptions(
         adapter_spec=args.adapter,
         steps=args.steps,
@@ -51,6 +58,7 @@ def _dose_options(measure: ModuleType, value: float, args: argparse.Namespace) -
         initial_population=args.initial_population,
         max_population=args.max_population,
         extra_config=extra_config,
+        gene_pool=gene_pool,
     )
 
 
@@ -75,6 +83,22 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
             "Price false alarms so reporting breaks even at this precision instead of "
             "at the flat penalty."
         ),
+    )
+    parser.add_argument(
+        "--score-units",
+        action="store_true",
+        help=(
+            "Calibrate adaptive escalation thresholds in the normalized score units they "
+            "are compared against, instead of the raw anomaly window."
+        ),
+    )
+    parser.add_argument(
+        "--threshold-range",
+        type=float,
+        nargs=2,
+        default=None,
+        metavar=("LOW", "HIGH"),
+        help="Starting range of the escalation_threshold trait in the gene pool.",
     )
     return parser.parse_args(argv)
 
@@ -102,6 +126,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(
             f"correct_report_attention_value={value:g} "
             f"break_even_precision={args.break_even_precision} "
+            f"score_units={args.score_units} "
+            f"threshold_range={args.threshold_range} "
             f"correct-report rate={float(np.mean(rates)):.2%}\n"
             f"  reports/adult lifetime: "
             f"{float(np.mean(reports_per_adult)):.2f}\n"

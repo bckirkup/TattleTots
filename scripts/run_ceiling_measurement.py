@@ -24,7 +24,7 @@ from typing import Any
 
 import numpy as np
 
-from tattletots.engine.config import SimulationConfig
+from tattletots.engine.config import GenePoolConfig, SimulationConfig
 from tattletots.engine.world import World
 from tattletots.interface.domain_adapter import DomainAdapter
 from tattletots.interface.instrument import validate_instrument
@@ -110,6 +110,7 @@ class HarnessOptions:
     max_stream_dim: int | None = None
     arms: tuple[str, ...] = ("ordinary", "oracle_monoculture", "oracle_invasion")
     extra_config: dict[str, Any] = field(default_factory=dict)
+    gene_pool: dict[str, Any] | None = None
 
 
 def build_adapter(adapter_spec: str, seed: int, steps: int) -> DomainAdapter:
@@ -173,7 +174,8 @@ def build_world(
 ) -> World:
     """Construct a seeded world for one grid cell against the supplied adapter."""
     config = _simulation_config(point, seed, options)
-    world = World(config=config)
+    gene_pool = GenePoolConfig(**options.gene_pool) if options.gene_pool else None
+    world = World(config=config, gene_pool=gene_pool)
     for stream in adapter.get_streams():
         world.add_stream(stream)
     for user in adapter.get_users():
