@@ -107,5 +107,10 @@ false-alarm penalty against the instrument's achievable precision, or calibratin
 escalation threshold to the agent's own anomaly distribution, are candidate changes to
 measure next — each with the same falsification test and each ablated.
 
+`docs/domain-richness-requirement.md` converts these two throttles into the analytic
+requirement they should be judged against, and finds that the 7.2 reports/lifetime bar
+quoted above is an *observer's* bar: selection itself needs ~0.9 reports per agent at
+perfect fitness alignment, or ~26 at the alignment measured so far.
+
 Nothing in this document changes engine behavior: it adds a measurement script and no
 defaults.

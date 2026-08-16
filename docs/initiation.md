@@ -299,6 +299,13 @@ gradient that points the wrong way just gets you there faster.
    lifespan. Silence is the evolved optimum, so the pricing of false alarms against
    attention income, and threshold calibration against the agent's own anomaly
    distribution, are the levers — not scaffolding, and not lifespan extension.
+   `docs/domain-richness-requirement.md` turns these measurements into an analytic
+   requirement a domain can be judged against before it is simulated (exploitable
+   margin, scored events per lifetime, effective population, generations, reward
+   geometry) and orders the levers by leverage: fitness alignment first (going from the
+   measured `b`=0.44 to 1.0 cuts the required reports per agent 29× and the required
+   population 5×), threshold calibration second, population size last — ~250 breeding
+   agents, not a vast one.
 4. **Price reproduction against function**, so precocity is not the dominant
    gradient — pay for offspring in the scarce currency.
 5. **Only then** consider innate calibration (adaptive escalation thresholds as the
