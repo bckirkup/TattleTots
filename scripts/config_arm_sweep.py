@@ -34,7 +34,11 @@ ROWS: tuple[tuple[str, str, str], ...] = (
     ("Clause 2: parent-child offspring correlation", "mean_corr_parent_child_offspring", "{:+.3f}"),
     ("Parent-child precision correlation", "mean_corr_parent_child_precision", "{:+.3f}"),
     ("Parent-child pairs", "mean_n_parent_child_pairs", "{:.1f}"),
+    ("Adults scored", "mean_n_adults", "{:.1f}"),
+    ("Final population", "mean_final_population", "{:.1f}"),
 )
+
+_NON_CONFIG_KEYS = frozenset({"gene_pool", "attention_budget_scale"})
 
 
 def load_coupling() -> ModuleType:
@@ -53,13 +57,15 @@ def run_arms(
 ) -> dict[str, Any]:
     """Run each labelled config setting over the same arm and seeds.
 
-    An arm's config may carry a `gene_pool` key, which sets the initial trait
-    distribution rather than a `SimulationConfig` field and is passed to the world
-    separately.
+    An arm's config may carry keys that are not `SimulationConfig` fields and are applied
+    to the run separately: `gene_pool` sets the initial trait distribution, and
+    `attention_budget_scale` multiplies every user's attention budget.
     """
     arms: dict[str, Any] = {}
     for label, arm_config in arm_configs:
-        extra_config = {key: value for key, value in arm_config.items() if key != "gene_pool"}
+        extra_config = {
+            key: value for key, value in arm_config.items() if key not in _NON_CONFIG_KEYS
+        }
         options = harness.HarnessOptions(
             adapter_spec=args.adapter,
             steps=args.steps,
@@ -71,7 +77,13 @@ def run_arms(
             extra_config=extra_config,
             gene_pool=arm_config.get("gene_pool"),
         )
-        results = coupling.run_measurement(options, (args.arm,), args.grounded_fraction, args.seeds)
+        results = coupling.run_measurement(
+            options,
+            (args.arm,),
+            args.grounded_fraction,
+            args.seeds,
+            attention_budget_scale=float(arm_config.get("attention_budget_scale", 1.0)),
+        )
         arms[label] = {
             "config": arm_config,
             "summary": results["summary"][args.arm],

@@ -96,6 +96,7 @@ def _summarize(runs: list[dict[str, Any]]) -> dict[str, Any]:
     summary["mean_grounded_yield_share"] = _pooled(
         [float(run["grounded_yield_share"]) for run in runs]
     )
+    summary["mean_final_population"] = _pooled([float(run["final_population"]) for run in runs])
     summary["n_runs"] = len(runs)
     return summary
 
