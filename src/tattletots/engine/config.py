@@ -124,6 +124,22 @@ class SimulationConfig(BaseModel):
             "than by agent creation order. At False (default) ordering is creation order."
         ),
     )
+    reproduction_correctness_weight: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Share of reproductive merit carried by rank in verified correctness rather "
+            "than rank in reserve sufficiency, used only when reproduction_merit_ordering "
+            "is on. Both terms enter as fractional ranks within the eligible parents, so "
+            "the weight is a mixing fraction rather than an exchange rate between "
+            "quantities with different units. Correctness is shrunk toward zero by a "
+            "pseudo-count of unreported opportunities, so a single lucky report does not "
+            "outrank a sustained reporter. At 0.0 (default) merit is reserves alone, "
+            "which is the currency an agent accumulates whether or not its reports were "
+            "correct."
+        ),
+    )
     recombination_probability: float = Field(
         default=0.3,
         ge=0.0,

@@ -46,6 +46,8 @@ def _dose_options(measure: ModuleType, value: float, args: argparse.Namespace) -
         extra_config["false_alarm_break_even_precision"] = args.break_even_precision
     if args.score_units:
         extra_config["escalation_calibration_in_score_units"] = True
+    if args.correctness_weight > 0.0:
+        extra_config["reproduction_correctness_weight"] = args.correctness_weight
     gene_pool = (
         {"escalation_threshold_range": list(args.threshold_range)}
         if args.threshold_range is not None
@@ -93,6 +95,15 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--correctness-weight",
+        type=float,
+        default=0.0,
+        help=(
+            "Share of reproductive merit carried by rank in verified correctness rather "
+            "than rank in reserve sufficiency."
+        ),
+    )
+    parser.add_argument(
         "--threshold-range",
         type=float,
         nargs=2,
@@ -128,6 +139,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"break_even_precision={args.break_even_precision} "
             f"score_units={args.score_units} "
             f"threshold_range={args.threshold_range} "
+            f"correctness_weight={args.correctness_weight:g} "
             f"correct-report rate={float(np.mean(rates)):.2%}\n"
             f"  reports/adult lifetime: "
             f"{float(np.mean(reports_per_adult)):.2f}\n"
