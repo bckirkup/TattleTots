@@ -49,7 +49,11 @@ emits `tattletots.output_schema.SimulationOutput` per run.
    Precision rises in all four domains. It clears the static-prior null in
    TattleTots and (marginally) in Coral; it does not clear it in Scrapiron or
    Xylella, whose instruments have much higher static priors (35.6% and 54.95%),
-   i.e. a well-placed constant guess is already strong there.
+   i.e. a well-placed constant guess is already strong there. Note this is a
+   statement about *evolved* arms only: designed-reporter arms later measured in
+   both of those domains reach 100% and 89.48% precision, so their instruments do
+   carry a large exploitable margin — see
+   [`docs/exploitable-margin-comparison.md`](exploitable-margin-comparison.md).
 4. **Heritable reproductive success is still missing.** Parent–child
    reproductive correlation stays at 0.05–0.13 everywhere, against the ~0.2
    falsification bar. Xylella is the sharpest control: in the same runs, the
@@ -61,10 +65,13 @@ emits `tattletots.output_schema.SimulationOutput` per run.
 The falsification test from `docs/initiation.md` has two clauses.
 
 - *Correct-report rate rises over a run without changing initial parameters, on
-  a real instrument with a non-vacuous null.* **Met** on SparseSensor
-  (3.09% → 12.80%, drift +0.87%, static-prior null 3.00%). Not met in Scrapiron
-  or Xylella, where the within-run trend is negative and becomes more negative
-  with more grounded input.
+  a real instrument with a non-vacuous null.* **Not met.** The 3.09% → 12.80%
+  jump on SparseSensor is *between arms* — it comes from raising
+  `grounded_input_fraction`, which is a parameter change. Within a single fixed
+  parameter run the drift is only +0.87 pp, and multi-seed reruns under all four
+  levers put the per-generation slope at −0.0018…+0.0007, rising in about half
+  the seeds. Not met in Scrapiron or Xylella either, where the within-run trend
+  is negative and becomes more negative with more grounded input.
 - *Parent–child reproductive correlation reliably above ~0.2.* **Not met**
   anywhere (best: Coral 0.134).
 
@@ -77,9 +84,10 @@ transmits reproductive success on the pest side in the same runs.
 
 ## Honest caveats
 
-- Every domain measured the post-fix arms against an editable install of the
-  TattleTots branch; the domain lockfiles still pin the previous rev, so those
-  runs are not reproducible from the lockfiles alone until the pins are bumped.
+- The domain lockfiles now pin the merged grounded-stream engine (Coral #30,
+  Scrapiron #28, Xylella #30), so these runs reproduce from the lockfiles; the
+  numbers themselves were first measured against editable installs of the same
+  revision.
 - Scrapiron and Xylella saturate at their population caps in every arm, so
   extinction and reproductive selection are not exercised; their near-zero
   reproductive correlations are consistent with, but not proof of, a missing

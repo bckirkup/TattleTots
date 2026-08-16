@@ -3,29 +3,20 @@
 from __future__ import annotations
 
 import argparse
+from typing import Any
 
 import pytest
 
+import arm_sweep_fixtures as fixtures
 from script_loading import load_script
 
 script = load_script("measure_threshold_calibration")
 
 
-def _args(**overrides: object) -> argparse.Namespace:
-    defaults: dict[str, object] = {
-        "adapter": "tattletots.scenarios.sparse_sensor:SparseSensorScenario",
-        "arm": "ordinary",
-        "steps": 40,
-        "seeds": [42],
-        "grounded_fraction": 0.67,
-        "initial_population": 20,
-        "max_population": 60,
-        "correct_report_value": 8.0,
-        "break_even_precision": 0.2,
-        "threshold_ranges": [(0.1, 0.5)],
-    }
-    defaults.update(overrides)
-    return argparse.Namespace(**defaults)
+def _args(**overrides: Any) -> argparse.Namespace:
+    lever: dict[str, Any] = {"threshold_ranges": [(0.1, 0.5)]}
+    lever.update(overrides)
+    return fixtures.sweep_args(**lever)
 
 
 def test_control_arm_differs_from_the_calibrated_arm_in_one_key() -> None:
@@ -78,29 +69,17 @@ def test_arm_configs_cover_the_control_and_every_requested_range() -> None:
     assert len({label for label in labels}) == len(labels)
 
 
-def _arm(label: str, **summary: float) -> tuple[str, dict[str, object]]:
-    return label, {"config": {}, "summary": {"n_runs": 3, **summary}, "runs": []}
-
-
-def _results(**overrides: object) -> dict[str, object]:
-    results: dict[str, object] = {
-        "adapter": "tattletots.scenarios.sparse_sensor:SparseSensorScenario",
-        "arm": "ordinary",
-        "steps": 200,
-        "seeds": [42, 43],
-        "grounded_input_fraction": 0.67,
-        "max_population": 60,
-        "correct_report_attention_value": 8.0,
-        "break_even_precision": 0.2,
-        "arms": dict(
+def _results(**overrides: Any) -> dict[str, Any]:
+    arms = overrides.pop(
+        "arms",
+        dict(
             [
-                _arm("raw_units_control", mean_mean_reports_per_adult=0.45),
-                _arm("score_units", mean_mean_reports_per_adult=3.5),
+                fixtures.arm("raw_units_control", mean_mean_reports_per_adult=0.45),
+                fixtures.arm("score_units", mean_mean_reports_per_adult=3.5),
             ]
         ),
-    }
-    results.update(overrides)
-    return results
+    )
+    return fixtures.sweep_results(arms, **overrides)
 
 
 def test_markdown_report_renders_one_column_per_arm() -> None:
@@ -113,7 +92,5 @@ def test_markdown_report_renders_one_column_per_arm() -> None:
 
 
 def test_markdown_report_marks_empty_arms_instead_of_printing_zeros() -> None:
-    results = _results(
-        arms={"score_units": {"config": {}, "summary": {"n_runs": 0}, "runs": []}},
-    )
+    results = _results(arms={"score_units": fixtures.empty_arm()})
     assert "n/a" in script.markdown_report(results)

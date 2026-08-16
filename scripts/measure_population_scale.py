@@ -22,7 +22,6 @@ its own rather than against a shrinking per-agent income.
 from __future__ import annotations
 
 import argparse
-import json
 from collections.abc import Sequence
 from typing import Any
 
@@ -136,25 +135,8 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         metavar=("LOW", "HIGH"),
         help="Starting range of the escalation_threshold trait, fixed from the previous lever.",
     )
-    parser.add_argument(
-        "--correct-report-value",
-        type=float,
-        default=8.0,
-        help="Fixed correct_report_attention_value supplying the value of a correct report.",
-    )
-    parser.add_argument(
-        "--break-even-precision",
-        type=float,
-        default=0.2,
-        help="Fixed false-alarm pricing target from the first lever.",
-    )
-    parser.add_argument(
-        "--no-write",
-        action="store_true",
-        help=(
-            "Print the report without rewriting the committed docs/ artifacts. "
-            "Writing expects the repository root as the working directory."
-        ),
+    measurement_support.add_lever_arguments(
+        parser, break_even_help="Fixed false-alarm pricing target from the first lever."
     )
     return parser.parse_args(argv)
 
@@ -163,12 +145,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Run the population sweep and write the JSON and markdown artifacts."""
     args = _parse_args(argv)
     results = run_sweep(args)
-    if not args.no_write:
-        with open(_JSON_ARTIFACT, "w", encoding="utf-8") as handle:
-            json.dump(results, handle, indent=2, sort_keys=True)
-        with open(_REPORT_ARTIFACT, "w", encoding="utf-8") as handle:
-            handle.write(markdown_report(results))
-    print(markdown_report(results))
+    measurement_support.emit_artifacts(
+        results,
+        markdown_report(results),
+        json_path=_JSON_ARTIFACT,
+        report_path=_REPORT_ARTIFACT,
+        write=not args.no_write,
+    )
     return 0
 
 

@@ -3,31 +3,24 @@
 from __future__ import annotations
 
 import argparse
+from typing import Any
 
 import pytest
 
+import arm_sweep_fixtures as fixtures
 from script_loading import load_script
 
 script = load_script("measure_population_scale")
 
 
-def _args(**overrides: object) -> argparse.Namespace:
-    defaults: dict[str, object] = {
-        "adapter": "tattletots.scenarios.sparse_sensor:SparseSensorScenario",
-        "arm": "ordinary",
-        "steps": 40,
-        "seeds": [42],
-        "grounded_fraction": 0.67,
-        "initial_population": 20,
-        "max_population": 60,
-        "correct_report_value": 8.0,
-        "break_even_precision": 0.2,
+def _args(**overrides: Any) -> argparse.Namespace:
+    lever: dict[str, Any] = {
         "threshold_range": (0.05, 0.3),
         "caps": [60, 125, 250],
         "reference_cap": 60,
     }
-    defaults.update(overrides)
-    return argparse.Namespace(**defaults)
+    lever.update(overrides)
+    return fixtures.sweep_args(**lever)
 
 
 @pytest.mark.parametrize("cap", [20, 60, 125, 250, 600])
@@ -104,31 +97,17 @@ def test_reference_cap_gets_no_redundant_per_capita_arm() -> None:
     assert "cap_60_per_capita" not in labels
 
 
-def _arm(label: str, **summary: float) -> tuple[str, dict[str, object]]:
-    return label, {"config": {}, "summary": {"n_runs": 3, **summary}, "runs": []}
-
-
-def _results(**overrides: object) -> dict[str, object]:
-    results: dict[str, object] = {
-        "adapter": "tattletots.scenarios.sparse_sensor:SparseSensorScenario",
-        "arm": "ordinary",
-        "steps": 200,
-        "seeds": [42, 43],
-        "grounded_input_fraction": 0.67,
-        "max_population": 60,
-        "correct_report_attention_value": 8.0,
-        "break_even_precision": 0.2,
-        "caps": [60, 250],
-        "reference_cap": 60,
-        "arms": dict(
+def _results(**overrides: Any) -> dict[str, Any]:
+    arms = overrides.pop(
+        "arms",
+        dict(
             [
-                _arm("cap_60", mean_final_population=48.0),
-                _arm("cap_250", mean_final_population=191.0),
+                fixtures.arm("cap_60", mean_final_population=48.0),
+                fixtures.arm("cap_250", mean_final_population=191.0),
             ]
         ),
-    }
-    results.update(overrides)
-    return results
+    )
+    return fixtures.sweep_results(arms, caps=[60, 250], reference_cap=60, **overrides)
 
 
 def test_markdown_report_renders_one_column_per_cap() -> None:
@@ -141,5 +120,5 @@ def test_markdown_report_renders_one_column_per_cap() -> None:
 
 
 def test_markdown_report_marks_empty_arms_instead_of_printing_zeros() -> None:
-    results = _results(arms={"cap_250": {"config": {}, "summary": {"n_runs": 0}, "runs": []}})
+    results = _results(arms={"cap_250": fixtures.empty_arm()})
     assert "n/a" in script.markdown_report(results)

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import json
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -46,6 +47,45 @@ def add_shared_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentPa
     parser.add_argument("--initial-population", type=int, default=20)
     parser.add_argument("--max-population", type=int, default=60)
     return parser
+
+
+def add_lever_arguments(
+    parser: argparse.ArgumentParser, *, break_even_help: str
+) -> argparse.ArgumentParser:
+    """Add the pricing lever and artifact arguments every later sweep holds fixed."""
+    parser.add_argument(
+        "--correct-report-value",
+        type=float,
+        default=8.0,
+        help="Fixed correct_report_attention_value supplying the value of a correct report.",
+    )
+    parser.add_argument("--break-even-precision", type=float, default=0.2, help=break_even_help)
+    parser.add_argument(
+        "--no-write",
+        action="store_true",
+        help=(
+            "Print the report without rewriting the committed docs/ artifacts. "
+            "Writing expects the repository root as the working directory."
+        ),
+    )
+    return parser
+
+
+def emit_artifacts(
+    results: dict[str, Any],
+    report: str,
+    *,
+    json_path: str,
+    report_path: str,
+    write: bool,
+) -> None:
+    """Print the rendered report, and refresh the committed artifacts unless suppressed."""
+    if write:
+        with open(json_path, "w", encoding="utf-8") as handle:
+            json.dump(results, handle, indent=2, sort_keys=True)
+        with open(report_path, "w", encoding="utf-8") as handle:
+            handle.write(report)
+    print(report)
 
 
 class Ledger(Protocol):
