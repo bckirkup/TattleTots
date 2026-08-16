@@ -32,34 +32,17 @@ Prints only; it writes no artifacts.
 from __future__ import annotations
 
 import argparse
-import importlib.util
-import sys
 from collections.abc import Sequence
 from dataclasses import replace
-from pathlib import Path
-from types import ModuleType
 from typing import Any
 
+import measurement_support
 import numpy as np
 
 from tattletots.models.genome import Genome
 from tattletots.telemetry.payoff_ledger import PayoffLedger
 
-_REPO_ROOT = Path(__file__).resolve().parents[1]
-_HARNESS_PATH = _REPO_ROOT / "scripts" / "run_ceiling_measurement.py"
-
-
-def _load_harness() -> ModuleType:
-    spec = importlib.util.spec_from_file_location("run_ceiling_measurement", _HARNESS_PATH)
-    if spec is None or spec.loader is None:
-        raise ImportError(f"could not load harness from {_HARNESS_PATH}")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-harness = _load_harness()
+harness = measurement_support.load_harness()
 
 
 def _pearson(xs: Sequence[float], ys: Sequence[float]) -> float:
@@ -87,14 +70,7 @@ def _run_world(
         world.agents.clear()
         world.seed_population(genomes=[genome.model_copy(deep=True) for genome in genomes])
     ledger = PayoffLedger()
-    for step in range(options.steps):
-        adapter.step(step)
-        active = adapter.get_active_locations(step)
-        world.set_event_state(active)
-        harness.set_oracle_locations(world, active)
-        world.step()
-        ledger.observe(world)
-    ledger.finalize(world)
+    measurement_support.drive_world(harness, world, adapter, options.steps, ledger)
     return world, ledger
 
 
@@ -283,15 +259,7 @@ def attenuation_prediction(
 
 
 def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--adapter", default="tattletots.scenarios.sparse_sensor:SparseSensorScenario"
-    )
-    parser.add_argument("--steps", type=int, default=200)
-    parser.add_argument("--seeds", type=int, nargs="+", default=[42, 43, 44, 45, 46])
-    parser.add_argument("--grounded-fraction", type=float, default=0.67)
-    parser.add_argument("--initial-population", type=int, default=20)
-    parser.add_argument("--max-population", type=int, default=60)
+    parser = measurement_support.add_shared_arguments(argparse.ArgumentParser(description=__doc__))
     parser.add_argument("--report-thresholds", type=int, nargs="+", default=[1, 5, 10, 20, 40])
     parser.add_argument("--clone-genomes", type=int, default=6)
     parser.add_argument("--clone-replicates", type=int, nargs="+", default=[42, 43, 44])
@@ -306,13 +274,7 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the three break-3 measurements and print them."""
     args = _parse_args(argv)
-    options = harness.HarnessOptions(
-        adapter_spec=args.adapter,
-        steps=args.steps,
-        seeds=tuple(args.seeds),
-        initial_population=args.initial_population,
-        max_population=args.max_population,
-    )
+    options = measurement_support.harness_options(harness, args)
 
     ledgers = [
         _run_world(args.arm, seed, options, args.grounded_fraction)[1] for seed in args.seeds

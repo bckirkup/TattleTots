@@ -122,6 +122,9 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# `tests/script_loading.py` and the committed measurement scripts are imported by path,
+# not as installed packages.
+pythonpath = ["tests", "scripts"]
 addopts = "--strict-markers -ra"
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",

@@ -2,32 +2,14 @@
 
 from __future__ import annotations
 
-import importlib.util
-import sys
 from dataclasses import dataclass, field
-from pathlib import Path
-from types import ModuleType
 
 import pytest
 
+from script_loading import load_script
 from tattletots.telemetry.payoff_ledger import AgentPayoffRecord
 
-_SCRIPT_PATH = (
-    Path(__file__).resolve().parents[1] / "scripts" / "measure_correctness_heritability.py"
-)
-
-
-def _load_script() -> ModuleType:
-    spec = importlib.util.spec_from_file_location("measure_correctness_heritability", _SCRIPT_PATH)
-    if spec is None or spec.loader is None:
-        raise ImportError(f"could not load script from {_SCRIPT_PATH}")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-script = _load_script()
+script = load_script("measure_correctness_heritability")
 
 
 @dataclass

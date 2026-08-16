@@ -2,27 +2,11 @@
 
 from __future__ import annotations
 
-import importlib.util
-import sys
-from pathlib import Path
-from types import ModuleType
-
 import pytest
 
-_SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "run_ceiling_measurement.py"
+from script_loading import load_script
 
-
-def _load_harness() -> ModuleType:
-    spec = importlib.util.spec_from_file_location("run_ceiling_measurement", _SCRIPT_PATH)
-    if spec is None or spec.loader is None:
-        raise ImportError(f"could not load harness from {_SCRIPT_PATH}")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-harness = _load_harness()
+harness = load_script("run_ceiling_measurement")
 
 
 def _options(**overrides: object) -> object:

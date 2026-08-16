@@ -289,6 +289,16 @@ gradient that points the wrong way just gets you there faster.
    trait (predicted +0.038; ~7 reports per agent are needed to halve it). Correctness is
    heritable; an individual's correctness is unmeasurable, and the next lever is
    reporting opportunity per lifetime — not payoff mechanics.
+   `docs/reporting-opportunity-measurement.md` then locates that: evidence arrival is
+   no longer the throttle (93% of adult steps carry grounded yield), but the escalation
+   threshold sits ~0.56 above the median normalized anomaly, so 79.5% of evolved adults
+   never report once; 97% of deaths are attention insolvency while information
+   accumulates at +0.63/step; and at ~12% precision escalating makes an agent's
+   attention balance **worse** (corr(escalation rate, attention drift) = −0.17), where
+   for the oracle lineage the same mechanism gives +0.33 and nearly triples adult
+   lifespan. Silence is the evolved optimum, so the pricing of false alarms against
+   attention income, and threshold calibration against the agent's own anomaly
+   distribution, are the levers — not scaffolding, and not lifespan extension.
 4. **Price reproduction against function**, so precocity is not the dominant
    gradient — pay for offspring in the scarce currency.
 5. **Only then** consider innate calibration (adaptive escalation thresholds as the
