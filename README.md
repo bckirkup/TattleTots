@@ -187,11 +187,20 @@ TattleTots supports optional GPU offloading via [CuPy](https://cupy.dev/) for la
 # Install with GPU support
 uv sync --locked --no-build --no-binary-package domain-runner --no-binary-package tattletots --extra gpu
 
-# Enable in config JSON
-{"simulation": {"use_gpu": true, ...}}
+# Enable GPU in a copy of an existing config
+uv run --no-sync --no-build python -c '
+import json
+from pathlib import Path
 
-# Or pass directly via the engine
-uv run --no-sync --no-build tattletots --config configs/gpu_scan.json --verbose
+source = Path("configs/gaussian_shift_default.json")
+target = Path("configs/gaussian_shift_gpu.json")
+config = json.loads(source.read_text())
+config.setdefault("simulation", {})["use_gpu"] = True
+target.write_text(json.dumps(config, indent=2) + "\n")
+'
+
+# Run the generated config (remove configs/gaussian_shift_gpu.json afterward if desired)
+uv run --no-sync --no-build tattletots --config configs/gaussian_shift_gpu.json --steps 1 --verbose
 ```
 
 When `use_gpu: true`, all array math (compression SVD, attention softmax, niche overlap) dispatches to CuPy. Falls back to NumPy silently if CuPy is unavailable or no CUDA device is found.
