@@ -208,40 +208,75 @@ When `use_gpu: true`, all array math (compression SVD, attention softmax, niche 
 ### Parameter Scans
 
 For large sweeps across parameter space, use a domain repository's wrapper with
-shell parallelism. The wrapper commands below run from that domain repository;
-the configuration-generation command runs from `TattleTots/` and writes
-configurations that must be available in the domain repository.
+shell parallelism. The configuration-generation block below runs from
+`TattleTots/` and copies configurations into the selected domain repository;
+the sweep block runs from that domain repository.
 
 ```bash
 # From the relevant domain repository: single run with JSON output
 uv run --no-sync --no-build python scripts/run_with_tattletots.py --config configs/tattletots_integration.json --output results.json
 ```
 
-To generate a scan configuration, run this from `TattleTots/`, then make the
-generated file available under the domain repository's `configs/scan/` directory:
+To generate a modest 2 × 2 scan, run this block from `TattleTots/`. Set
+`DOMAIN_REPO` to the domain repository you want to exercise; the generated
+configurations are copied into its `configs/scan/` directory:
 
 ```bash
-uv run --no-sync --no-build python -c '
+DOMAIN_REPO=../Coral-Key-in-Three-Hour-Epochs
+mkdir -p "$DOMAIN_REPO/configs/scan"
+for rate in 0.1 0.2; do
+  for seed in 1 2; do
+    RATE="$rate" SEED="$seed" uv run --no-sync --no-build python -c '
 import json
+import os
 from pathlib import Path
 
 cfg = json.load(open("configs/gaussian_shift_default.json"))
-cfg["simulation"]["mutation_rate"] = 0.1
-cfg["simulation"]["seed"] = 1
+cfg["simulation"]["mutation_rate"] = float(os.environ["RATE"])
+cfg["simulation"]["seed"] = int(os.environ["SEED"])
 scan_dir = Path("configs/scan")
 scan_dir.mkdir(parents=True, exist_ok=True)
-with (scan_dir / "mr0.1_s1.json").open("w") as output:
+rate = os.environ["RATE"]
+seed = os.environ["SEED"]
+name = f"mr{rate}_s{seed}.json"
+with (scan_dir / name).open("w") as output:
     json.dump(cfg, output)
 '
+    cp "configs/scan/mr${rate}_s${seed}.json" \
+      "$DOMAIN_REPO/configs/scan/mr${rate}_s${seed}.json"
+  done
+done
 ```
 
-From the relevant domain repository, run the generated configuration:
+From the selected domain repository, run the generated configurations in parallel:
 
 ```bash
 mkdir -p results
-uv run --no-sync --no-build python scripts/run_with_tattletots.py \
-  --config "configs/scan/mr0.1_s1.json" \
-  --output "results/mr0.1_s1.json"
+for rate in 0.1 0.2; do
+  for seed in 1 2; do
+    uv run --no-sync --no-build python scripts/run_with_tattletots.py \
+      --config "configs/scan/mr${rate}_s${seed}.json" \
+      --seed "$seed" \
+      --epochs 3 \
+      --output "results/mr${rate}_s${seed}.json" &
+  done
+done
+wait
+```
+
+Confirm that every generated result is a valid `SimulationOutput`:
+
+```bash
+uv run --no-sync --no-build python -c '
+from pathlib import Path
+from tattletots.output_schema import SimulationOutput
+
+results = sorted(Path("results").glob("mr*_s*.json"))
+assert len(results) == 4, results
+for path in results:
+    SimulationOutput.model_validate_json(path.read_text())
+print(f"validated {len(results)} scan results")
+'
 ```
 
 All output files conform to `tattletots.output_schema.SimulationOutput`, so results can be loaded and compared programmatically:
