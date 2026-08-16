@@ -624,6 +624,7 @@ class World:
             model,
             combined,
             raw_anomaly=raw_anomaly,
+            score_units=self.config.escalation_calibration_in_score_units,
         )
         agent.state.last_anomaly_score = anomaly
         agent.state.last_inferred_location = infer_spatial_location(

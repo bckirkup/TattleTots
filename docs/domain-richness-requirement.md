@@ -177,7 +177,12 @@ remaining levers by expected value:
    ordinary arm, so the response gate stays shut and neither clause clears;
 2. calibrate the escalation threshold to the agent's own anomaly distribution (worth up
    to ~21× in `k` at no cost in population: the oracle policy escalates on 78% of adult
-   steps in the same worlds against the evolved arm's 3.67%);
+   steps in the same worlds against the evolved arm's 3.67%) — done and measured in
+   `docs/threshold-calibration-measurement.md`: the adaptive modes were calibrated in raw
+   anomaly units while being compared against normalized scores, and fixing that plus a
+   low starting quantile takes `k` to 9.2 reports per adult lifetime and the silent-adult
+   share to 26%, but `b` stays at +0.02..+0.07 and clause 2 clears in 0/20 seeds, so `k`
+   is no longer a binding term anywhere;
 3. run designed-reporter arms in Scrapiron and Xylella to establish whether their
    ceilings clear their nulls at all;
 4. only then consider raising `N_e` — and if so, to ~250, not to Trantor.

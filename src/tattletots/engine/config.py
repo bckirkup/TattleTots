@@ -106,6 +106,16 @@ class SimulationConfig(BaseModel):
             "penalty is flat, independent of the precision the instrument makes reachable."
         ),
     )
+    escalation_calibration_in_score_units: bool = Field(
+        default=False,
+        description=(
+            "Calibrate adaptive escalation thresholds against the normalized anomaly "
+            "scores they are compared with, instead of against the raw anomaly window "
+            "whose scale is set by the compression model. At False (default) the "
+            "adaptive quantile and volatility modes mix units: they return a raw-scale "
+            "number that `should_escalate` compares against a 0-1 score."
+        ),
+    )
     reproduction_merit_ordering: bool = Field(
         default=False,
         description=(
