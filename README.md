@@ -223,16 +223,22 @@ generated file available under the domain repository's `configs/scan/` directory
 ```bash
 uv run --no-sync --no-build python -c '
 import json
+from pathlib import Path
+
 cfg = json.load(open("configs/gaussian_shift_default.json"))
 cfg["simulation"]["mutation_rate"] = 0.1
 cfg["simulation"]["seed"] = 1
-json.dump(cfg, open("configs/scan/mr0.1_s1.json", "w"))
+scan_dir = Path("configs/scan")
+scan_dir.mkdir(parents=True, exist_ok=True)
+with (scan_dir / "mr0.1_s1.json").open("w") as output:
+    json.dump(cfg, output)
 '
 ```
 
 From the relevant domain repository, run the generated configuration:
 
 ```bash
+mkdir -p results
 uv run --no-sync --no-build python scripts/run_with_tattletots.py \
   --config "configs/scan/mr0.1_s1.json" \
   --output "results/mr0.1_s1.json"
