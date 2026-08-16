@@ -171,7 +171,10 @@ no scaffolding is added, and neither falsification clause is claimed. It reorder
 remaining levers by expected value:
 
 1. reprice false alarms against the instrument's reachable precision (raises `b`, the
-   highest-leverage term, and the cause of the current binding failure);
+   highest-leverage term, and the cause of the current binding failure) — done and
+   measured in `docs/false-alarm-pricing-measurement.md`: it raises `k` 7× (0.45 → 3.3
+   reports per adult lifetime) and doubles adult lifespan, but leaves `b` at +0.04 in the
+   ordinary arm, so the response gate stays shut and neither clause clears;
 2. calibrate the escalation threshold to the agent's own anomaly distribution (worth up
    to ~21× in `k` at no cost in population: the oracle policy escalates on 78% of adult
    steps in the same worlds against the evolved arm's 3.67%);
