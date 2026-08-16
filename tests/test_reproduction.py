@@ -22,14 +22,28 @@ def _adult(information: float, attention: float) -> Agent:
     )
 
 
-def _cap_config(*, merit_ordering: bool, population: int, cap: int) -> SimulationConfig:
+def _cap_config(
+    *,
+    merit_ordering: bool,
+    population: int,
+    cap: int,
+    correctness_weight: float = 0.0,
+) -> SimulationConfig:
     return SimulationConfig(
         initial_population=population,
         max_population=cap,
         recombination_probability=0.0,
         reproduction_merit_ordering=merit_ordering,
+        reproduction_correctness_weight=correctness_weight,
         seed=42,
     )
+
+
+def _reporter(*, information: float, attention: float, reports: int, correct: int) -> Agent:
+    agent = _adult(information=information, attention=attention)
+    agent.state.reports_issued = reports
+    agent.state.correct_reports = correct
+    return agent
 
 
 def test_binding_cap_rations_by_creation_order_by_default() -> None:
@@ -61,6 +75,86 @@ def test_merit_ordering_does_not_change_which_agents_are_eligible() -> None:
     offspring = attempt_reproduction(agents, unconstrained, np.random.default_rng(42))
 
     assert {child.state.parent_ids[0] for child in offspring} == {a.id for a in agents}
+
+
+def _accurate_last() -> list[Agent]:
+    """Four eligible parents whose reserve order is the reverse of their correctness."""
+    return [
+        _reporter(information=8.0, attention=8.0, reports=8, correct=0),
+        _reporter(information=6.0, attention=6.0, reports=8, correct=2),
+        _reporter(information=4.0, attention=4.0, reports=8, correct=5),
+        _reporter(information=2.0, attention=2.0, reports=8, correct=8),
+    ]
+
+
+def test_correctness_weight_defaults_to_the_reserves_only_ordering() -> None:
+    """At the default weight a binding cap still goes to the best-provisioned parents."""
+    parents = _accurate_last()
+    config = _cap_config(merit_ordering=True, population=4, cap=6)
+
+    offspring = attempt_reproduction(parents, config, np.random.default_rng(42))
+
+    assert [child.state.parent_ids[0] for child in offspring] == [parents[0].id, parents[1].id]
+
+
+def test_full_correctness_weight_gives_the_cap_to_the_most_accurate_parents() -> None:
+    parents = _accurate_last()
+    config = _cap_config(merit_ordering=True, population=4, cap=6, correctness_weight=1.0)
+
+    offspring = attempt_reproduction(parents, config, np.random.default_rng(42))
+
+    assert [child.state.parent_ids[0] for child in offspring] == [parents[3].id, parents[2].id]
+
+
+@pytest.mark.parametrize("weight", [0.0, 0.25, 0.5, 0.75, 1.0])
+def test_reproductive_share_of_accurate_parents_is_graded_in_the_weight(weight: float) -> None:
+    """Correctness rank displaces reserve rank progressively, not all at once."""
+    parents = _accurate_last()
+    config = _cap_config(merit_ordering=True, population=4, cap=6, correctness_weight=weight)
+
+    offspring = attempt_reproduction(parents, config, np.random.default_rng(42))
+    accurate_ids = {parents[2].id, parents[3].id}
+    accurate_share = sum(
+        1 for child in offspring if child.state.parent_ids[0] in accurate_ids
+    ) / len(offspring)
+
+    assert 0.0 <= accurate_share <= 1.0
+    if weight <= 0.25:
+        assert accurate_share == pytest.approx(0.0)
+    if weight >= 0.75:
+        assert accurate_share == pytest.approx(1.0)
+
+
+def test_one_lucky_report_does_not_outrank_a_sustained_reporter() -> None:
+    """Shrinkage keeps a 1/1 record below a longer record of the same accuracy."""
+    lucky = _reporter(information=2.0, attention=2.0, reports=1, correct=1)
+    sustained = _reporter(information=2.0, attention=2.0, reports=8, correct=8)
+    config = _cap_config(merit_ordering=True, population=2, cap=3, correctness_weight=1.0)
+
+    offspring = attempt_reproduction([lucky, sustained], config, np.random.default_rng(42))
+
+    assert len(offspring) == 1
+    assert offspring[0].state.parent_ids == [sustained.id]
+
+
+def test_silent_parents_rank_below_any_correct_reporter() -> None:
+    silent = _reporter(information=8.0, attention=8.0, reports=0, correct=0)
+    correct = _reporter(information=2.0, attention=2.0, reports=4, correct=3)
+    config = _cap_config(merit_ordering=True, population=2, cap=3, correctness_weight=1.0)
+
+    offspring = attempt_reproduction([silent, correct], config, np.random.default_rng(42))
+
+    assert len(offspring) == 1
+    assert offspring[0].state.parent_ids == [correct.id]
+
+
+def test_correctness_weight_does_not_change_which_agents_are_eligible() -> None:
+    parents = _accurate_last()
+    unconstrained = _cap_config(merit_ordering=True, population=4, cap=100, correctness_weight=1.0)
+
+    offspring = attempt_reproduction(parents, unconstrained, np.random.default_rng(42))
+
+    assert {child.state.parent_ids[0] for child in offspring} == {a.id for a in parents}
 
 
 def test_sufficiency_still_discriminates_between_solvent_agents() -> None:
