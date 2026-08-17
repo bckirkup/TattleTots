@@ -29,6 +29,7 @@ def _run(
     seed: int = 42,
     correct_report_attention_value: float = 0.0,
     false_alarm_break_even_precision: float | None = None,
+    recruitment_share: float = 1.0,
 ) -> tuple[World, PayoffLedger]:
     adapter = SparseSensorScenario(seed=seed, total_steps=_STEPS)
     config = SimulationConfig(
@@ -39,6 +40,7 @@ def _run(
         grounded_input_fraction=0.67,
         correct_report_attention_value=correct_report_attention_value,
         false_alarm_break_even_precision=false_alarm_break_even_precision,
+        reproduction_recruitment_share=recruitment_share,
     )
     world = World(config=config)
     for stream in adapter.get_streams():
@@ -73,6 +75,21 @@ def test_ledger_metrics_are_bounded_and_finite() -> None:
     assert math.isfinite(summary["mean_information_share_of_reserves"])
     for share in summary["reproduction_gate"].values():
         assert 0.0 <= share <= 1.0
+
+
+def test_restricting_recruitment_lowers_the_run_s_lineage_output() -> None:
+    """The recruitment share grades how much reproduction the run affords at all."""
+    totals = []
+    for share in (1.0, 0.5, 0.1):
+        _, ledger = _run(recruitment_share=share)
+        summary = ledger.coupling_summary()
+        assert summary["reproductive_excess"] >= 1.0
+        assert 0.0 <= summary["slot_limited_step_share"] <= 1.0
+        assert math.isfinite(summary["opportunity_for_selection"])
+        assert summary["opportunity_for_selection"] >= 0.0
+        totals.append(sum(record.offspring for record in ledger.records))
+
+    assert totals[0] > totals[1] > totals[2]
 
 
 def test_ledger_conserves_offspring_and_report_counts() -> None:

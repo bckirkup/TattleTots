@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from tattletots.engine.reproduction import recruitment_allowance
 from tattletots.models.agent import Agent, LifecycleStage
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -133,6 +134,24 @@ class ReproductionGate:
     information_limited_agent_steps: int = 0
     population_capped_steps: int = 0
     steps: int = 0
+    recruitment_slots: int = 0
+    slot_limited_steps: int = 0
+
+    @property
+    def reproductive_excess(self) -> float:
+        """Eligible parents per recruitment slot the environment could afford.
+
+        At 1.0 every eligible parent recruits, so an ordering over parents cannot
+        change lineage output; above 1.0 the ordering decides who reproduces at all.
+        """
+        if self.recruitment_slots == 0:
+            return float(self.eligible_agent_steps)
+        return self.eligible_agent_steps / self.recruitment_slots
+
+    @property
+    def slot_limited_step_share(self) -> float:
+        """Share of steps on which eligible parents outnumbered recruitment slots."""
+        return self.slot_limited_steps / max(self.steps, 1)
 
     def as_dict(self) -> dict[str, float]:
         """Shares of agent-steps in each reproduction-gating condition."""
@@ -143,6 +162,7 @@ class ReproductionGate:
             "attention_limited_share": self.attention_limited_agent_steps / agent_steps,
             "information_limited_share": self.information_limited_agent_steps / agent_steps,
             "population_capped_step_share": self.population_capped_steps / max(self.steps, 1),
+            "slot_limited_step_share": self.slot_limited_step_share,
         }
 
 
@@ -173,6 +193,20 @@ def _precision(record: AgentPayoffRecord) -> float:
 
 def _mean(values: list[float]) -> float:
     return float(np.mean(values)) if values else 0.0
+
+
+def _opportunity_for_selection(offspring: list[float]) -> float:
+    """Crow's index `var(offspring) / mean(offspring)^2` over the scored adults.
+
+    It is the ceiling on any fitness correlation: a population where lineage output
+    barely varies cannot express a heritable advantage however well it is ranked.
+    """
+    if not offspring:
+        return 0.0
+    mean = float(np.mean(offspring))
+    if math.isclose(mean, 0.0, abs_tol=1e-12):
+        return 0.0
+    return float(np.var(offspring)) / (mean * mean)
 
 
 def _slope(xs: list[float], ys: list[float]) -> float:
@@ -218,6 +252,7 @@ class PayoffLedger:
         self.gate.steps += 1
         if len(living) >= world.config.max_population:
             self.gate.population_capped_steps += 1
+        self._observe_recruitment(living, world)
 
         for agent in living:
             record = self._record_for(agent)
@@ -233,6 +268,22 @@ class PayoffLedger:
                 record.trust_samples += user.get_trust(agent.id)
                 record.trust_observations += 1
             self._observe_gate(agent, world)
+
+    def _observe_recruitment(self, living: list[Agent], world: World) -> None:
+        """Record how many eligible parents competed for how many recruitment slots.
+
+        The slots are what the step could actually afford: the room left under the
+        population cap, further limited by the recruitment share. Comparing them with
+        the eligible parents gives the reproductive excess an ordering can act on.
+        """
+        eligible = sum(1 for agent in living if agent.can_reproduce)
+        if eligible == 0:
+            return
+        headroom = max(world.config.max_population - len(living), 0)
+        slots = min(headroom, recruitment_allowance(eligible, world.config))
+        self.gate.recruitment_slots += slots
+        if eligible > slots:
+            self.gate.slot_limited_steps += 1
 
     def _observe_gate(self, agent: Agent, world: World) -> None:
         config = world.config
@@ -384,6 +435,10 @@ class PayoffLedger:
                 [record.attention_income_per_step for record in incorrect_group]
             ),
             "reproduction_gate": self.gate.as_dict(),
+            "reproductive_excess": self.gate.reproductive_excess,
+            "slot_limited_step_share": self.gate.slot_limited_step_share,
+            "mean_offspring": _mean(offspring),
+            "opportunity_for_selection": _opportunity_for_selection(offspring),
             **self._falsification_summary(adults),
         }
 

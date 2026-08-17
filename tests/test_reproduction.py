@@ -157,6 +157,72 @@ def test_correctness_weight_does_not_change_which_agents_are_eligible() -> None:
     assert {child.state.parent_ids[0] for child in offspring} == {a.id for a in parents}
 
 
+def _share_config(share: float, *, correctness_weight: float = 1.0) -> SimulationConfig:
+    return SimulationConfig(
+        initial_population=8,
+        max_population=100,
+        recombination_probability=0.0,
+        reproduction_merit_ordering=True,
+        reproduction_correctness_weight=correctness_weight,
+        reproduction_recruitment_share=share,
+        seed=42,
+    )
+
+
+@pytest.mark.parametrize(
+    ("share", "expected"),
+    [(1.0, 8), (0.5, 4), (0.25, 2), (0.1, 1)],
+)
+def test_recruitment_share_grades_how_many_eligible_parents_reproduce(
+    share: float, expected: int
+) -> None:
+    """Fewer eligible parents recruit as the share falls, with the cap far away."""
+    parents = [_adult(information=2.0 + i, attention=2.0 + i) for i in range(8)]
+
+    offspring = attempt_reproduction(parents, _share_config(share), np.random.default_rng(42))
+
+    assert len(offspring) == expected
+
+
+def test_recruitment_share_defaults_to_unlimited_recruitment() -> None:
+    parents = [_adult(information=2.0 + i, attention=2.0 + i) for i in range(8)]
+    default = SimulationConfig(
+        initial_population=8, max_population=100, recombination_probability=0.0, seed=42
+    )
+
+    assert default.reproduction_recruitment_share == pytest.approx(1.0)
+    offspring = attempt_reproduction(parents, default, np.random.default_rng(42))
+    assert len(offspring) == len(parents)
+
+
+def test_a_scarce_recruitment_share_goes_to_the_most_accurate_parents() -> None:
+    """With reproduction scarce, correctness rank decides who reproduces at all."""
+    parents = _accurate_last()
+
+    offspring = attempt_reproduction(parents, _share_config(0.5), np.random.default_rng(42))
+
+    assert [child.state.parent_ids[0] for child in offspring] == [parents[3].id, parents[2].id]
+
+
+def test_recruitment_share_never_starves_a_population_with_an_eligible_parent() -> None:
+    """Rounding up keeps one recruit, so a small share cannot force extinction."""
+    parents = [_adult(information=4.0, attention=4.0)]
+
+    offspring = attempt_reproduction(parents, _share_config(0.01), np.random.default_rng(42))
+
+    assert len(offspring) == 1
+
+
+def test_recruitment_share_stays_within_the_population_cap() -> None:
+    parents = [_adult(information=2.0 + i, attention=2.0 + i) for i in range(8)]
+    capped = _share_config(1.0)
+    capped = capped.model_copy(update={"max_population": 10})
+
+    offspring = attempt_reproduction(parents, capped, np.random.default_rng(42))
+
+    assert len(offspring) == 2
+
+
 def test_sufficiency_still_discriminates_between_solvent_agents() -> None:
     lean = _adult(information=2.0, attention=2.0)
     rich = _adult(information=8.0, attention=8.0)
