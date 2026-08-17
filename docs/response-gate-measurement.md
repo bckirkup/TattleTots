@@ -107,6 +107,11 @@ of the ordering key. That is the quantity to attack next if clause 2 matters: re
 excess, i.e. the share of eligible agents the environment can actually afford, is the term
 that converts an ordering advantage into a heritable reproductive one.
 
+[`docs/reproductive-excess-measurement.md`](reproductive-excess-measurement.md) measured
+that prediction and refuted it: per-step recruitment is already scarce 31.7:1 at the
+default, because the room left under the cap binds before the eligibility rule does, and
+forcing it to 77:1 leaves offspring per adult unchanged.
+
 Correctness heritability is unchanged by the lever (+0.12…+0.17 across all arms and seed
 blocks), which is what it should be: the lever changes who reproduces, not how faithfully a
 genome transmits.

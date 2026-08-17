@@ -48,6 +48,8 @@ def _dose_options(measure: ModuleType, value: float, args: argparse.Namespace) -
         extra_config["escalation_calibration_in_score_units"] = True
     if args.correctness_weight > 0.0:
         extra_config["reproduction_correctness_weight"] = args.correctness_weight
+    if args.recruitment_share < 1.0:
+        extra_config["reproduction_recruitment_share"] = args.recruitment_share
     gene_pool = (
         {"escalation_threshold_range": list(args.threshold_range)}
         if args.threshold_range is not None
@@ -104,6 +106,15 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--recruitment-share",
+        type=float,
+        default=1.0,
+        help=(
+            "Share of the step's eligible parents allowed to recruit an offspring, the "
+            "reproductive excess an ordering over parents can act on."
+        ),
+    )
+    parser.add_argument(
         "--threshold-range",
         type=float,
         nargs=2,
@@ -125,6 +136,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         precision_corrs: list[float] = []
         rates: list[float] = []
         reports_per_adult: list[float] = []
+        excess: list[float] = []
+        opportunity: list[float] = []
         for seed in args.seeds:
             run = measure.measure_run("ordinary", args.grounded_fraction, seed, options)
             coupling = run["coupling"]
@@ -133,6 +146,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             precision_corrs.append(coupling["corr_parent_child_precision"])
             rates.append(run["correct_report_rate"])
             reports_per_adult.append(coupling["mean_reports_per_adult"])
+            excess.append(coupling["reproductive_excess"])
+            opportunity.append(coupling["opportunity_for_selection"])
         n = len(args.seeds)
         print(
             f"correct_report_attention_value={value:g} "
@@ -140,9 +155,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"score_units={args.score_units} "
             f"threshold_range={args.threshold_range} "
             f"correctness_weight={args.correctness_weight:g} "
+            f"recruitment_share={args.recruitment_share:g} "
             f"correct-report rate={float(np.mean(rates)):.2%}\n"
             f"  reports/adult lifetime: "
             f"{float(np.mean(reports_per_adult)):.2f}\n"
+            f"  reproductive excess: {float(np.mean(excess)):.2f} eligible/slot, "
+            f"opportunity for selection I={float(np.mean(opportunity)):.3f}\n"
             f"  clause 1 (within-run rise): mean slope {float(np.mean(slopes)):+.4f}/generation, "
             f"rising in {sum(1 for s in slopes if s > 0)}/{n} seeds\n"
             f"  clause 2 (parent-child offspring r > {_CORRELATION_CLAUSE}): "

@@ -140,6 +140,21 @@ class SimulationConfig(BaseModel):
             "correct."
         ),
     )
+    reproduction_recruitment_share: float = Field(
+        default=1.0,
+        gt=0.0,
+        le=1.0,
+        description=(
+            "Share of the eligible parents that may recruit an offspring on one step, "
+            "the reproductive excess the environment imposes. At 1.0 (default) every "
+            "eligible parent reproduces until the population cap binds, so an ordering "
+            "over parents only decides who reproduces first on the minority of steps "
+            "where the cap is reached. Below 1.0 the step's recruitment is limited to "
+            "that share of the eligible parents, so the ordering decides who reproduces "
+            "at all. This is a limit on recruitment, not a payment: it removes "
+            "reproduction from low-ranked parents and gives nothing to anyone."
+        ),
+    )
     recombination_probability: float = Field(
         default=0.3,
         ge=0.0,

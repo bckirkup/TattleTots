@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 
 from tattletots.engine.config import SimulationConfig
@@ -34,8 +36,11 @@ def attempt_reproduction(
         eligible = _merit_ordered(eligible, config)
 
     current_pop = len([a for a in agents if a.is_alive])
+    allowance = recruitment_allowance(len(eligible), config)
 
     for parent in eligible:
+        if len(offspring) >= allowance:
+            break
         if current_pop + len(offspring) >= config.max_population:
             break
 
@@ -61,6 +66,19 @@ def attempt_reproduction(
         offspring.append(child)
 
     return offspring
+
+
+def recruitment_allowance(eligible_count: int, config: SimulationConfig) -> int:
+    """How many of this step's eligible parents may recruit an offspring.
+
+    Reproductive excess is what makes an ordering over parents consequential: if every
+    eligible parent reproduces, rank decides only the order of arrival. The share is
+    rounded up so a population with any eligible parent keeps at least one recruit,
+    rather than going extinct because the share is small.
+    """
+    if config.reproduction_recruitment_share >= 1.0:
+        return eligible_count
+    return max(1, math.ceil(config.reproduction_recruitment_share * eligible_count))
 
 
 def _merit_ordered(eligible: list[Agent], config: SimulationConfig) -> list[Agent]:
