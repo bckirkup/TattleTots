@@ -115,6 +115,15 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--attention-budget-scale",
+        type=float,
+        default=1.0,
+        help=(
+            "Scale on every user's attention budget, the mortality pressure an adult "
+            "faces while it waits for a recruitment slot."
+        ),
+    )
+    parser.add_argument(
         "--threshold-range",
         type=float,
         nargs=2,
@@ -138,9 +147,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         reports_per_adult: list[float] = []
         excess: list[float] = []
         opportunity: list[float] = []
+        persistence: list[float] = []
+        rank_lifespan: list[float] = []
+        childless: list[float] = []
         for seed in args.seeds:
-            run = measure.measure_run("ordinary", args.grounded_fraction, seed, options)
+            run = measure.measure_run(
+                "ordinary",
+                args.grounded_fraction,
+                seed,
+                options,
+                attention_budget_scale=args.attention_budget_scale,
+            )
             coupling = run["coupling"]
+            persistence.append(coupling["rank_persistence"])
+            rank_lifespan.append(coupling["corr_rank_adult_steps"])
+            childless.append(coupling["childless_adult_share"])
             slopes.append(coupling["precision_generation_slope"])
             offspring_corrs.append(coupling["corr_parent_child_offspring"])
             precision_corrs.append(coupling["corr_parent_child_precision"])
@@ -156,7 +177,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"threshold_range={args.threshold_range} "
             f"correctness_weight={args.correctness_weight:g} "
             f"recruitment_share={args.recruitment_share:g} "
+            f"attention_budget_scale={args.attention_budget_scale:g} "
             f"correct-report rate={float(np.mean(rates)):.2%}\n"
+            f"  rank persistence: {float(np.mean(persistence)):+.3f}, "
+            f"rank -> adult lifespan: {float(np.mean(rank_lifespan)):+.3f}, "
+            f"childless adults: {float(np.mean(childless)):.2%}\n"
             f"  reports/adult lifetime: "
             f"{float(np.mean(reports_per_adult)):.2f}\n"
             f"  reproductive excess: {float(np.mean(excess)):.2f} eligible/slot, "

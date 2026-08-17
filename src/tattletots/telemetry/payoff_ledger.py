@@ -13,12 +13,16 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from tattletots.engine.reproduction import recruitment_allowance
+from tattletots.engine.reproduction import (
+    fractional_ranks,
+    recruitment_allowance,
+    verified_correctness,
+)
 from tattletots.models.agent import Agent, LifecycleStage
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -47,6 +51,36 @@ class AgentPayoffRecord:
     final_information_energy: float = 0.0
     final_attention_energy: float = 0.0
     offspring: int = 0
+    eligible_steps: int = 0
+    alive_at_end: bool = False
+    rank_history: list[float] = field(default_factory=list)
+
+    @property
+    def mean_correctness_rank(self) -> float:
+        """Mean rank in verified correctness across this agent's adult steps.
+
+        The rank is the same quantity the reproduction ordering sorts on, so it is what
+        an adult's reproductive prospects were worth while it was alive.
+        """
+        if not self.rank_history:
+            return 0.0
+        return float(np.mean(self.rank_history))
+
+    @property
+    def early_rank(self) -> float:
+        """Mean correctness rank over the first half of this agent's adult life."""
+        half = len(self.rank_history) // 2
+        if half == 0:
+            return 0.0
+        return float(np.mean(self.rank_history[:half]))
+
+    @property
+    def late_rank(self) -> float:
+        """Mean correctness rank over the second half of this agent's adult life."""
+        half = len(self.rank_history) // 2
+        if half == 0:
+            return 0.0
+        return float(np.mean(self.rank_history[half:]))
 
     @property
     def mean_user_trust(self) -> float:
@@ -120,6 +154,9 @@ class AgentPayoffRecord:
             "mean_correct_report_value": self.mean_correct_report_value,
             "realized_break_even_precision": self.realized_break_even_precision,
             "offspring": self.offspring,
+            "eligible_steps": self.eligible_steps,
+            "alive_at_end": self.alive_at_end,
+            "mean_correctness_rank": self.mean_correctness_rank,
         }
 
 
@@ -253,6 +290,7 @@ class PayoffLedger:
         if len(living) >= world.config.max_population:
             self.gate.population_capped_steps += 1
         self._observe_recruitment(living, world)
+        self._observe_ranks(living)
 
         for agent in living:
             record = self._record_for(agent)
@@ -285,11 +323,26 @@ class PayoffLedger:
         if eligible > slots:
             self.gate.slot_limited_steps += 1
 
+    def _observe_ranks(self, living: list[Agent]) -> None:
+        """Record every living adult's rank in verified correctness on this step.
+
+        Ranking over all living adults rather than over this step's eligible parents
+        keeps the series comparable across steps and includes the adults that were
+        waiting for eligibility, which is where an unrewarded merit advantage would sit.
+        """
+        adults = [agent for agent in living if agent.state.lifecycle == LifecycleStage.ADULT]
+        if not adults:
+            return
+        ranks = fractional_ranks([verified_correctness(agent) for agent in adults])
+        for agent, rank in zip(adults, ranks, strict=True):
+            self._record_for(agent).rank_history.append(rank)
+
     def _observe_gate(self, agent: Agent, world: World) -> None:
         config = world.config
         self.gate.agent_steps += 1
         if agent.can_reproduce:
             self.gate.eligible_agent_steps += 1
+            self._record_for(agent).eligible_steps += 1
         factor = agent.reproduction_limiting_factor(
             config.reproduction_coupling_strength,
             config.reproduction_information_scale,
@@ -326,6 +379,7 @@ class PayoffLedger:
             record.false_alarms = agent.state.false_alarms
             record.final_information_energy = agent.state.energy.information
             record.final_attention_energy = agent.state.energy.attention
+            record.alive_at_end = agent.is_alive
         for agent in world.agents.values():
             for parent_id in agent.state.parent_ids:
                 parent = self._records.get(parent_id)
@@ -439,7 +493,58 @@ class PayoffLedger:
             "slot_limited_step_share": self.gate.slot_limited_step_share,
             "mean_offspring": _mean(offspring),
             "opportunity_for_selection": _opportunity_for_selection(offspring),
+            **self._rank_mortality_summary(adults),
             **self._falsification_summary(adults),
+        }
+
+    def _rank_mortality_summary(self, adults: list[AgentPayoffRecord]) -> dict[str, Any]:
+        """Whether reproductive rank is coupled to mortality and to lifetime output.
+
+        An ordering over parents only produces differential lineage output if a low-ranked
+        adult can die before its turn arrives. That needs two things this block measures:
+        rank has to persist over an adult's life (an early-life rank that predicts its
+        late-life rank), and death has to arrive while a low-ranked adult is still waiting,
+        which shows up as childless adults being lower-ranked and shorter-lived than the
+        adults that did reproduce.
+        """
+        ranks = [record.mean_correctness_rank for record in adults]
+        offspring = [float(record.offspring) for record in adults]
+        adult_steps = [float(record.adult_steps) for record in adults]
+        childless = [record for record in adults if record.offspring == 0]
+        parents = [record for record in adults if record.offspring > 0]
+        persistence_group = [record for record in adults if len(record.rank_history) >= 4]
+        corr_rank_offspring = _pearson(ranks, offspring)
+        corr_steps_offspring = _pearson(adult_steps, offspring)
+        return {
+            "childless_adult_share": len(childless) / len(adults),
+            "childless_mean_rank": _mean([record.mean_correctness_rank for record in childless]),
+            "parent_mean_rank": _mean([record.mean_correctness_rank for record in parents]),
+            "childless_mean_adult_steps": _mean(
+                [float(record.adult_steps) for record in childless]
+            ),
+            "parent_mean_adult_steps": _mean([float(record.adult_steps) for record in parents]),
+            "childless_mean_eligible_steps": _mean(
+                [float(record.eligible_steps) for record in childless]
+            ),
+            "parent_mean_eligible_steps": _mean(
+                [float(record.eligible_steps) for record in parents]
+            ),
+            "childless_never_eligible_share": (
+                sum(1 for record in childless if record.eligible_steps == 0) / len(childless)
+                if childless
+                else 0.0
+            ),
+            "died_adult_share": sum(1 for record in adults if not record.alive_at_end)
+            / len(adults),
+            "rank_persistence": _pearson(
+                [record.early_rank for record in persistence_group],
+                [record.late_rank for record in persistence_group],
+            ),
+            "corr_rank_offspring": corr_rank_offspring,
+            "corr_rank_adult_steps": _pearson(ranks, adult_steps),
+            "corr_adult_steps_offspring": corr_steps_offspring,
+            "offspring_variance_share_from_rank": corr_rank_offspring**2,
+            "offspring_variance_share_from_lifespan": corr_steps_offspring**2,
         }
 
     def _falsification_summary(self, adults: list[AgentPayoffRecord]) -> dict[str, Any]:

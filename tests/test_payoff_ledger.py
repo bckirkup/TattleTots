@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import math
 
+import pytest
+
 from tattletots.engine.config import SimulationConfig
 from tattletots.engine.world import World
 from tattletots.scenarios.sparse_sensor import SparseSensorScenario
@@ -90,6 +92,55 @@ def test_restricting_recruitment_lowers_the_run_s_lineage_output() -> None:
         totals.append(sum(record.offspring for record in ledger.records))
 
     assert totals[0] > totals[1] > totals[2]
+
+
+def test_rank_mortality_metrics_are_bounded_and_finite() -> None:
+    """The rank telemetry has to stay in range whatever the run does to the population."""
+    _, ledger = _run()
+    summary = ledger.coupling_summary()
+
+    for key in ("childless_adult_share", "died_adult_share", "childless_never_eligible_share"):
+        assert 0.0 <= summary[key] <= 1.0
+    for key in ("childless_mean_rank", "parent_mean_rank"):
+        assert 0.0 <= summary[key] <= 1.0
+    for key in (
+        "rank_persistence",
+        "corr_rank_offspring",
+        "corr_rank_adult_steps",
+        "corr_adult_steps_offspring",
+    ):
+        assert -1.0 <= summary[key] <= 1.0
+    for key in ("offspring_variance_share_from_rank", "offspring_variance_share_from_lifespan"):
+        assert 0.0 <= summary[key] <= 1.0
+    assert math.isfinite(summary["childless_mean_eligible_steps"])
+
+
+def test_rank_history_tracks_adult_steps_and_splits_into_halves() -> None:
+    """Ranks are recorded once per adult step, so early and late life are comparable."""
+    _, ledger = _run()
+    adults = [record for record in ledger.records if record.adult_steps >= 4]
+
+    assert adults
+    for record in adults:
+        assert len(record.rank_history) == record.adult_steps
+        assert all(0.0 <= rank <= 1.0 for rank in record.rank_history)
+        assert record.mean_correctness_rank == pytest.approx(
+            sum(record.rank_history) / len(record.rank_history)
+        )
+        halves = (record.early_rank, record.late_rank)
+        assert all(0.0 <= half <= 1.0 for half in halves)
+
+
+def test_rank_history_is_empty_for_agents_that_never_reached_adulthood() -> None:
+    _, ledger = _run()
+    juveniles = [record for record in ledger.records if record.adult_steps == 0]
+
+    assert juveniles
+    for record in juveniles:
+        assert record.rank_history == []
+        assert record.mean_correctness_rank == pytest.approx(0.0)
+        assert record.early_rank == pytest.approx(0.0)
+        assert record.late_rank == pytest.approx(0.0)
 
 
 def test_ledger_conserves_offspring_and_report_counts() -> None:
