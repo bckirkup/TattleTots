@@ -6,7 +6,11 @@ import numpy as np
 import pytest
 
 from tattletots.engine.config import SimulationConfig
-from tattletots.engine.reproduction import attempt_reproduction
+from tattletots.engine.reproduction import (
+    attempt_reproduction,
+    fractional_ranks,
+    verified_correctness,
+)
 from tattletots.models.agent import Agent, AgentState, LifecycleStage
 from tattletots.models.energy import EnergyReserves
 from tattletots.models.genome import Genome
@@ -247,3 +251,31 @@ def test_attention_starved_agent_reproduces_less_than_solvent_agent() -> None:
 
     assert len(offspring) == 1
     assert offspring[0].state.parent_ids == [solvent.id]
+
+
+def test_fractional_ranks_grade_between_zero_and_one_and_share_ties() -> None:
+    """The merit ordering ranks on this, and telemetry reads the same ranks."""
+    ranks = fractional_ranks([0.0, 1.0, 4.0, 4.0])
+
+    assert ranks[0] == pytest.approx(0.0)
+    assert ranks[1] == pytest.approx(1.0 / 3.0)
+    assert ranks[2] == ranks[3] == pytest.approx(5.0 / 6.0)
+    assert all(0.0 <= rank <= 1.0 for rank in ranks)
+
+
+def test_fractional_ranks_of_a_lone_value_is_defined() -> None:
+    assert fractional_ranks([0.3]) == [1.0]
+
+
+def test_verified_correctness_rises_with_correct_reports_and_shrinks_short_records() -> None:
+    silent = _adult(information=2.0, attention=2.0)
+    lucky = _adult(information=2.0, attention=2.0)
+    lucky.state.reports_issued = 1
+    lucky.state.correct_reports = 1
+    sustained = _adult(information=2.0, attention=2.0)
+    sustained.state.reports_issued = 20
+    sustained.state.correct_reports = 12
+
+    assert verified_correctness(silent) == pytest.approx(0.0)
+    assert verified_correctness(lucky) < verified_correctness(sustained)
+    assert verified_correctness(sustained) < 12 / 20

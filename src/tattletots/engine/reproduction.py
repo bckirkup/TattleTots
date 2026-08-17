@@ -103,8 +103,8 @@ def _merit_ordered(eligible: list[Agent], config: SimulationConfig) -> list[Agen
     if weight <= 0.0:
         return sorted(eligible, key=sufficiency, reverse=True)
 
-    reserve_rank = _fractional_ranks([sufficiency(agent) for agent in eligible])
-    correctness_rank = _fractional_ranks([_verified_correctness(agent) for agent in eligible])
+    reserve_rank = fractional_ranks([sufficiency(agent) for agent in eligible])
+    correctness_rank = fractional_ranks([verified_correctness(agent) for agent in eligible])
     merit = {
         agent.id: (1.0 - weight) * reserve_rank[index] + weight * correctness_rank[index]
         for index, agent in enumerate(eligible)
@@ -112,17 +112,19 @@ def _merit_ordered(eligible: list[Agent], config: SimulationConfig) -> list[Agen
     return sorted(eligible, key=lambda a: merit[a.id], reverse=True)
 
 
-def _verified_correctness(agent: Agent) -> float:
+def verified_correctness(agent: Agent) -> float:
     """Verified-correct share of an agent's reports, shrunk toward zero.
 
     The pseudo-count keeps an agent with one lucky correct report from outranking a
-    sustained reporter, and leaves silent agents at zero rather than undefined.
+    sustained reporter, and leaves silent agents at zero rather than undefined. This is
+    the quantity the merit ordering ranks on, so telemetry reads it from here rather
+    than recomputing a variant of it.
     """
     reports = agent.state.reports_issued
     return agent.state.correct_reports / (reports + _CORRECTNESS_PRIOR_REPORTS)
 
 
-def _fractional_ranks(values: list[float]) -> list[float]:
+def fractional_ranks(values: list[float]) -> list[float]:
     """Rank each value in `[0, 1]`, largest value ranked 1.0, ties sharing a rank."""
     if len(values) < 2:
         return [1.0] * len(values)
